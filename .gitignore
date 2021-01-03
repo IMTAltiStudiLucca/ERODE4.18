@@ -23,11 +23,18 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 /.metadata/
-/it.imt.erode.crn.platform.linux32.feature/
-/it.imt.erode.crn.platform.win32.feature/
-/it.imt.erode.crn.product.linux32/
-/it.imt.erode.crn.product.win32/
-it.imt.erode.crn.product.macosx/bin/
+it.imt.erode.crn.platform.linux32.feature
+it.imt.erode.crn.platform.win32.feature
+it.imt.erode.crn.product.linux32
+it.imt.erode.crn.product.win32
+it.imt.erode.crn.product.macosx/bin
 it.imt.erode.crn.product.win64/bin/dummy
 it.imt.erode.crn.product/bin/dummy
-it.imt.erode.crn.ide/bin/
+it.imt.erode.crn.ide/bin
+
+it.imt.erode.crn.ide/bin
+it.imt.erode.crn.product.linux64/bin
+it.imt.erode.crn.product.macosx/bin
+it.imt.erode.crn.product.win64/bin
+it.imt.erode.crn.product/bin
+it.imt.erode.crn/bin
