@@ -1,0 +1,29 @@
+Manifest-Version: 1.0
+Automatic-Module-Name: it.imt.erode.crn.ui
+Bundle-ManifestVersion: 2
+Bundle-Name: it.imt.erode.crn.ui
+Bundle-Vendor: My Company
+Bundle-Version: 1.0.0.qualifier
+Bundle-SymbolicName: it.imt.erode.crn.ui; singleton:=true
+Bundle-ActivationPolicy: lazy
+Require-Bundle: it.imt.erode.crn,
+ it.imt.erode.crn.ide,
+ org.eclipse.xtext.ui,
+ org.eclipse.xtext.ui.shared,
+ org.eclipse.xtext.ui.codetemplates.ui,
+ org.eclipse.ui.editors;bundle-version="3.5.0",
+ org.eclipse.ui.ide;bundle-version="3.5.0",
+ org.eclipse.ui,
+ org.eclipse.compare,
+ org.eclipse.xtext.builder,
+ org.eclipse.ui.console,
+ org.eclipse.nebula.visualization.xygraph,
+ org.eclipse.draw2d,
+ org.eclipse.ui.navigator,
+ it.imt.erode
+Import-Package: org.apache.log4j
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Export-Package: it.imt.erode.crn.ui.quickfix,
+ it.imt.erode.crn.ui.contentassist,
+ it.imt.erode.crn.ui.internal
+Bundle-Activator: it.imt.erode.crn.ui.internal.CrnActivator
