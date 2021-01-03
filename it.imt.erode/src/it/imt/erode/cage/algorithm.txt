@@ -1,0 +1,1001 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%% BEGINNING OF THE ALGORITHM %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+    
+    
+
+    % For Debugging purposes only. Loads a precalculated set of BDEs and
+    % computes all emulations. 
+%     load('bdes_ncc-p.mat');    
+%     if(print_des == 1)        
+%         for i = 1 : size(bdes,1)
+%             % Print partitions in a human friendly format
+%             fprintf('\n====== BDE Partition %d =======================\n', i);
+%             javaMethod('printPartition', crnreducer, bdes(i,:));
+%             fprintf('\n==============================================\n');
+%         end
+%     end    
+%     % Search emulations
+%     if(exist('crnunion') == 1)        
+%         emuls = get_emuls(bdes,crnunion);    
+%         save('emuls.mat', 'emuls');        
+%     end         
+%     error('Manual stop');    
+
+
+
+    % If i refers to an artificial species, A(i,:) will be zero.
+    % The code below calculates the indices of artifical species that 
+    % mimick constants and eliminates the corresponding rows and columns.
+    const_spec = [];
+    for i = 1 : size(A,1)
+        if(isequal(A(i,:),zeros(1,n)))
+            const_spec = [const_spec, i];
+        end
+    end        
+    
+    for i = 1 : size(const_spec,2);
+        A(:,const_spec(i) - i + 1) = [];                
+        A(const_spec(i) - i + 1,:) = [];
+    end
+    n = size(A,2);
+
+    % For debugging purposes only
+    %load('bdes_simpncc.mat');    
+    %emuls = get_emuls(bdes,'CRNNetworks/simpncc_and_simpgw.crn');    
+    %save('emuls.mat', 'emuls');      
+    
+    
+    
+    % Calculate the (potentially complex) Jordan normal form of A
+    % A = sym(A);
+    startJordan=toc;
+    fprintf('jordan decomposition started\n');
+    [V,D] = jordan(A)        
+    endJordan=toc;
+    fprintf('jordan decomposition terminated in %d seconds\n',endJordan-startJordan);
+    
+%     [V1,T] = schur(A);
+%     fprintf('schur terminated');
+%     toc
+%     [V2,D] = jordan(T);
+%     fprintf('jordan terminated');
+%     toc
+%     V=V1*V2;
+%     fprintf('multiplication terminated');
+%     toc
+    
+
+    % Transform the potentially complex generalized eigenvectors into the
+    % corresponding real generalized eigenvectors  
+    [B,D] = get_real_gen_eig(V,D);  
+    
+    
+    % Calculate the partition underlying the generalized eigenspace
+    % decomposition
+    G = get_vector_part(diag(D));    
+    
+    save('b_and_d.mat', 'B', 'G');   
+    
+    % In the following, we calculate the set of guiding partitions gparts.
+    % It is such that for any BDE/FDE space U of dimension m there exist m
+    % partitions p_1,...p_m in gparts such that  = <v_{p_1},...,v_{p_m}>.
+    % This ensures that the second part of the algorithm finds *all*
+    % FDE/BDE partitions.
+    for i = 1 : size(G,1)
+        C = [];
+        for j = 1 : n            
+            if (G(i,j) == 1)
+                C = [C, B(:,j)];
+            end                        
+        end
+                
+        update_gparts(C);
+    end
+    
+    % In the case of a CRN with artificial species, we have to transform 
+    % the potential candidate vectors back into the long format.
+    if(~isempty(const_spec))
+        transform_gparts(n, const_spec);
+        n = n + size(const_spec,2);    
+    end
+
+    
+    % FDE/BDE partitions calculated so far    
+    des = 1:n; 
+    % FDE/BDE partitions which have to be used as initial conditions for the
+    % search of further FDE/BDE partitions
+    todo = [];
+  
+    % At the beginning, todo contains the coarsest DE partition
+    todo = [todo; H];
+    while (size(todo,1) > 0)
+        H = todo(size(todo,1),:);
+        todo(size(todo,1),:) = [];
+        
+        for k = 1 : size(gparts,1)
+            % Calculate the coarsest DE partition that refines H and
+            % gparts(k,:)
+            H_new = get_part_cut_wrt([gparts(k,:); H]);
+            H_new = get_coarsest(mode_bde, H_new, crnreducer);
+            
+            if(isequal(H,H_new))
+                continue;
+            end
+            
+            %If H_new is not in todo and is not in des, add it to todo            
+            [~,indx] = ismember(H_new,des,'rows');            
+            if(indx == 0)
+                % If H_new is not in des, check whether it is in todo. If
+                % not, add it.
+                if(isempty(todo))
+                    todo = [todo; H_new];                
+                else
+                    [~,indx] = ismember(H_new,todo,'rows');
+                    if(indx == 0)
+                        todo = [todo; H_new];                
+                    end
+                end 
+            end            
+        end
+        
+        %After H has been processed, add it to des
+        [~,indx] = ismember(H,des,'rows');
+        des = [des; H];
+    end
+    
+    % Sort and save des
+    des = sortrows(des);
+    save('des.mat', 'des');
+    
+    % Print DEs
+    if(print_des == 1)        
+        for i = 1 : size(des,1)
+            % Print partitions in a human friendly format
+            if(mode_bde == 1)
+                fprintf('\n====== BDE partition %d =======================\n', i);
+            else
+                fprintf('\n====== FDE partition %d =======================\n', i);            
+            end
+            
+            javaMethod('printPartition', crnreducer, des(i,:));
+            fprintf('\n==============================================\n');
+        end
+    end
+
+    
+    
+    % In the case we calculated BDEs and want now to check whether there is 
+    % an emulation to a smaller target network, the crnunion variable has
+    % to be initialized
+    if(mode_bde == 1 && strcmp(crnunion,'') == 0)        
+        emuls = get_emuls(des,crnunion);    
+        save('emuls.mat', 'emuls');        
+    end
+    
+    runtime = toc;
+    
+    
+    fprintf('\nThe analysis took %d seconds \n',runtime);
+end
+
+
+
+% Transforms the potential candidate partitions from short format (where
+% the artificial species are not present) into the long format (where the
+% artificial species are present). Constant species are collected into a 
+% separate block.
+function transform_gparts(n, const_spec)
+
+    global gparts
+
+    n_new = n + size(const_spec,2);
+    aux = zeros(1,n_new);          
+
+    for i = 1 : size(const_spec,2)
+        aux(const_spec(i)) = 1;        
+    end    
+    
+    tr_map = zeros(1,n);
+    aux_i = 1;
+    for i = 1 : n
+        while(aux(aux_i) == 1)
+            aux_i = aux_i + 1;
+        end
+        tr_map(i) = aux_i;
+        aux_i = aux_i + 1;
+    end
+    
+    tmp_gparts = gparts;
+    gparts = zeros(size(gparts,1),n_new);
+    for j = const_spec
+        gparts(:,j) = j;
+    end
+  
+    for k = 1 : size(tmp_gparts,1)
+        for i = 1 : n
+            gparts(k,tr_map(i)) = tr_map(tmp_gparts(k,i));
+        end
+    end
+end
+
+
+
+% With B being a base of a generalized eigenspace of the Jacobian, update_gparts
+% calculates the guiding set of partitions generated by <B>
+function update_gparts(B)
+
+    global tol
+    global gparts
+    global comp_bound
+
+    n = size(B,1);
+    m = size(B,2);
+
+    if (size(B,2) == 1)
+        gparts = [gparts; get_part_cut_wrt(B(:,1)')];  
+        gparts = unique(gparts, 'rows');
+        return;     
+    end       
+    
+    % Index of the last used row in parts and ord_vecs
+    psize = 1;
+    % Main data
+    parts = zeros(psize * nchoosek(n, 2), n);
+    ord_vecs = zeros(psize * nchoosek(n, 2), m*m + 1);
+    % Auxiliary boolean for the first while iteration
+    first = 1; 
+    % Auxiliary variables
+    all_pairs = nchoosek(1:n, 2);    
+    new_ord_vec = zeros(1, m*m + 1);
+    aux = zeros(1,m*m);
+    % For debugging purposes only
+    itr = 1;
+
+    
+    % The next commands provide information about computation
+    fprintf('=====================================================\n');
+    fprintf('=== Process generalized eigenspace of dimension %d ===\n', m);
+    fprintf('=====================================================\n');    
+    while (psize > 0)      
+        % The pair set of the first iteration is 1:n
+        if(first)
+            parts(1,:) = 1:n;
+        end
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        % Calculate the closure of parts(nu,:) for all 1 \leq nu \leq psize
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        for nu = 1 : psize   
+            % For each pair (i,j) in all_pairs, decide whether the union 
+            % partition underlying parts(nu,:) and (i,j) has the same 
+            % solution space as parts(nu,:). If so, replace parts(nu,:) 
+            % with the union partition.
+            for k = 1 : size(all_pairs,1)
+                i = all_pairs(k,1);
+                j = all_pairs(k,2);
+
+                % Calculate the union of the pair (i,j) and parts(nu,:) and
+                % store it as new_part. (We do not invoke the more general 
+                % get_part_union_wrt to speed up calculation.)
+                new_part = parts(nu,:);                   
+                if(new_part(i) == new_part(j))
+                    continue;
+                elseif(new_part(i) < new_part(j))
+                    rep = new_part(j);
+                    for l = 1 : n
+                        if(new_part(l) == rep)
+                            new_part(l) = new_part(i);
+                        end
+                    end
+                elseif(new_part(j) < new_part(i))
+                    rep = new_part(i);                        
+                    for l = 1 : n
+                        if(new_part(l) == rep)
+                            new_part(l) = new_part(j);
+                        end
+                    end                        
+                end                    
+                
+                % Construct the linear system corresponding to the constraints
+                % imposed by new_part
+                A_new_part = get_lin_sys(B, new_part);
+
+                % Calculate the solution space
+                new_sol_sp_base = null(A_new_part);
+                % If the given constraints cannot be met, the underlying
+                % partition can be ignored
+                if(isempty(new_sol_sp_base))
+                    continue;
+                end
+
+                % Since null() returns an orthonormal basis, the orthogonal 
+                % projection onto the solution space calculates as
+                pr_to_new_sol_sp = new_sol_sp_base * new_sol_sp_base';
+
+                % Each linear subspace of R^m is uniquely identified by
+                % the orthogonal projections of e_1,...,e_m into it. Thus,
+                % each new_sol_sp_base is uniquely identified by its 
+                % pr_to_new_sol_sp. To speed up calculation, we store also
+                % its dimension size(new_sol_sp_base, 2)                
+                new_ord_vec(1) = size(new_sol_sp_base, 2);
+
+                % The values of the orthogonal projection may be saved as
+                % vectors in (\mathbb{Z} / 10^mu)^{m * m} to account for
+                % round off errors, where mu \geq 10. A small mu value
+                % yields faster running times but increases the probability
+                % of a faulty calculation.
+                aux = reshape(pr_to_new_sol_sp, [m*m,1])';
+                %aux = floor(10^15 .* aux) ./ 10^15;                                
+                new_ord_vec(2:(m*m + 1)) = aux;   
+
+                
+                % If adding (i,j) to parts(nu,:) does not change the solution
+                % space, replace parts(nu,:) by new_part              
+                if(first)
+                    if(new_ord_vec(1) == m)
+                        parts(nu,:) = new_part;                
+                    end                    
+                else                    
+                    if(sum(abs(ord_vecs(nu,:) - new_ord_vec)) < tol)
+                        parts(nu,:) = new_part;                
+                    end
+                end
+            end                        
+        end
+        
+        
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        %  Add the partitions of the closures to gparts
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        
+        % Append new candidate vectors to gparts and remove repetitions afterwards
+        gparts = [gparts; parts(1:psize,:)];
+        gparts = unique(gparts, 'rows');                
+        
+
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        %  Compute the new pair sets induced by the closures  
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+                        
+        % Interrupt computation of gparts if (n over 2) * psize exceeds the 
+        % predefined computation bound comp_bound
+        if(comp_bound > 0)
+            novertwo = (nchoosek(n, 2) * psize);
+            if(novertwo > comp_bound)
+                fprintf('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n');
+                fprintf('!!! (n over 2) * psize exceeded computation bound (%d)!!!\n',novertwo);
+                fprintf('!!!  calculation of gparts terminated incomplete  !!!\n');            
+                fprintf('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n');          
+                break;
+            end
+        end
+        
+        % The next commands provide information about computation
+        fprintf('Size of psets in iteration %d is %d, yielding at most %d pair extensions\n', itr, psize, psize * nchoosek(n, 2));
+        fprintf('The size of gparts in iteration %d is %d\n', itr, size(gparts,1));        
+        itr = itr + 1;                 
+        
+        % Copy data from the last main iteration into larger arrays
+        % (needed because the amount of data may increase with each new iteration)
+        if(~first)
+            tmp_parts = parts;
+            tmp_ord_vecs = ord_vecs;
+
+            parts = zeros(psize * nchoosek(n, 2), n);
+            ord_vecs = zeros(psize * nchoosek(n, 2), m*m + 1);
+
+            for nu = 1 : psize
+                parts(nu,:) = tmp_parts(nu,:);
+                ord_vecs(nu,:) = tmp_ord_vecs(nu,:);
+            end
+        end
+        
+        
+        % Initialize auxiliary data structures used in the current
+        % iteration
+        new_parts = zeros(psize * nchoosek(n, 2), n);
+        new_ord_vecs = zeros(psize * nchoosek(n, 2), m*m + 1);
+        tmplist = zeros(psize * nchoosek(n, 2), n);
+        
+
+        % Populate new_parts and new_ord_vecs
+        for nu = 1 : psize            
+            for k = 1 : size(all_pairs,1)
+                i = all_pairs(k,1);
+                j = all_pairs(k,2);
+
+                
+                % Calculate the union of the pair (i,j) and parts(nu,:) and
+                % store it as new_part. (We do not invoke the more general 
+                % get_part_union_wrt to speed up calculation.)
+                new_part = parts(nu,:);                   
+                if(new_part(i) == new_part(j))
+                    continue;
+                elseif(new_part(i) < new_part(j))
+                    rep = new_part(j);
+                    for l = 1 : n
+                        if(new_part(l) == rep)
+                            new_part(l) = new_part(i);
+                        end
+                    end
+                elseif(new_part(j) < new_part(i))
+                    rep = new_part(i);                        
+                    for l = 1 : n
+                        if(new_part(l) == rep)
+                            new_part(l) = new_part(j);
+                        end
+                    end                        
+                end                    
+
+                
+                % Construct the linear system corresponding to the constraints
+                % imposed by new_part
+                A_new_part = get_lin_sys(B, new_part);
+
+                % Calculate the solution space
+                new_sol_sp_base = null(A_new_part);
+                % If the given constraints cannot be met, the underlying
+                % partition can be ignored
+                if(isempty(new_sol_sp_base))
+                    continue;
+                end
+                
+                % Since null() returns an orthonormal basis, the orthogonal 
+                % projection onto the solution space calculates as
+                pr_to_new_sol_sp = new_sol_sp_base * new_sol_sp_base';
+                
+                % Each linear subspace of R^m is uniquely identified by
+                % the orthogonal projections of e_1,...,e_m into it. Thus,
+                % each new_sol_sp_base is uniquely identified by its 
+                % pr_to_new_sol_sp. To speed up calculation, we store also
+                % its dimension size(new_sol_sp_base, 2)                
+                new_ord_vec(1) = size(new_sol_sp_base, 2);
+                
+                % The values of the orthogonal projection may be saved as
+                % vectors in (\mathbb{Z} / 10^mu)^{m * m} to account for
+                % round off errors, where mu \geq 10. A small mu value
+                % yields faster running times but increases the probability
+                % of a faulty calculation.
+                aux = reshape(pr_to_new_sol_sp, [m*m,1])';
+                %aux = floor(10^15 .* aux) ./ 10^15;                                
+                new_ord_vec(2:(m*m + 1)) = aux;                
+                
+                % Store the new values in new_parts and new_ord_vecs
+                new_parts((nu - 1) * nchoosek(n, 2) + k,:) = new_part;                             
+                new_ord_vecs((nu - 1) * nchoosek(n, 2) + k,:) = new_ord_vec;                          
+            end
+        end
+        
+        first = 0;        
+       
+        % Sort the elements of new_ord_vecs in descending order wrt
+        % column one and ascending order wrt the remaining columns
+        [new_ord_vecs, indx] = sortrows(new_ord_vecs,[-1,2:(m*m + 1)]);
+        % Sort new_parts wrt new_ord_vecs
+        for l = 1 : size(new_ord_vecs, 1)
+            tmplist(l,:) = new_parts(indx(l),:);
+        end
+        new_parts = tmplist;
+        
+        
+        % Merge all elements in new_parts that have the same entry in 
+        % new_ord_vecs and store the result in parts and ord_vecs. (Merge
+        % means here that all elements of the same block have the finest
+        % coarsening of all partitions in the block.)
+
+        % The ``continue'' commands in the for loop may lead to zero rows 
+        % at the end of new_ord_vecs and new_parts. 
+        if(new_ord_vecs(size(new_ord_vecs,1),1) > 0)
+            len = size(new_ord_vecs,1);
+        else          
+            [~,len] = ismember(zeros(1,m*m + 1),new_ord_vecs,'rows');
+        end
+               
+        % After completing the following while loop, psize will have the 
+        % true length of parts and ord_vecs        
+        cur_beg = 1;        
+        psize = 0;        
+        while (cur_beg < len)
+            cur_end = cur_beg;
+            while ( cur_end < size(new_ord_vecs,1) && (sum(abs(new_ord_vecs(cur_beg,:) - new_ord_vecs(cur_end + 1,:))) < tol) )
+                cur_end = cur_end + 1;
+            end
+
+            psize = psize + 1;            
+            if(cur_beg < cur_end)
+                % new_parts(cur_beg:cur_end,:) share the same solution space
+                % and thus have to be merged                
+                parts(psize,:) = get_part_union_wrt(new_parts(cur_beg:cur_end,:));                        
+                ord_vecs(psize,:) = new_ord_vecs(cur_beg,:);
+                
+                cur_beg = cur_end + 1;
+            else
+                parts(psize,:) = new_parts(cur_beg,:);                
+                ord_vecs(psize,:) = new_ord_vecs(cur_beg,:);                
+                
+                cur_beg = cur_beg + 1;
+            end
+        end                
+        
+        % Thanks to descending sorting, partitions that have a solution space 
+        % of dimension one will appear at the end of parts.
+        tmplen = 0;
+        while(psize > 0 && ord_vecs(psize,1) == 1)
+            % If the solution space has dimension one and thus can be
+            % written as a span <vec>, each nonzero projection is a
+            % multiple of vec. Since
+            % ord_vec(2:(m*m + 1)) = reshape(pr_to_new_sol_sp,[m*m,1])',
+            % a base vector can be recovered by
+
+            vec = B * sum(reshape(ord_vecs(psize,2:(m*m + 1)), [m,m]),2);
+            G = get_part_cut_wrt(vec');
+            % We add the so new candidate vector to tmplist
+            tmplen = tmplen + 1;
+            tmplist(tmplen,:) = G;
+
+            % After adding the candidate partition to the gparts, we
+            % decrement psize (thus, ``removing'' the last entries of parts
+            % and ord_vecs, respectively)
+            psize = psize - 1;
+        end        
+        
+        % Append new candidate vectors to gparts and remove repetitions afterwards
+        gparts = [gparts; tmplist(1:tmplen,:)];
+        gparts = unique(gparts, 'rows');        
+    end
+end
+
+
+
+% Calculates the coarsest partition that refines the partition G, where
+% G(i) gives the *smallest* representative of i, i.e. G(i) = min [i], if
+% [i] denotes the equivalence class of i wrt G.
+function H = get_coarsest(mode_bde, G, crnreducer)    
+    if(mode_bde == 1)
+        H = javaMethod('computeBB', crnreducer, G)';
+    else
+        H = javaMethod('computeFE', crnreducer, G)';
+    end    
+end
+
+
+
+% Constructs the linear system of constraints which is induced by partition
+% part that is given row format
+function C = get_lin_sys(B, part)
+
+    part = get_part_alt(part);
+    n = size(part,2);
+    
+    C = [];
+    for i = 1 : size(part,1)
+        % Find the first element of the block part(i,:)
+        for j = 1 : n
+            if(part(i,j) == 1)
+                rep = j;
+                break;
+            end            
+        end
+                
+        % Construct the constraints underlying block part(i,:)
+        for j = rep + 1 : n
+            if(part(i,j) == 1) 
+                % Coordinates i and j of the linear combination must be equal
+                C = [C; (B(rep,:) - B(j,:))];
+            end
+        end
+    end
+end
+
+
+
+% Transforms a partition from row format into block format
+function G = get_part_alt(H)
+
+    global tol
+
+    n = size(H,2);
+    H = [H; 1:n]';
+    H = sortrows(H,1);
+      
+    G = [];    
+    cur_begin = 1;
+    while (cur_begin <= n)
+        cur_block = zeros(1,n);
+        val_begin = H(cur_begin,1);
+        
+        for k = cur_begin : n            
+            cur_block(H(k,2)) = 1;
+            if (k == n) || (abs(val_begin - H(k + 1,1)) > tol)
+                cur_begin = k + 1;
+                G = [G; cur_block];
+                break;
+            end
+        end
+    end   
+end
+
+
+
+%Input: Matrix m x n where each row encodes a partition of {1,...,n} via:
+%x,y equivalent wrt A(k,:) iff A(k,i) = A(k,j).
+%Output: Gives the coarsest common refinement of all m partitions.
+%A = [ [1,1,3,1,3,3]; [1,2,2,1,5,5] ] returns  [1,2,3,1,5,5].
+function H = get_part_cut_wrt(A)
+
+    global tol
+
+    %For testing
+    %A = [ [1,1,3,1,3,3]; [1,2,2,1,5,5] ]
+    
+    [m,n] = size(A);
+    
+    A = [A; 1:n];
+    A = A';
+    A = sortrows(A);
+        
+    cur_begin = 1;
+    while (cur_begin <= n)
+        val_begin = A(cur_begin,1:m);
+        cur_indx = A(cur_begin,m + 1);
+        
+        for k = cur_begin : n            
+            %A(k,1) = A(cur_begin,m + 1);
+            
+            if(A(k,m + 1) < cur_indx)
+                cur_indx = A(k,m + 1);
+            end
+            
+            if (k == n) || (sum(abs(val_begin - A(k + 1,1:m))) > tol)
+                for j = cur_begin : k
+                    A(j,1) = cur_indx;
+                end
+                
+                cur_begin = k + 1;                
+                break;
+            end            
+        end
+    end
+    
+    A = [A(:,m + 1),A(:,1)];
+    H = sortrows(A,1);    
+    H = H(:,2)';
+end
+
+
+
+%Input: Matrix m x n where each row encodes a partition of {1,...,n} via:
+%x,y equivalent wrt part(k,:) iff part(k,i) = part(k,j).
+%Output: Calculates the partition that corresponds to the transitive clousure
+%of the union of the equivalence relations underlying the partitions part
+function punion = get_part_union_wrt(part)
+    R = get_pre_clos(part);
+    R = get_trans_clos(R);
+
+%    % Transform the equivalence R into the alternative partition block-format
+%    R = sortrows(R);    
+%     cur_pos = 1;
+%     while ( cur_pos < size(R,1) )       
+%        if(isequal(R(cur_pos,:),R(cur_pos + 1,:)))
+%            R(cur_pos + 1,:) = [];
+%        else
+%            cur_pos = cur_pos + 1;
+%        end
+%     end
+%   punion = R;
+
+    % Transform the equivalence R into the common row-format
+    n = size(R,1);
+    punion = (n + 1) * ones(1,n);
+    
+    for i = 1 : n
+        for j = i : n
+            if(R(i,j) == 1 && punion(j) > i)
+                punion(j) = i;
+            end            
+        end
+    end
+end
+
+
+%Input: Matrix m x n where each row encodes a partition of {1,...,n} via:
+%x,y equivalent wrt part(k,:) iff part(k,i) = part(k,j).
+%Output: Each row of part is transformed into a relation that is such that its 
+%transitive closure gives rise to the equivalence relation defined by the
+%row. Afterwards, the union of all such relations is calculated and returned. 
+function R = get_pre_clos(part)
+    n = size(part,2);    
+    R = diag(ones(1,n));
+
+    for k = 1 : size(part,1)
+        for i = 1 : n
+            R(i,part(k,i)) = 1;
+            R(part(k,i),i) = 1; 
+        end        
+    end
+end
+
+% Given a reflexive and symmetric relation R over the set {1,...,n}, the
+% function calculates the transitive closure of R
+function R = get_trans_clos(R)
+    n = size(R,1);
+
+    % Calculate the transitive closure of R
+    changed = 1;
+    % Look for one step clousures as long as R is modified
+    while (changed == 1)
+        changed = 0;
+        
+        for i = 1 : n
+            for j = i : n
+                if(R(i,j) == 1)
+                    continue;
+                end
+
+                for k = 1 : n
+                    if ( (R(i,k) == 1) && (R(k,j) == 1) )                        
+                        R(i,j) = 1;
+                        R(j,i) = 1;
+                        
+                        changed = 1;
+                    end
+                end
+            end
+        end        
+    end
+end
+
+
+
+% Groups the generalized eigenvectors V from [V,D] = jordan(A) according to
+% their eigenvalue. Input is the diagonal matrix D with eigenvalues.
+function G = get_vector_part(ev)
+
+    global tol
+    
+    n = size(ev,1);
+    ev = [ev,(1:n)'];
+    ev = sortrows(ev);
+    
+    cur_begin = 1;
+    while (cur_begin <= n)
+        val_begin = ev(cur_begin,1);
+        for k = cur_begin : n            
+            ev(k,1) = ev(cur_begin,2);
+            if (k == n) || (abs(val_begin - ev(k + 1,1)) > tol)
+                cur_begin = k + 1;                
+                break;
+            end
+        end
+    end
+    
+    H = sortrows(ev,2);    
+    G = get_part_alt(H(:,1)');   
+end
+
+
+
+% Transforms the potentially complex generalized eigenvectors into the
+% corresponding real generalized eigenvectors
+function [B,D] = get_real_gen_eig(V,D)
+
+    n = size(V,1);
+    B = zeros(n,n);
+
+    for k = 1 : n
+        if(isreal(V(:,k)) == 1)
+            %If the generalized eigenvector V(:,k) is real, add it to B.
+            B(:,k) = V(:,k);
+        else
+            %If the generalized eigenvector V(:,k) is complex, its real and
+            %complex parts to B yield two distinct vectors in B.
+            realp_vec = real(V(:,k));
+            imagp_vec = imag(V(:,k));
+
+            realp_val = real(D(k,k));
+            imagp_val = imag(D(k,k));
+            
+            %If imagp_val is postive, B(:,k) is set to realp_vec. Otherwise,
+            %B(:,k) is set to imagp_vec. Since complex vectors appear in V
+            %only as conjugate pairs, this ensures that the real and the
+            %imaginary part of V(:,k) will be in B after the for loop terminates.            
+            if(imagp_val > 0)
+                B(:,k) = realp_vec;
+                %D(k,k) = realp_val + imagp_val * 1i;
+            else
+                B(:,k) = imagp_vec;
+                % The eigenvalue is updated as well. This is needed to
+                % identify later vectros that belong to the same span.
+                D(k,k) = realp_val - imagp_val * 1i;                
+            end
+        end
+    end
+end
+
+
+% Input: bdes contains all BDEs of the source network, while unioncrn
+% refers to the unioncrn that encapsulates the source and target network.
+% Output: Gives all union bdes that correspond to emulations from the
+% source to the target network.
+% Complexity: m! * |{ b | b BDE of source network with exactly m blocks}|,
+% where m denotes the size of the target network. If m exceeds nine, expect
+% trouble.
+function ubdes = get_emuls(bdes, unioncrn)
+       
+    ubdes = [];
+    cands = [];
+    permutations = [];
+  
+    n = size(bdes,2);
+
+    crnreducer = it.imt.erode.commandline.EntryPointForMatlab(false,true);
+    n_u = javaMethod('loadCRN', crnreducer, unioncrn);    
+    
+    % Find out whether the union network has artificial species. The
+    % current version of the function covers only the case where source
+    % and target CRNs have exactly one artificial species each. In the case
+    % of simplified networks, this implies that all triplets have the same
+    % total concentration.    
+    %A = javaMethod('computeJacobian', crnreducer, ones(1,n_u));
+    A = myjacobian(ones(1,n_u));      
+    const_spec = [];
+    for i = 1 : size(A,1)
+        if(isequal(A(i,:),zeros(1,n_u)))
+            const_spec = [const_spec, i];
+        end
+    end           
+    
+    if(size(const_spec,2) ~= 0 && size(const_spec,2) ~= 2)
+        fprintf('Only union networks with zero or two artificial species are supported.\n');
+        exit(1);
+    end
+    
+    m = n_u - n;    
+    
+    cand = zeros(1, n + m);    
+    
+    % Calculate the number of partitions with m blocks in bdes
+    counter = 0;
+    for i = 1 : size(bdes,1)    
+        k = size(unique(bdes(i,:)),2);                        
+        if(m == k)
+            counter = counter + 1;
+        end        
+    end
+    
+    % Allocate the memory for emulation candidates, if counter > 0. (Instead,
+    % if counter is 0, there can be now emulation from the source to the 
+    % target network.)
+    if(counter == 0)
+        return;
+    else
+        if(isempty(const_spec))
+            cands = zeros(counter * factorial(m),n + m);
+        else
+            % If const_spec is not empty, one of the m species of the
+            % target network is a constant. This reduces the number of
+            % emulation candidates.
+            cands = zeros(counter * factorial(m - 1),n + m);
+        end   
+    end
+      
+    counter = 1;
+    for i = 1 : size(bdes,1)
+        k = size(unique(bdes(i,:)),2);                        
+        
+        %Each BDE that does not have m blocks is skipped
+        if(m ~= k)
+            continue;
+        elseif(isequal(permutations,[]))
+            if(isempty(const_spec))
+                % If no constants are involved, 
+                permutations = perms(1:m); 
+                indices = 1 : m;
+            else
+                % nu := const_spec(2) - n is the index of the constant in the
+                % target network. In the following, we calculate all
+                % permutations \rho : {1,...,m} -> {1,...,m} such that
+                % rho(nu) = nu.
+                
+                indices = [];
+                for j = 1 : m
+                    if(j ~= (const_spec(2) - n))
+                        indices = [indices, j];                        
+                    end                    
+                end                
+                
+                permutations = zeros(factorial(m - 1), m);
+                permutations(:,1:(m - 1)) = perms(indices);                 
+                permutations(:,(const_spec(2) - n + 1):m) = permutations(:,(const_spec(2) - n):(m - 1));
+                % The entries permutations(:,const_spec(2) - n) are not
+                % used in the code but are added for mathematical beauty
+                permutations(:,const_spec(2) - n) = const_spec(2) - n;
+            end
+        end
+        
+        G = get_part_alt(bdes(i,:));        
+        % cand stores the union BDE that arises from bdes(i,:) and
+        % permutations(l,:). The idea is to add the target species 
+        % 1 \leq i \leq m to the block number permutations(l,i) in bdes(i,:).         
+        cand(1:n) = bdes(i,:);
+        if(~isempty(const_spec))
+            % In the case constans are present, we put the constant
+            % from the target network into the block of the constant
+            % species from the source network.
+            cand(const_spec(2)) = bdes(i,const_spec(1));
+            
+            % Afterwards we make sure that block number const_spec(2) of G
+            % corresponds to the constant species of the source network
+            const_block = zeros(1,n);
+            const_block(const_spec(1)) = 1;
+            % G should have exactly one row equal to const_block (since the
+            % artificial species of the source network equals only to itself
+            % in the source network)
+            [~,indx] = ismember(const_block,G,'rows');
+               
+            % Ensure that the block of the artifical species is stored in
+            % the (const_spec(2) - n)-th row
+            if(indx ~= (const_spec(2) - n))
+                tmp = G(const_spec(2) - n,:);
+                G(const_spec(2) - n,:) = const_block;
+                G(indx,:) = tmp;
+            end
+        end
+        
+        % Set the entries n + 1,...,n + m of cand according to the
+        % current permutation permutations(l,:)
+        for l = 1 : size(permutations,1)            
+            for j = indices
+                % Set the representative of target species j to the one
+                % of the permutations(l,j)-th block in G
+                for k = 1 : n
+                    if(G(permutations(l,j),k) == 0)
+                        continue;
+                    end
+
+                    cand(n + j) = k;                
+                    break;
+                end
+            end     
+                        
+            cands(counter,:) = cand;
+            counter = counter + 1;
+        end                
+    end 
+    
+    % After all potential emulation candidates have been calculated, decide 
+    % which of them are BDEs of the union network
+    for i = 1 : size(cands,1)  
+        % For debugging purposes only
+        %javaMethod('printPartition', crnreducer, cands(i,:));        
+                
+        H = javaMethod('computeBB', crnreducer, cands(i,:))';
+        
+        % For debugging purposes only
+        %javaMethod('printPartition', crnreducer, H);        
+        
+        if(isequal(H,cands(i,:)))
+            ubdes = [ubdes; H];
+        end
+    end
+    
+    ubdes = sortrows(ubdes);    
+    
+    % Print emulations
+    if(isempty(ubdes))        
+        fprintf('\n===========================================\n');        
+        fprintf('There is no emulation between the source and the target network.\n');
+        fprintf('===========================================\n');                
+    else
+        for i = 1 : size(ubdes,1)
+            % Print partitions in a human friendly format
+            fprintf('\n====== Emulation %d =======================\n', i);
+            javaMethod('printPartition', crnreducer, ubdes(i,:));
+            fprintf('\n===========================================\n');
+        end
+    end
+end

@@ -1,0 +1,29 @@
+
+Double check if it is correct to invoke splittersGenerator.skipSplittersWhichShouldBeIgnored(); in refine of CRNBisimulations and CRNBisimulationsNAry
+In general, check if we handle this properly
+
+STEFANO:
+- C'è da aggiungere le initial conditions non zero per l'export modelica?!??
+
+
+Check collapseAndAddReactions of CRN
+Check collapseReactions of non massaction 
+
+What about absolute value?
+ 
+For simulateCTMC, for arbitrary reactions I compute the value considering only the rate, without doing other calculations, which instead are done for the mass-action reactions.
+
+CHECK TODO OF OLD PROJECT (uk.ac.soton.crn . The previous, trashy, one is uk.ac.soton.cse.crn)
+
+it.imt.erode.crn.updatesite
+erode
+ERODE
+ERODE: a fully featured Eclipse plugin for the Evaluation and Reduction of Ordinary Differential Equations
+
+Remember that using eclipse mars java is ok, but an internet connection is necessary.
+
+Check the C library CVODE to solve ODEs: http://lh3lh3.users.sourceforge.net/solveode.shtml
+Java porting of CVODE: http://www.biouml.org/help/user/html/index.html?jvode.htm
+ASK TABEA!
+Porting for FORTRAN ODE solver: (the same solve is used by Python's numpy library)
+https://github.com/fons/JavaOdeInt

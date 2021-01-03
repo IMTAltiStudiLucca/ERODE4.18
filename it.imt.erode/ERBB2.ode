@@ -1,0 +1,184 @@
+// Supplementary File 
+// ERODE description of the BooleCube odefication of the Boolean model for tyrosine kinase ERBB2 of
+// Özgur̈ Sahin, Holger Fröhlich, Christian Löbke, Ulrike Korf, Sara Burmester, Meher Ma- jety, Jens Mattern, Ingo Schupp, Claudine Chaouiya, Denis Thieffry, Annemarie Poustka, Stefan Wiemann, Tim Beissbarth, and Dorit Arlt.
+// Modeling ERBB receptor-regulated G1/S transition to find novel targets for de novo trastuzumab resistance.
+// BMC systems biology, 3(1):1, 849– 1863, 2009. 
+ 
+
+begin model ERBB2
+ begin init
+  MEK1
+  CDK4
+  p21
+  CyclinD1
+  p27
+  CDK2
+  CyclinE1
+  pRB1
+  ERalpha
+  AKT1
+  CDK6
+  MYC
+  IGF1R
+  EGF
+  ERBB1
+  ERBB2
+  ERBB3
+  ERBB2_3
+  ERBB1_2
+  ERBB1_3
+  I = 1
+ end init
+begin partition
+//The initial partition refined by backward equivalence has two blocks: the input species EGF belongs a singleton block, while all the other species belong the second block
+{EGF}
+end partition 
+begin reactions
+  MEK1 -> MEK1 + ERalpha , 1.0
+  MEK1 -> MEK1 + MYC , 1.0
+  MEK1 -> 2*MEK1 , ( 0 - 1)
+  MEK1 + ERalpha -> MEK1 + ERalpha + MYC , -1.0+-1.0+1.0
+  MEK1 + ERalpha + AKT1 -> MEK1 + ERalpha + AKT1 + MYC , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  MEK1 + ERalpha + AKT1 + MYC -> MEK1 + CyclinD1 + ERalpha + AKT1 + MYC , -1.0+-1.0+1.0
+  MEK1 + ERalpha + MYC -> MEK1 + CyclinD1 + ERalpha + MYC , 1.0
+  MEK1 + AKT1 -> MEK1 + ERalpha + AKT1 , -1.0+-1.0+1.0
+  MEK1 + AKT1 -> MEK1 + AKT1 + MYC , -1.0+-1.0+1.0
+  CDK4 -> CDK4 + p21 , -1.0
+  CDK4 -> CDK4 + p27 , -1.0
+  CDK4 -> 2*CDK4 , ( 0 - 1)
+  CDK4 + CDK2 -> CDK4 + p27 + CDK2 , 1.0
+  CDK4 + CDK2 + AKT1 -> CDK4 + p27 + CDK2 + AKT1 , -1.0
+  CDK4 + CDK2 + AKT1 + MYC -> CDK4 + p27 + CDK2 + AKT1 + MYC , 1.0
+  CDK4 + CDK2 + MYC -> CDK4 + p27 + CDK2 + MYC , -1.0
+  CDK4 + AKT1 -> CDK4 + p21 + AKT1 , 1.0
+  CDK4 + AKT1 -> CDK4 + p27 + AKT1 , 1.0
+  CDK4 + AKT1 + MYC -> CDK4 + p21 + AKT1 + MYC , -1.0
+  CDK4 + AKT1 + MYC -> CDK4 + p27 + AKT1 + MYC , -1.0
+  CDK4 + CDK6 -> CDK4 + pRB1 + CDK6 , 1.0
+  CDK4 + MYC -> CDK4 + p21 + MYC , 1.0
+  CDK4 + MYC -> CDK4 + p27 + MYC , 1.0
+  p21 -> 2*p21 , ( 0 - 1)
+  p21 + CyclinD1 -> CDK4 + p21 + CyclinD1 , -1.0
+  p21 + CyclinD1 + p27 -> CDK4 + p21 + CyclinD1 + p27 , 1.0
+  p21 + p27 + CyclinE1 -> p21 + p27 + CDK2 + CyclinE1 , 1.0
+  p21 + CyclinE1 -> p21 + CDK2 + CyclinE1 , -1.0
+  CyclinD1 -> CDK4 + CyclinD1 , 1.0
+  CyclinD1 -> CyclinD1 + CDK6 , 1
+  CyclinD1 -> 2*CyclinD1 , ( 0 - 1)
+  CyclinD1 + p27 -> CDK4 + CyclinD1 + p27 , -1.0
+  p27 -> 2*p27 , ( 0 - 1)
+  p27 + CyclinE1 -> p27 + CDK2 + CyclinE1 , -1.0
+  CDK2 -> p27 + CDK2 , -1.0
+  CDK2 -> 2*CDK2 , ( 0 - 1)
+  CDK2 + AKT1 -> p27 + CDK2 + AKT1 , 1.0
+  CDK2 + AKT1 + MYC -> p27 + CDK2 + AKT1 + MYC , -1.0
+  CDK2 + MYC -> p27 + CDK2 + MYC , 1.0
+  CyclinE1 -> CDK2 + CyclinE1 , 1.0
+  CyclinE1 -> 2*CyclinE1 , ( 0 - 1)
+  pRB1 -> 2*pRB1 , ( 0 - 1)
+  ERalpha -> ERalpha + MYC , 1.0
+  ERalpha -> ERalpha + IGF1R , 1.0
+  ERalpha -> 2*ERalpha , ( 0 - 1)
+  ERalpha + AKT1 -> ERalpha + AKT1 + MYC , -1.0+-1.0+1.0
+  ERalpha + AKT1 -> ERalpha + AKT1 + IGF1R , -1.0+-1.0+1.0
+  ERalpha + AKT1 + MYC -> CyclinD1 + ERalpha + AKT1 + MYC , 1.0
+  ERalpha + AKT1 + ERBB2_3 -> ERalpha + AKT1 + IGF1R + ERBB2_3 , -1.0+1.0+1.0
+  ERalpha + ERBB2_3 -> ERalpha + IGF1R + ERBB2_3 , -1.0
+  AKT1 -> p21 + AKT1 , -1.0
+  AKT1 -> p27 + AKT1 , -1.0
+  AKT1 -> ERalpha + AKT1 , 1.0
+  AKT1 -> AKT1 + MYC , 1.0
+  AKT1 -> AKT1 + IGF1R , 1.0
+  AKT1 -> 2*AKT1 , ( 0 - 1)
+  AKT1 + MYC -> p21 + AKT1 + MYC , 1.0
+  AKT1 + MYC -> p27 + AKT1 + MYC , 1.0
+  AKT1 + ERBB2_3 -> AKT1 + IGF1R + ERBB2_3 , -1.0
+  CDK6 -> 2*CDK6 , ( 0 - 1)
+  MYC -> p21 + MYC , -1.0
+  MYC -> p27 + MYC , -1.0
+  MYC -> CyclinE1 + MYC , 1
+  MYC -> 2*MYC , ( 0 - 1)
+  IGF1R -> MEK1 + IGF1R , 1.0
+  IGF1R -> AKT1 + IGF1R , 1.0
+  IGF1R -> 2*IGF1R , ( 0 - 1)
+  IGF1R + ERBB1 -> MEK1 + IGF1R + ERBB1 , -1.0+-1.0+1.0
+  IGF1R + ERBB1 -> AKT1 + IGF1R + ERBB1 , -1.0+-1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 -> MEK1 + IGF1R + ERBB1 + ERBB2_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 -> AKT1 + IGF1R + ERBB1 + ERBB2_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 -> MEK1 + IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 -> AKT1 + IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 -> MEK1 + IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 -> AKT1 + IGF1R + ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 + ERBB1_3 -> MEK1 + IGF1R + ERBB1 + ERBB2_3 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB2_3 + ERBB1_3 -> AKT1 + IGF1R + ERBB1 + ERBB2_3 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB1_2 -> MEK1 + IGF1R + ERBB1 + ERBB1_2 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB1_2 -> AKT1 + IGF1R + ERBB1 + ERBB1_2 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB1_2 + ERBB1_3 -> MEK1 + IGF1R + ERBB1 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB1_2 + ERBB1_3 -> AKT1 + IGF1R + ERBB1 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB1_3 -> MEK1 + IGF1R + ERBB1 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1 + ERBB1_3 -> AKT1 + IGF1R + ERBB1 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB2_3 -> MEK1 + IGF1R + ERBB2_3 , -1.0+-1.0+1.0
+  IGF1R + ERBB2_3 -> AKT1 + IGF1R + ERBB2_3 , -1.0+-1.0+1.0
+  IGF1R + ERBB2_3 + ERBB1_2 -> MEK1 + IGF1R + ERBB2_3 + ERBB1_2 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB2_3 + ERBB1_2 -> AKT1 + IGF1R + ERBB2_3 + ERBB1_2 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB2_3 + ERBB1_2 + ERBB1_3 -> MEK1 + IGF1R + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB2_3 + ERBB1_2 + ERBB1_3 -> AKT1 + IGF1R + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB2_3 + ERBB1_3 -> MEK1 + IGF1R + ERBB2_3 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB2_3 + ERBB1_3 -> AKT1 + IGF1R + ERBB2_3 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1_2 -> MEK1 + IGF1R + ERBB1_2 , -1.0+-1.0+1.0
+  IGF1R + ERBB1_2 -> AKT1 + IGF1R + ERBB1_2 , -1.0+-1.0+1.0
+  IGF1R + ERBB1_2 + ERBB1_3 -> MEK1 + IGF1R + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1_2 + ERBB1_3 -> AKT1 + IGF1R + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  IGF1R + ERBB1_3 -> MEK1 + IGF1R + ERBB1_3 , -1.0+-1.0+1.0
+  IGF1R + ERBB1_3 -> AKT1 + IGF1R + ERBB1_3 , -1.0+-1.0+1.0
+  EGF -> EGF + ERBB1 , 1
+  EGF -> EGF + ERBB2 , 1
+  EGF -> EGF + ERBB3 , 1
+  ERBB1 -> MEK1 + ERBB1 , 1.0
+  ERBB1 -> AKT1 + ERBB1 , 1.0
+  ERBB1 -> 2*ERBB1 , ( 0 - 1)
+  ERBB1 + ERBB2 -> ERBB1 + ERBB2 + ERBB1_2 , 1.0
+  ERBB1 + ERBB3 -> ERBB1 + ERBB3 + ERBB1_3 , 1.0
+  ERBB1 + ERBB2_3 -> MEK1 + ERBB1 + ERBB2_3 , -1.0+-1.0+1.0
+  ERBB1 + ERBB2_3 -> AKT1 + ERBB1 + ERBB2_3 , -1.0+-1.0+1.0
+  ERBB1 + ERBB2_3 + ERBB1_2 -> MEK1 + ERBB1 + ERBB2_3 + ERBB1_2 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB2_3 + ERBB1_2 -> AKT1 + ERBB1 + ERBB2_3 + ERBB1_2 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 -> MEK1 + ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 -> AKT1 + ERBB1 + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+-1.0+1.0+1.0+1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB2_3 + ERBB1_3 -> MEK1 + ERBB1 + ERBB2_3 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB2_3 + ERBB1_3 -> AKT1 + ERBB1 + ERBB2_3 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB1_2 -> MEK1 + ERBB1 + ERBB1_2 , -1.0+-1.0+1.0
+  ERBB1 + ERBB1_2 -> AKT1 + ERBB1 + ERBB1_2 , -1.0+-1.0+1.0
+  ERBB1 + ERBB1_2 + ERBB1_3 -> MEK1 + ERBB1 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB1_2 + ERBB1_3 -> AKT1 + ERBB1 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB1 + ERBB1_3 -> MEK1 + ERBB1 + ERBB1_3 , -1.0+-1.0+1.0
+  ERBB1 + ERBB1_3 -> AKT1 + ERBB1 + ERBB1_3 , -1.0+-1.0+1.0
+  ERBB2 -> 2*ERBB2 , ( 0 - 1)
+  ERBB2 + ERBB3 -> ERBB2 + ERBB3 + ERBB2_3 , 1.0
+  ERBB3 -> 2*ERBB3 , ( 0 - 1)
+  ERBB2_3 -> MEK1 + ERBB2_3 , 1.0
+  ERBB2_3 -> AKT1 + ERBB2_3 , 1.0
+  ERBB2_3 -> 2*ERBB2_3 , ( 0 - 1)
+  ERBB2_3 + ERBB1_2 -> MEK1 + ERBB2_3 + ERBB1_2 , -1.0+-1.0+1.0
+  ERBB2_3 + ERBB1_2 -> AKT1 + ERBB2_3 + ERBB1_2 , -1.0+-1.0+1.0
+  ERBB2_3 + ERBB1_2 + ERBB1_3 -> MEK1 + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB2_3 + ERBB1_2 + ERBB1_3 -> AKT1 + ERBB2_3 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+-1.0+1.0+1.0+1.0+1.0
+  ERBB2_3 + ERBB1_3 -> MEK1 + ERBB2_3 + ERBB1_3 , -1.0+-1.0+1.0
+  ERBB2_3 + ERBB1_3 -> AKT1 + ERBB2_3 + ERBB1_3 , -1.0+-1.0+1.0
+  ERBB1_2 -> MEK1 + ERBB1_2 , 1.0
+  ERBB1_2 -> AKT1 + ERBB1_2 , 1.0
+  ERBB1_2 -> 2*ERBB1_2 , ( 0 - 1)
+  ERBB1_2 + ERBB1_3 -> MEK1 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+1.0
+  ERBB1_2 + ERBB1_3 -> AKT1 + ERBB1_2 + ERBB1_3 , -1.0+-1.0+1.0
+  ERBB1_3 -> MEK1 + ERBB1_3 , 1.0
+  ERBB1_3 -> AKT1 + ERBB1_3 , 1.0
+  ERBB1_3 -> 2*ERBB1_3 , ( 0 - 1)
+  I -> p21 + I , 1.0
+  I -> p27 + I , 1.0
+ end reactions
+// Reduction up to the largest backward equivalence, starting from the initial partition defined above 
+//reduceNBB(reducedFile="ERBB2_input_preserving_backward.ode",prePartition=USER)
+//Export the actual underlying ODE system
+//write(fileOut="ERBB2_ODE.ode",format=ODE)
+end model
+

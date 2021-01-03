@@ -1,0 +1,77 @@
+% Compute the error amplifier
+    t0 = 0;
+    %deltat = t1 / 200;        
+    lambda = 1;
+    lambdaBad = 1;
+    tic
+    % Compute the transition matrix \Lambda(0,T) 
+    X = zeros(size(0:deltat:t1,2),2*numvars,numvars);           
+    for i = 1 : numvars
+        z0 = zeros(1,numvars);
+        z0(i) = 1;
+
+        [T,tmpX]=ode45(@drift, 0:deltat:t1, [y0,z0]);
+        X(:,:,i) = tmpX;
+    end   
+    
+    
+    % Compute the maximum norm of the Jacobian across [0;t1], i.e.
+    % max{ \norm(J(x(t)),'inf') | 0 \leq t \leq t1 }
+    jaconorm = 0;
+    for t = 1 : size(T,1)
+        aux = norm(jacobian(X(t,1:numvars,1)),'inf');
+        if(jaconorm < aux) 
+            jaconorm = aux;
+        end
+    end
+    
+
+    % Compute the maximum norm of Lambda(s,t) where 0 \leq s \leq t \leq t1
+    % using the identity Lambda(s,t) = Lambda(0,t) * Lambda(0,s)^{-1}
+    aux = zeros(numvars, numvars);        
+    for s = 1 : size(T,1)
+        for i = 1 : numvars
+            aux2 = X(s,numvars+1:2*numvars,i);
+            aux(:,i) = aux2';
+        end      
+        % Compute the norm of Lambda(0,s) w.r.t. the parameters
+        normaux = norm(aux(:,uindx),'inf');   
+        if(lambda < normaux)
+            lambda = normaux;
+        end   
+        % Compute Lambda(0,s)^{-1}
+        invLambda0s = inv(aux);    
+        normaux = norm((aux * invLambda0s -eye(numvars)),'inf');
+        
+        for t = s + 1 : size(T,1)                        
+            for i = 1 : numvars
+                aux2 = X(t,numvars+1:2*numvars,i);
+                aux(:,i) = aux2';
+            end
+            % aux has the value of Lambda(0,t) and is 
+            % multiplied by Lambda(0,s)^{-1}
+            aux = aux * invLambda0s;                  
+            % Compute the norm of Lambda(s,t)
+            normaux = norm(aux(:,1:numvars),'inf');   
+            if(lambdaBad < normaux)
+                lambdaBad = normaux;
+            end                                     
+        end
+    end
+    tComp = toc;    
+    disp('**************************************************')        
+    sprintf('\nNumvars: %d\nTime horizon: %f\nDeltat: %f\nMaximum norm of Jacobian: %f\n\nGood lambda: %f (%f including numerical errors)\nBad lambda: %f (%f including numerical errors)\nComputation Time: %d seconds\n', numvars, t1, ...
+        deltat, jaconorm, lambda, lambda*exp(jaconorm*deltat), lambdaBad, lambdaBad*(1 + jaconorm*deltat*(1 + exp(jaconorm*deltat))),tComp)        
+    disp('**************************************************')    
+end    
+
+function dx = drift(t,x)
+    global numvars
+    
+    dy = ode(x(1:numvars));   
+    
+    jac = jacobian(x(1:numvars));
+    dz = jac * x(numvars+1:2*numvars);
+    
+    dx = [dy;dz];
+end    

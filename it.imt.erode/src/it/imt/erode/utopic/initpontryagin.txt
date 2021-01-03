@@ -1,0 +1,80 @@
+function initpontryagin(f,p,x,u)
+
+     global htf
+     global p_ind_Hu
+     global x_ind_Hu
+     global htHu
+     global htHx
+     global x_ind_Hx
+     global u_ind_Hx
+     
+    
+    
+    % Numeric ODE drift vector 
+    htf = matlabFunction(f); 
+    
+    % Compute the symbolic Hamiltonian 
+    %H = dot(p,f); %more ellegant but introduces conjugates
+    sym H;
+    H = 0;
+    for i = 1 : size(f,1)
+        H = H + p(i)*f(i);
+    end
+       
+    
+    % Symbolic drift of the costate p    
+    Hx = -jacobian(H, x);     
+    HxVars = symvar(Hx);
+    % Compute the indices of x appearing in Hx
+    x_ind_Hx = [];
+    for i = 1 : size(x,1)
+        for j = 1 : size(HxVars,2)
+            if(isequal(x(i),HxVars(j)))
+                x_ind_Hx = [x_ind_Hx , i];
+                break;
+            end
+        end
+    end
+    % Compute the indices of u appearing in Hx
+    u_ind_Hx = [];
+    for i = 1 : size(u,1)
+        for j = 1 : size(HxVars,2)
+            if(isequal(u(i),HxVars(j)))
+                u_ind_Hx = [u_ind_Hx , i];
+                break;
+            end
+        end
+    end        
+    % Numeric drift of the costate p
+    htHx = matlabFunction(Hx);
+    
+
+    % Symbolic correction of control u
+    Hu = -jacobian(H, u);   
+    HuVars = symvar(Hu);    
+    % Since we assume that the drift is linear in controls, the indices of
+    % u do not have to be computed (because there are no u variables in Hu)    
+    % Compute the indices of x appearing in Hu
+    x_ind_Hu = [];
+    for i = 1 : size(x,1)
+        for j = 1 : size(HuVars,2)
+            if(isequal(x(i),HuVars(j)))
+                x_ind_Hu = [x_ind_Hu , i];
+                break;
+            end
+        end
+    end
+    % Compute the indices of p appearing in Hu
+    p_ind_Hu = [];
+    for i = 1 : size(p,1)
+        for j = 1 : size(HuVars,2)
+            if(isequal(p(i),HuVars(j)))
+                p_ind_Hu = [p_ind_Hu , i];
+                break;
+            end
+        end
+    end
+    % Numeric correction of control u
+    htHu = matlabFunction(Hu);
+
+end

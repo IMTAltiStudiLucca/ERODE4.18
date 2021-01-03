@@ -1,0 +1,132 @@
+function pontryagin(maximize,vcoeff,max_iter,delta,uVars,cHeader,gamma,tspan,tspanRev,x0,u_max,u_min,csvfile,doPlot,wait)
+
+     global x_num
+     global u_num
+     global p_ind_Hu
+     global x_ind_Hu
+     global htHu
+    
+
+     if(maximize)
+         % Boundary condition of the costate
+        pT = - vcoeff;
+     else
+        %Use the following if interested in minimizing
+        pT = vcoeff;
+     end
+        
+     
+
+    delta_u_num = zeros(uVars,size(tspan,2));
+	new_u_num = zeros(uVars,size(tspan,2));
+    
+    u_num = zeros(uVars,size(tspan,2));
+    for i = 1 : uVars
+        u_num(i,:) = ((u_max(i) + u_min(i)) / 2) .* ones(1,size(tspan,2));
+    end
+    
+    
+    % Gradient based Pontryagin algorithm for the correction of the 
+    % optimal control
+    corr = inf;
+    for iter = 1 : max_iter
+        if(corr <= delta)
+            break;
+        end
+        corr = 0;
+        
+        [t,x_num] = ode45(@numf,tspan,x0);
+        [t,p_num] = ode45(@numHx,tspanRev,pT);
+        p_num = flipud(p_num);
+        
+        for j = 1 : size(tspan,2)
+            % Compute the control change at time j
+            p_num_aux = p_num(j,:);
+            p_num_aux = p_num_aux(p_ind_Hu);
+            p_cell = num2cell(p_num_aux);
+            
+            x_num_aux = x_num(j,:);
+            x_num_aux = x_num_aux(x_ind_Hu);
+            x_cell = num2cell(x_num_aux);
+            
+            delta_u_num(:,j) = htHu(p_cell{:},x_cell{:});            
+            new_u_num(:,j) = u_num(:,j) + gamma(iter) .* delta_u_num(:,j);
+
+            % Project the new controls to the control space at time j
+            new_u_num(:,j) = min(new_u_num(:,j), u_max');
+            new_u_num(:,j) = max(new_u_num(:,j), u_min');
+            
+            % Compute the norm of the correction vector at time j
+            aux = norm(new_u_num(:,j) - u_num(:,j),'inf');
+            if(aux > corr)
+                corr = aux;
+            end            
+        end    
+        
+        u_num = new_u_num;
+    end
+	
+	m = size(u_num,1)+1;
+    u_num2(1,1) = 0.0;
+    u_num2(2:m,1) = u_num(:,1);
+    %
+    %for i=2:size(u_num,2)
+    %    if u_num(:,i) ~= u_num(:,i-1)
+    %        u_num2(1,i) = tspan(i);
+    %        u_num2(2:m,i) = u_num(:,i);
+    %    end
+    %end
+    %
+    ind = 2;
+    for i=2:size(u_num,2)-1
+        if ~isequal(u_num(:,i),u_num(:,i-1))
+            u_num2(1,ind) = tspan(i);
+            u_num2(2:m,ind) = u_num(:,i);
+        ind = ind + 1;
+        end
+    end
+    
+    u_numTransp = u_num2';
+	%u_numTransp = u_num';
+	 
+	commaHeader = [cHeader;repmat({','},1,numel(cHeader))]; %insert commaas
+	commaHeader = commaHeader(:)';
+	textHeader = cell2mat(commaHeader); %cHeader in text with commas
+	%write header to file
+	fid = fopen(csvfile,'w');
+	fprintf(fid,'%s\n',textHeader);
+	fclose(fid);
+	%write data to end of file
+	dlmwrite(csvfile,u_numTransp, 'precision', '%.8i','-append');
+    
+    % After the grandient algorithm has finished, u_num stores the optimal 
+    % control candidate    
+    if(doPlot == 1)        
+        % Plot the optimal control candidate and the underlying ODE solution
+        [t,x_num] = ode45(@numf,tspan,x0);    
+        %figure(03)
+        if(maximize > 0)
+            figure('Name','Maximized projection (candidate)');
+        else
+            figure('Name','Minimized projection (candidate)');
+        end
+        %iptsetpref('ImshowBorder','tight'); 
+        proj_num = zeros(size(x_num,1),1);
+        for i = 1 : size(x_num,2)
+            proj_num = proj_num + vcoeff(i) .* x_num(:,i);
+        end
+        plot(tspan,proj_num);    
+        %figure(04)       
+        if(maximize > 0)
+            h = figure('Name','Maximizing control (candidate)');
+        else
+            h = figure('Name','Minimizing control (candidate)');
+        end
+        %iptsetpref('ImshowBorder','tight');                            
+        plot(tspan,u_num);
+        if(wait)
+            waitfor(h)
+        end
+    end
+
+end

@@ -1,0 +1,252 @@
+function epsForMaxError(erodeMatlabScript,csvFile,max_allowed_slope_percentage)
+    clear(erodeMatlabScript);
+    beginTime=now;
+
+    eps_increment=0.1;
+    min_eps_increment=1e-6;
+    tolerance_espCLump=min_eps_increment;
+    
+    first_epsilon=eps_increment;
+    epsilon=first_epsilon;
+    chosen_epsilon=0;
+    beginLastEps=now;
+    endLastEps=now;
+    
+    
+    [x0,J,N,~,M0,driftName,modelName,maxPerturbation] = feval(erodeMatlabScript);
+    clear(driftName);
+        
+    fprintf('Jacobian loaded at time %s\n', datestr(now,'HH:MM:SS.FFF'))
+    
+    %how many Ji do we have
+    %k = size(J,1); 
+    %This is a function to remove the zero matrices from J
+    [J,k] = removeZeroJ(J,N);
+    
+    fprintf('Jacobian loaded and cleaned at time %s\n', datestr(now,'HH:MM:SS.FFF'))
+    fprintf('  We have %d Ji\n\n',k);
+    
+    
+    fprintf('Computing the maximum allowed error for slope percentage %d at time %s\n',  datestr(now,'HH:MM:SS.FFF'))
+    max_allowed_error=computeMaxAllowedError(driftName,x0,max_allowed_slope_percentage);
+    fprintf('\t Terminated at %s: with max allowed error %d\n',datestr(now,'HH:MM:SS.FFF'),max_allowed_error)
+    
+    use_avg_err=1;
+    error_comparison_tol=max_allowed_error/10;
+    chosen_err=0;
+    
+    consideredEpsilons=0;
+    
+    should_continue=1;
+    while should_continue
+        consideredEpsilons=consideredEpsilons+1;
+        beginLastEps=now;
+        fprintf('Computing epsCLump at (%s) for epslion=%d\n',datestr(now,'HH:MM:SS.FFF'),epsilon);
+        [avg_err,max_err,nRows]=epsCLump(epsilon,M0,J,k,modelName,driftName,tolerance_espCLump);
+        endLastEps=now;
+        if use_avg_err
+            err=avg_err;
+        else
+            err=max_err;
+        end
+        fprintf('Computed epsCLump at (%s): nRows=%d, epslion=%d, error=%d, max_allowed_error=%d\n',datestr(now,'HH:MM:SS.FFF'),nRows,epsilon,err,max_allowed_error);
+        if abs(err - max_allowed_error) < error_comparison_tol
+            fprintf(' ERROR EQUAL to maximum allowed one (%s).\n',datestr(now,'HH:MM:SS.FFF'));
+            should_continue=0;
+        else
+            current_eps=epsilon;
+            if err < max_allowed_error
+                fprintf(' ERROR BELOW the maximum allowed one. We store it but we check for larger epsilons satisfying it as well (%s).\n',datestr(now,'HH:MM:SS.FFF'));
+                chosen_epsilon=epsilon;
+                chosen_err=err;
+                begin_time_chosen_epsilon=beginLastEps;
+                end_time_chosen_epsilon=endLastEps;
+                epsilon=epsilon+eps_increment;
+                
+            else
+                fprintf(' ERROR ABOVE the maximum allowed one. We revert to previous epsilon, and use smaller increments.\n');
+                epsilon=epsilon-eps_increment;
+                eps_increment=eps_increment/2;
+                epsilon=epsilon+eps_increment;
+            end
+            
+            
+            if eps_increment < min_eps_increment
+                fprintf('We terminate because the epsilon increment (%d) has reached the minimum one (%d)\n',eps_increment,min_eps_increment);
+                should_continue=0;
+            elseif current_eps==epsilon
+                fprintf('We terminate because epsilon cannot be changed anymore due to precision issues (epsilon=%d, eps_increment=%d)\n',eps_increment);
+                should_continue=0;
+            end                
+        end
+        fprintf('\n\n');
+    end
+    
+    endTime=now;
+    
+    fprintf('The procedure terminated at (%s) with nRows=%d epslion=%d, error=%d, max_allowed_error=%d\n',datestr(now,'HH:MM:SS.FFF'),nRows,chosen_epsilon,chosen_err,max_allowed_error)         
+    
+    addCaption=0;
+    if ~isfile(csvFile)
+        addCaption=1;
+    end
+    
+    fprintf('\n')
+    fid = fopen(csvFile, 'a');
+    if(addCaption)
+        fprintf(fid,'modelName,maxPerturbation,epsilon,tolerance,size,nRows,avg_err,max_err,consideredEpsilons,secThisEpsilon,secTotal\n');
+        fprintf('Caption added to CSV file %s\n',csvFile);
+    end
+    fprintf(fid,"%s,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s\n",modelName,maxPerturbation,epsilon,tolerance_espCLump,size(x0,1),nRows,avg_err,max_err,consideredEpsilons,etime(datevec(end_time_chosen_epsilon),datevec(begin_time_chosen_epsilon)),etime(datevec(endTime),datevec(beginTime)));
+    fclose(fid);
+    fprintf('Line added to CSV file %s\n\n\n',csvFile);
+end
+
+function [avg_err,max_err,nRows]=epsCLump(epsilon,M0,J,k,modelName,driftName,tolerance)
+    %diary('myDiary')
+    
+    
+    
+    beginTime = now;
+    %fprintf('epsCLump invoked at time %s\n',datestr(beginTime,'HH:MM:SS.FFF'))
+    %fprintf('\tepsilon=%d,erodeMatlabScript=%s\n',epsilon,erodeMatlabScript)
+
+    %J is a list of J0, J1, J2, ...
+    %N is the number of variables
+    %epsilon is the epsilon
+    %M0 are the constraints to use in constrained lumping
+    
+%     [J,N,~,M0,driftName,modelName,maxPerturbation] = feval(erodeMatlabScript);
+%     clear(driftName);
+%         
+%     fprintf('Jacobian loaded at time %s\n', datestr(now,'HH:MM:SS.FFF'))
+%     
+%     %how many Ji do we have
+%     %k = size(J,1); 
+%     %This is a function to remove the zero matrices from J
+%     [J,k] = removeZeroJ(J,N);
+%     
+%     fprintf('Jacobian loaded and cleaned at time %s\n', datestr(now,'HH:MM:SS.FFF'))
+%     fprintf('  We have %d Ji\n',k);
+
+    %A simple default M0 where I want to sum the last two variables
+    %M0 = zeros(1,N);
+    %M0(1,N-1)=1;
+    %M0(1,N  )=1;
+    %disp(M0);
+
+    %Compute orthonormal rows spanning spanning the row space 
+    %of M0 and store them as M0 (use a numerically stable algorithm)
+    M0 = (orth(M0'))';
+    %disp(M0);
+    
+    %tolerance = 1e-10;
+    %tolerance = 1e-6;
+    %For e2 it changes whether we use 1e-11 or 2e-11
+    %tolerance = 1e-11;
+    %tolerance = 2e-11;
+    % if epsilon > 0
+    %     tolerance = min(tolerance,epsilon/10.0);
+    % end
+    beginEpsTolTime = now;
+    fprintf("\tComputation for epsilon=%d and tolerance=%d started at %s\n",epsilon,tolerance,datestr(beginEpsTolTime,'HH:MM:SS.FFF'));
+
+    %I precompute M^t and M^t * M.
+    % This will be updated every time we append one row to M
+    % we could preallocate memory for M, there should be at most N rows.
+    M=M0;
+    Mtransp = M';
+    MtranspM = Mtransp*M;
+    nRows=size(M,1);
+
+    %I begin my iterations
+    shouldContinue = 1;
+    iter=0;
+    while shouldContinue
+        iter=iter+1;
+        beginIterTime=now;
+        fprintf('\t  Iteration %d started at %s with %d rows in M. ',iter,datestr(beginIterTime,'HH:MM:SS.FFF'),nRows);
+        shouldContinue=0;
+        %disp(M);
+        for i=1:1:k
+            %Now I consider J{i}
+            %is size(M,1) recomputed everytime we change M?
+            nRows=size(M,1);
+            for rindex = 1:1:nRows
+                %Now I compute p
+                %p := rJi dot M T dot M
+                r = M(rindex,:);
+                rJi = r*J{i};
+                p = rJi*MtranspM; %p = rJi(M(1:k,:))'*M(1:k,:)
+
+                %Now we check if we have to add a new row to M
+                dist = norm(rJi - p);
+                if(dist - tolerance >= epsilon)
+                    nRows=nRows+1;
+
+                    %The orth ensures numerical stability, but it is
+                    %computationally intensive. We will change it later on
+                    M=[M;rJi];  %M(nRows,:)=rJi;
+                    M = (orth(M'))'; %M(1:k,:) = orth((M(1:k,:))')'                    
+
+                    %aux = (rJi - p)/norm(rJi - p);
+                    %M=[M;aux];
+
+                    Mtransp = M';
+                    MtranspM = Mtransp*M;
+                    shouldContinue=1;
+                end
+            end
+        end
+        endIterTime=now;
+        fprintf("Terminated in %s time with %d rows for epsilon %d\n",datestr(endIterTime-beginIterTime,'HH:MM:SS.FFF'),nRows,epsilon);
+    end
+        
+    endTime = now;
+    fprintf("\n\tTerminated %s with %d rows for epsilon=%d and tolerance=%d\n",modelName,size(M,1),epsilon,tolerance);
+    fprintf('\t The computation for this epsilon required %d iterations in %s time (it terminated at %s).\n',iter,datestr(endTime-beginEpsTolTime,'HH:MM:SS.FFF'),datestr(endTime,'HH:MM:SS.FFF'));
+    fprintf('\t Overall this model took %s time\n',datestr(endTime-beginTime,'HH:MM:SS.FFF'));
+    %Finally, I print M
+    %fprintf('We computed M:\n')
+    %disp(M)
+    %diary off
+
+    [avg_err,max_err] = computeErrors(M, 100, 300,driftName);
+    %fprintf('Avg error: %d, Max error: %d\n',avg_err,max_err)
+%    
+%     addCaption=0;
+%     if ~isfile(csvFile)
+%         addCaption=1;
+%     end
+%     
+%     fprintf('\n')
+%     fid = fopen(csvFile, 'a');
+%     if(addCaption)
+%         fprintf('Caption added to CSV file %s\n',csvFile);
+%         fprintf(fid,'modelName,maxPerturbation,epsilon,tolerance,nRows,avg_err,max_err,iteration,msThisEpsilon,msTotal\n');
+%     end
+%     fprintf(fid,"%s,%d,%d,%d,%d,%d,%d,%d,%s,%s\n",modelName,maxPerturbation,epsilon,tolerance,nRows,avg_err,max_err,iter,milliseconds(endTime-beginEpsTolTime),milliseconds(endTime-beginTime));
+%     fclose(fid);
+%     fprintf('Line added to CSV file %s\n\n\n',csvFile);
+
+end
+
+function [max_allowed_error] = computeMaxAllowedError(driftName,x0,max_allowed_slope_percentage)
+
+    %IC
+    %x0=[1,2,4,5];
+    
+    %This is the maximum allowed percentage of the slope at time point 0
+    %that we allow for: [0,1] = 0,100%. But we can even have more than 100%
+    %if needed
+    %We decide this value. The smaller it is, the smaller will be the
+    %accepted error
+    %max_allowed_slope_percentage 
+    
+    
+    fx0=norm(feval(driftName,0,x0));
+    
+    max_allowed_error=max_allowed_slope_percentage*fx0;
+   
+    %avg_err should be smaller than max_allowed_error
+end

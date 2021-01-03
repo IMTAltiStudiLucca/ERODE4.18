@@ -1,0 +1,87 @@
+Eclipse SDK 4.16 
+
+1)
+Downloaded eclipse SDK 4.16 from https://download.eclipse.org/eclipse/downloads/drops4/R-4.16-202006040540/ (via https://download.eclipse.org/eclipse/downloads/index.html)
+
+2) Edited Info.plist in Contents. I added
+<string>-vm</string><string>/Library/Java/JavaVirtualMachines/jdk1.8.0_191.jdk/Contents/Home/bin/java</string>			
+in 
+<key>Eclipse</key>
+		<array>
+
+You might also need to do from terminal xattr -cr ERODE.app
+		
+3) I installed XTEXT through add new software (https://www.eclipse.org/Xtext/download.html, releases)
+
+4) I installed NEBULA widgets through add new software (https://www.eclipse.org/nebula/downloads.php)
+
+5) I imported all projects from workspace ERODE473a, closing all projects but erode and the xtext ones
+
+6) I run ChemicalReactionNetwork.xtext of it.imt.erode.crn
+
+7) I removed some warnings from 'imports'
+
+8) I opened all feature, platform and product project general or for macosx. I cleaned all projects
+
+9) Project it.imt.erode.crn.platform.feature had a number of warnings:	
+31 plugin references could not be resolved 
+ (see migrationToEclipseSDK4.16ForBigSur_warnings_it.imt.erode.crn.platform.feature_.txt)
+
+10) I went to it.imt.erode.crn.product/ERODE.product, In tab overview I clicked on Cross Platform Wiki Page, and I followed the instructions of 'Multi-platform builds'
+
+11) I closed it.imt.erode.crn.platform.feature and I reopened it. 5 warnings were solved. I still had 26. After cleaning all projects we still have 26 warnings.
+I removed all of them from tab 'feature.xml' (see removedPluginsMigrationSDK4.16.txt)
+
+
+12) I opened ERODE.product of macosx. I clicked on Launch Eclipse application. 
+It gave some errors. I opened run configurations, ERODE.product, plug-ins. I removed tick from 'include optional dependencies when computing required plugins' and I clicked on 'add required plugins.
+From 218 selected plugins (out of 459) I got 227.
+These are the 9 added
+1 org.apache.batik.constants
+2 org.apache.batik.i18n
+3 org.apache.commons.io
+4 org.apache.xmlgraphics
+5 org.eclipse.e4.ui.dialogs
+6 org.eclipse.e4.ui.ide
+7 org.eclipse.equinox.supplement
+8 org.eclipse.ui.genericeditor
+9 org.eclipse.urischeme
+
+Instead, with 'include optional...' we get 233 plugins.
+
+13) I added the 9 plugins in tab included plugins of it.imt.erode.crn.platform.feature
+
+14)
+Now, 
+- Launch Eclipse application in ERODE.product of macosx works!
+- Export product for macosx works!
+	But I still have to modify by hands the info.plist
+	
+15)
+I opened all the projects for the remaning platforms.
+I have 3 warnings in it.imt.erode.crn.platform.win32.feature
+Plug-in reference 'org.eclipse.equinox.launcher.win32.win32.x86' cannot be resolved	feature.xml	/it.imt.erode.crn.platform.win32.feature	line 24	Plug-in Problem
+Plug-in reference 'org.eclipse.equinox.security.win32.x86' cannot be resolved	feature.xml	/it.imt.erode.crn.platform.win32.feature	line 31	Plug-in Problem
+Plug-in reference 'org.eclipse.swt.win32.win32.x86' cannot be resolved	feature.xml	/it.imt.erode.crn.platform.win32.feature	line 39	Plug-in Problem
+
+The same happens if one tries to open linux32. Could it be
+
+15)
+If I export linux64 it seems ok.
+If I export win64 I get an error
+	Processing inclusion from feature org.eclipse.equinox.executable: Unable to find plug-in: org.eclipse.equinox.launcher.win32.win32.x86_64_1.1.1200.v20200508-1552. Please check the error log for more details.
+
+16) 
+I moved the workspace in dropbox and I changed the name of the folder. I got some new errors of missing plugins (11).
+By closing all platform specific projects apart for the mac, I have 6 missing plugins in it.imt.erode.crn.platform.feature.
+I did again step 10 (multiplatform)	. I had first to 'remove the update site' and to add it again.
+I still had the warnings. I did 'clean' and they were gone.
+
+17) Now exporting of mac and linux64 seem to work.
+While win64 gives an error
+/Users/andrea/Dropbox/TOOLS/ERODE/ERODE416/.metadata/.plugins/org.eclipse.pde.core/temp/org.eclipse.pde.container.feature/package.org.eclipse.pde.container.feature.win32.win32.x86_64.xml:90: The following error occurred while executing this line:
+/Users/andrea/Dropbox/TOOLS/ERODE/ERODE416/.metadata/.plugins/org.eclipse.pde.core/temp/org.eclipse.pde.container.feature/package.org.eclipse.pde.container.feature.win32.win32.x86_64.xml:1217: The following error occurred while executing this line:
+/Applications/EclipseSDK4.16.app/Contents/Eclipse/plugins/org.eclipse.pde.build_3.10.800.v20200410-1419/scripts/genericTargets.xml:240: A problem occured while invoking the director.
+The following error occurred while executing this line:
+/Users/andrea/Dropbox/TOOLS/ERODE/ERODE416/.metadata/.plugins/org.eclipse.pde.core/temp/org.eclipse.pde.container.feature/package.org.eclipse.pde.container.feature.win32.win32.x86_64.xml:1217: The following error occurred while executing this line:
+/Applications/EclipseSDK4.16.app/Contents/Eclipse/plugins/org.eclipse.pde.build_3.10.800.v20200410-1419/scripts/genericTargets.xml:240: A problem occured while invoking the director.

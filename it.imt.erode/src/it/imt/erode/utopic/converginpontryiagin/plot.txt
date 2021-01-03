@@ -1,0 +1,13 @@
+    
+    % After the grandient algorithm has finished, u_num stores the optimal 
+    % control candidate    
+    if(doPlot == 1)        
+        % Plot the optimal control candidate and the underlying ODE solution
+        [t,x_num] = ode45(@numf,tspan,x0);    
+        figure(03)
+        iptsetpref('ImshowBorder','tight');                            
+        plot(tspan,x_num);    
+        figure(04)
+        iptsetpref('ImshowBorder','tight');                            
+        plot(tspan,u_num);       
+    end

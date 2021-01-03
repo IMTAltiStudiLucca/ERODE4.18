@@ -1,0 +1,16 @@
+
+getline(file2,line);
+ 
+for (int i=0;i<m;i++){
+   getline(file2,line);
+   std::stringstream    lineStream(line);
+   string       cell2;
+   getline(lineStream,cell2,',');
+   if(i>0){
+     t2[i-1]=string_to_interval(cell2.c_str());
+   }
+ 
+   for(int j=0; getline(lineStream,cell2,','); j++){
+      p2[i].val[j]=string_to_interval(cell2.c_str());
+   }
+}

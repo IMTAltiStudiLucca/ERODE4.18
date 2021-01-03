@@ -1,0 +1,2 @@
+https://stackoverflow.com/questions/62647625/not-able-to-run-eclipse-on-macos-big-sur
+https://bugs.eclipse.org/bugs/show_bug.cgi?id=565913

@@ -1,0 +1,15 @@
+while (!feof(fp)){
+  ch = fgetc(fp);
+  if(ch == '\n'){
+    m++;
+  }
+}
+m--;
+rewind(fp);
+
+UncertainParameters p2[m];
+t= 0.0;
+ 
+ 
+// getting u_min from file
+iVector t2(m);

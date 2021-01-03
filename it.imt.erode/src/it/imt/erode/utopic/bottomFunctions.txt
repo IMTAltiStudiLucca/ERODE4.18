@@ -1,0 +1,35 @@
+function dx = numf(t,x)
+
+    global u_num
+    global htf
+    global dt    
+    
+    i = max(floor(t / dt),1);    
+    u = u_num(:,i);  
+    u_cell = num2cell(u);
+    x_cell = num2cell(x);
+    dx = htf(u_cell{:},x_cell{:});
+end
+
+
+function dp = numHx(t,p)
+
+    global u_num
+    global x_num
+    global htHx
+    global x_ind_Hx    
+    global u_ind_Hx      
+    global dt    
+    
+    i = max(floor(t / dt),1);    
+    u = u_num(:,i);   
+    u = u(u_ind_Hx);
+    u_cell = num2cell(u);
+    x = x_num(i,:);
+    x = x(x_ind_Hx);    
+    x_cell = num2cell(x);
+    
+    p_cell = num2cell(p);    
+
+    dp = htHx(p_cell{:},u_cell{:}, x_cell{:})';
+end

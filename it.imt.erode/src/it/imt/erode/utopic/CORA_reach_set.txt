@@ -1,0 +1,75 @@
+ addpath(genpath(corapath));
+ tic
+ dim=size(x0_,1);
+
+%set options --------------------------------------------------------------
+options.tStart=0; %start time
+options.tFinal=T; %final time
+options.x0=x0_;
+options.R0=zonotope([options.x0,0.0*eye(dim)]); %initial state for reachability analysis
+
+options.timeStep=0.01; %time step size for reachable set computation
+options.taylorTerms=20; %number of taylor terms for reachable sets
+
+options.zonotopeOrder=80; %zonotope order
+options.intermediateOrder=30;
+options.reductionTechnique='girard';
+options.errorOrder=4;
+options.polytopeOrder=5; %polytope order
+options.reductionInterval=1e3;
+options.maxError = 1e1*ones(dim,1);
+
+options.plotType='frame';
+options.projectedDimensions=[1 2];
+
+options.originContained = 0;
+options.advancedLinErrorComp = 1;
+options.tensorOrder = 3;
+
+options.path = [coraroot '/contDynamics/stateSpaceModels'];
+%--------------------------------------------------------------------------
+
+v1=zeros(size(theta_min,2),1);
+v2=zeros(size(theta_min,2),1);
+for i=1:size(theta_min,2)
+    v1(i)=0.5*(theta_max(i)+theta_min(i));
+    v2(i)=0.5*(theta_max(i)-theta_min(i));
+end
+
+options.uTrans = v1; % center of uncertain inputs. 
+options.U = zonotope([zeros(size(theta_min,2),1),diag(v2)]); % input for reachability analysis
+
+
+% specify continuous dynamics-----------------------------------------------
+
+tank = nonlinearSys(dim,size(theta_min,2),@ode_cora,options); %initialize tank system
+%--------------------------------------------------------------------------
+
+
+%compute reachable set using zonotopes
+
+Rcont = reach(tank, options);
+tComp = toc;
+disp(['computation time of reachable set: ',num2str(tComp)]);
+
+%create random simulations; RRTs would provide better results, but are
+%computationally more demanding
+runs = 100; % number of simulation runs
+fractionVertices = 1; % fraction of initial states starting from vertices
+fractionInputVertices = 0.1; % fraction of input values taken from the vertices of the input set
+inputChanges = 6; %number of time the input changes in a simulation
+simRes = simulate_random(tank, options, runs, fractionVertices, fractionInputVertices, inputChanges);
+projectedDimensions = proyDim;
+
+% plot reachable set at time tFinal
+ind_finalSet = length(Rcont);
+plotFilled(Rcont{ind_finalSet}{1},projectedDimensions,[.8 .8 .8],'EdgeColor','none');
+xlabel(['x_{',num2str(projectedDimensions(1)),'}']);
+ylabel(['x_{',num2str(projectedDimensions(2)),'}']);
+hold on;
+ for i=1:length(simRes.t)
+     plot(simRes.x{i}(:,projectedDimensions(1)),simRes.x{i}(:,projectedDimensions(2)),'Color',0*[1 1 1]);
+ end
+ rmpath(genpath(corapath));
+end
+ 

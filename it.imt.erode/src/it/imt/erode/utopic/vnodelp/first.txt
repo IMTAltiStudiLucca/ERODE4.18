@@ -1,0 +1,19 @@
+char ch;
+while (!feof(fp)){
+  ch = fgetc(fp);
+  if(ch == '\n'){
+    m++;
+  }
+}
+m--;
+rewind(fp);
+
+UncertainParameters p[m];
+interval t= 0.0;
+ 
+ 
+
+// getting u_max from file
+
+iVector t_(m);
+string line;

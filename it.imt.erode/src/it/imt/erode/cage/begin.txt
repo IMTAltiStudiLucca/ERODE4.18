@@ -1,0 +1,30 @@
+    
+    dateString = datestr(datetime);
+	dateString=strrep(dateString,filesep,'_');
+	dateString=strrep(dateString,':','_');
+	dateString=strrep(dateString,'-','_');
+	dateString=strrep(dateString,' ','_');
+
+    diary off
+    diary(strcat('cage',strcat(dateString,'.txt')))
+    
+    dateString
+
+
+    tic;
+    
+    % Set precision to 32 bit
+    digits(32);
+      
+    % Threshold below which two reals are considered to be equal.
+    global tol
+    tol = 0.00000001;
+    
+    % List of guiding partitions
+    global gparts
+    gparts = [];  
+    
+    % Bounded computation constant. The algorithm will stop if 
+    % (n over 2) * |pset| exceeds comp_bound. Set comp_bound = 0 in the
+    % case an unbounded computation is desired.
+    global comp_bound;

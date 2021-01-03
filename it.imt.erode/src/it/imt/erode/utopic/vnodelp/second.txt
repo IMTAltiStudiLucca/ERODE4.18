@@ -1,0 +1,30 @@
+// Verified ODE solver solution for u_max control
+AD*myad;
+VNODE*Solver;
+for (int i=0; i<m ; i++){
+ myad= new FADBAD_AD(n,drift,drift,&p[i]);
+ Solver= new VNODE(myad);
+ Solver->integrate(t,y,t_[i]);
+ if(!Solver->successful()){
+    cout<<"VNODE-LP could not reach t = "<<t_[i-1]<<endl;
+    break;
+ }
+ delete myad, Solver; 
+}
+
+
+// print results
+interval res=0.0;
+cout<<"Maximum reachable point enclosure at t = "<<t_[m-1] <<endl;
+for (int i=0;i<n;i++)
+   res += coef[i]*y[i];
+cout << res << endl;
+
+/*************************************************************************
+*
+* Computing minimum of the reachable set 
+*
+*************************************************************************/
+
+
+m=0;

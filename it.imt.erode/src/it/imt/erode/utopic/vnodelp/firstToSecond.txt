@@ -1,0 +1,15 @@
+getline(file,line);
+int j;
+for (int i=0;i<m;i++){
+   getline(file,line);
+   std::stringstream    lineStream(line);
+   string       cell;
+   getline(lineStream,cell,',');
+   if(i>0){
+     t_[i-1]=string_to_interval(cell.c_str());
+   }
+ 
+   for(int j=0; getline(lineStream,cell,','); j++){
+      p[i].val[j]=string_to_interval(cell.c_str());
+   }
+}

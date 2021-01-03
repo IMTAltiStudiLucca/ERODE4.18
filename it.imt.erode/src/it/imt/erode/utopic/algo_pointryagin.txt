@@ -1,0 +1,392 @@
+function [res,theta_opt]=algo_pointryagin(i,alpha,T,x0,theta_min,theta_max,maxim)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%      Pontryagin Maximum Principle based algorithm
+%
+%      General explanation:
+%      This algorithm finds the maximum (or the minimum) of 
+%       \sum \alpha_i x_i(T), i.e.,
+%      a linear combination of (two) coordinates of the vector x at time T, 
+%      where x is given by \dot{x}(t)=f(x,\theta),
+%      with \theta\in\[theta_min,theta_max].
+% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%      Inputs: i,alpha,T,x0,theta_min,theta_max,maxim
+%	
+%      Input parameters description:
+%	    - i: coordinates that we want to maximize/minimize 
+%            Maximum number of coordinates is 2.
+%       - alpha: linear combination parameters
+%       - T: finite horizon
+%       - x0: initial point
+%       - theta_min, theta_max: extreme values of the interval where
+%	                        the unknown parameters belongs, i.e., 
+%				[theta_min,theta_max].
+%       - maxim: integer that specifies to maximize or minimize x_i(T) 
+%	         If maxim==1, we aim to maximize x_i(T), otherwise, minimize it
+%	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%	Outputs: x_res, theta_opt.
+%	
+%	Output parameters description:
+%	- res: the vector x at time t=T, i.e., res=(res_1(T),...,res_i(T),...),
+%	         where res_i(T) maximizes/minimizes x_i(T).
+%              
+%	- theta_opt: the control that maximizes/minimizes x_i(T)
+%
+%	Note for the output:
+%	  If the algorithm does not converge (in KMAX loops), we give a suboptimal
+%	  solution and, instead of giving the output that maximizes/minimizes x_i(T),
+%         the output is the one that maximizes/minimizes x_i(T) among all the obtained  
+% 	  curves in the loops.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%	Example1: 
+%	[x th]=algo_pointryagin2([1 2],[.5 .5],.1,rand(5,1),7,8,1,...
+%        'replicatedBindingSite2Asymm')
+%   we aim to find the maximum of 0.5*x_1(0.1)+0.5*x_2(0.1) where 
+%   \theta\in\[7,8], the system is replicatedBindingSite2Asymm and 
+%   the initial point is rand(5,1).
+%		     
+%	Example2: 
+%	[x th]=algo_pointryagin2([1 2],[1 0],.1,rand(5,1),7,8,1,...
+%        'replicatedBindingSite2Asymm')
+%   we aim to find the maximum of x_1(0.1) where 
+%   \theta\in\[7,8], the system is replicatedBindingSite2Asymm and 
+%   the initial point is rand(5,1).
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+x0=x0';
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%     COMPUTATION PARAMETERS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+h  = 0.001; 
+myT=ceil(T/h+1);
+KMAX=400; 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  INITIAL TRAJECTORY 1: ALWAYS THETA_MAX 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+disp('initial traj 1')
+theta=zeros(myT,size(theta_min,2));
+for t=1:myT-1
+    theta(t,:)=theta_max;
+end;
+theta(myT,:)=theta_max;
+    
+options = odeset('RelTol',1e-12,'Stats','off');
+[T2,X2]=ode15s(@(t,y) ode(t,y,theta,0:h:T), 0:h:T ,x0,options); 
+
+
+[x1,t1,k1,theta1] = fun_pontryagin(theta,i,alpha,x0,h,T,theta_min,theta_max,...
+    KMAX,T2,X2,maxim);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   INITIAL TRAJECTORY 2: ALWAYS THETA_MIN 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+disp('initial traj 2')
+for t=1:myT-1
+    theta(t,:)=theta_min;
+end;
+theta(myT,:)=theta_min;
+
+options = odeset('RelTol',1e-12,'Stats','off');
+[T2,X2]=ode15s(@(t,y) ode(t,y,theta,0:h:T), 0:h:T ,x0,options); 
+
+[x2,t2,k2,theta2] = fun_pontryagin(theta,i,alpha,x0,h,T,theta_min,...
+    theta_max,KMAX,T2,X2,maxim);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   INITIAL TRAJECTORy 3: THETA_MAX & THETA_MIN 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+disp('initial traj 3')
+for t=1:myT-1
+    if t<=myT/2
+        theta(t,:)=theta_min;
+    else
+        theta(t,:)=theta_max;
+    end
+end;
+theta(myT,:)=theta_max;
+    
+options = odeset('RelTol',1e-12,'Stats','off');
+[T2,X2]=ode15s(@(t,y) ode(t,y,theta,0:h:T), 0:h:T ,x0,options); 
+
+[x3,t3,k3,theta3] = fun_pontryagin(theta,i,alpha,x0,h,T,theta_min,...
+    theta_max,KMAX,T2,X2,maxim);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   INITIAL TRAJECTORY 4: THETA_MAX & THETA_MIN 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+disp('initial traj 4')
+for t=1:myT-1
+    if t<=myT/2
+        theta(t,:)=theta_max;
+    else
+        theta(t,:)=theta_min;
+    end
+end;
+theta(myT,:)=theta_min;
+
+options = odeset('RelTol',1e-12,'Stats','off');
+[T2,X2]=ode15s(@(t,y) ode(t,y,theta,0:h:T), 0:h:T ,x0,options); 
+
+[x4,t4,k4,theta4] = fun_pontryagin(theta,i,alpha,x0,h,T,theta_min,...
+    theta_max,KMAX,T2,X2,maxim);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   GET THE OPTIMUM TRAJECTORY AMONG THOSE THAT CONVERGED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if k1+k2+k3+k4<4*KMAX
+  if maxim==1
+   mymax=-1;
+   if k1<KMAX
+      mymax=alpha(1)*x1(size(t1,1),i(1))+alpha(2)*x1(size(t1,1),i(2)); 
+      x_opt=x1; t_opt=t1;
+      theta_opt=theta1;
+   end
+   if alpha(1)*x2(size(t2,1),i(1))+alpha(2)*x2(size(t2,1),i(2))>mymax && k2<KMAX
+        mymax=alpha(1)*x2(size(t2,1),i(1))+alpha(1)*x2(size(t2,1),i(1));
+        x_opt=x2; t_opt=t2;
+        theta_opt=theta2;
+   end
+   if alpha(1)*x3(size(t3,1),i(1))+alpha(2)*x3(size(t3,1),i(2))>mymax && k3<KMAX
+        mymax=alpha(1)*x3(size(t3,1),i(1))+alpha(2)*x3(size(t3,1),i(2));
+        x_opt=x3; t_opt=t3;
+        theta_opt=theta3;
+   end
+   if alpha(1)*x4(size(t4,1),i(1))+alpha(2)*x4(size(t4,1),i(2))>mymax && k4<KMAX
+        x_opt=x4; t_opt=t4;  
+        theta_opt=theta4;
+   end
+  else
+    mymin=1000;
+    if k1<KMAX
+      mymin=alpha(1)*x1(size(t1,1),i(1))+alpha(2)*x1(size(t1,1),i(2)); 
+      x_opt=x1; t_opt=t1;
+      theta_opt=theta1;
+    end
+    if alpha(1)*x2(size(t2,1),i(1))+alpha(2)*x2(size(t2,1),i(2))<mymin && k2<KMAX
+        mymin=alpha(1)*x2(size(t2,1),i(1))+alpha(2)*x2(size(t2,1),i(2));
+        x_opt=x2; t_opt=t2;
+        theta_opt=theta2;
+    end
+    if alpha(1)*x3(size(t3,1),i(1))+alpha(2)*x3(size(t3,1),i(2))<mymin && k3<KMAX
+        mymin=alpha(1)*x3(size(t3,1),i(1))+alpha(2)*x3(size(t3,1),i(2));
+        x_opt=x3; t_opt=t3;
+        theta_opt=theta3;
+    end
+    if alpha(1)*x4(size(t4,1),i(1))+alpha(2)*x4(size(t4,1),i(2))<mymin && k4<KMAX
+        x_opt=x4; t_opt=t4;  
+        theta_opt=theta4;
+    end
+  end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   THE CASE OF NON-CONVERGENCE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+else
+    disp('NO CONVERGENCE!')
+    if maxim==1
+      mymax=x1(size(t1,1),i); 
+      x_opt=x1; t_opt=t1;
+      theta_opt=theta1;
+      if x2(size(t2,1),i)>mymax
+        mymax=x2(size(t2,1),i);
+        x_opt=x2; t_opt=t2;
+        theta_opt=theta2;
+      end
+      if x3(size(t3,1),i)>mymax
+        mymax=x3(size(t3,1),i);
+        x_opt=x3; t_opt=t3;
+        theta_opt=theta3;
+      end
+      if x4(size(t4,1),i)>mymax
+        x_opt=x4; t_opt=t4; 
+        theta_opt=theta4;
+      end
+    else
+      mymin=x1(size(t1,1),i); 
+      x_opt=x1; t_opt=t1;
+      theta_opt=theta1;
+      if x2(size(t2,1),i)<mymin
+        mymin=x2(size(t2,1),i);
+        x_opt=x2; t_opt=t2;
+        theta_opt=theta2;
+      end
+      if x3(size(t3,1),i)<mymin
+        mymin=x3(size(t3,1),i);
+        x_opt=x3; t_opt=t3;
+        theta_opt=theta3;
+      end
+      if x4(size(t4,1),i)<mymin
+        x_opt=x4; t_opt=t4; 
+        theta_opt=theta4;
+      end    
+    end
+end    
+res=x_opt(size(t_opt,1),:);
+end
+
+
+function [X2,T2,k,theta]=fun_pontryagin(theta,i,alpha,x0,h,T,theta_min,theta_max,KMAX,T2,X2,maxim)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Main function of the Algorithm.
+% For a given input theta, it returns the trajectory that is the value that
+%     maximizes/minimizes \sum \alpha_i x_i(T), for alpha_i and T fixed.
+% Until convergence or it does KMAX loops, in each loop, it computes :
+%   (1) backward in time the optimal conditions for the costate vector
+%   (2) forward in time the optimal control theta
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+p=zeros(size(T2,1),size(x0,2));
+d = 0;
+d2 = 0; 
+k=0;
+mydif_=1;
+p20=p;
+while max(mydif_)>0.001  && k<KMAX
+    T2_=T2;
+    x_old2=X2;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Backward in time
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    p2=zeros(size(T2,1),size(x0,2));
+    if maxim==1 
+        p2(size(T2,1),i(1))=alpha(1);  p2(size(T2,1),i(2))=alpha(2);
+    else
+        p2(size(T2,1),i(1))=-alpha(1); p2(size(T2,1),i(2))=-alpha(2);
+    end
+    for t=size(T2,1):-1:2
+        p2(t-1,:)=p2(t,:)+(T2(t)-T2(t-1))*opt_costate(X2(t,:),theta(t,:),p2(t,:))';
+    end
+    p2=d*p20+(1-d)*p2;
+    d=k/(1+k);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Forward in time
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    x_=X2;
+   % theta0=theta;
+    theta=zeros(size(T2,1),size(theta_min,2));
+    for t=1:size(T2,1)-1
+       theta(t,:)=mytheta_max(x_(t,:),p2(t,:),theta_min,theta_max);
+    end
+    theta(size(T2,1),:)=mytheta_max(x_(size(T2,1),:),p2(size(T2,1),:),...
+        theta_min,theta_max);
+    
+    options = odeset('RelTol',1e-12,'Stats','off');
+    [T2,X2]=ode15s(@(t,y) ode(t,y,theta,T2_), 0:h:T ,x0,options); 
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Comparison with previus trajectory
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    mydif_=abs(alpha(1)*X2(:,i(1))+alpha(2)*X2(:,i(2))...
+              -alpha(1)*x_old2(:,i(1))-alpha(2)*x_old2(:,i(2)));
+    X2=d2*x_old2+(1-d2)*X2;
+    d2=k/(1+k);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Update "best" trajectory among those computed in the loops
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if k>1 
+        if maxim==1 && ...
+           alpha(1)*X2(size(T2,1),i(1))+alpha(2)*X2(size(T2,1),i(2))...
+           > alpha(1)*x_save(size(T2_save,1),i(1))+...
+           alpha(2)*x_save(size(T2_save,1),i(2))
+              x_save=X2;
+              T2_save=T2;
+              theta_save=theta;
+        end
+        if maxim~=1 && ...
+           alpha(1)*X2(size(T2,1),i(1))+alpha(2)*X2(size(T2,1),i(2))...
+           < alpha(1)*x_save(size(T2_save,1),i(1))+...
+           alpha(2)*x_save(size(T2_save,1),i(2))
+              x_save=X2;
+              T2_save=T2;
+              theta_save=theta;
+        end
+    else
+        x_save=X2;
+        T2_save=T2;
+        theta_save=theta;
+    end
+    k=k+1;
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% In case of non-convergence, it returs a suboptimal solution that is 
+%   the "best" trajectory among those that have been computed in the loops.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if k==KMAX
+   disp('Did not converge.') 
+   X2=x_save;
+   T2=T2_save;
+   theta=theta_save;
+end
+
+end
+
+function theta=mytheta_max(x,p,theta_min,theta_max)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Function to compute the optimal theta at time t, that is, the value of  
+%    theta that maximizes the inner product of f(x,theta) and  p
+% Given the linearity of the equations, the maximum is obtaines for 
+%   theta_min or theta_max.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+m=dec2bin(0:(2^(size(theta_min,2))-1)) - '0';
+
+mymax=-realmax;
+for i=1:size(m,1)
+   v=[];
+   for j=1:size(m,2)
+       if m(i,j)==1
+          v=[v theta_max(j)];
+       else
+          v=[v theta_min(j)];
+       end
+   end
+   f=ode2(x,v);
+   val=(dot(f, p));
+   if val>mymax
+       theta=v;
+       mymax=val;
+   end
+end
+
+
+end
+
+function p_=opt_costate(y,theta,p)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Function to compute the vector formed by the jacobian times the
+%   vector p.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+dfdx=myjacobian(y,theta);
+p_=zeros(size(p,2),1);
+
+for j=1:size(p,2)
+    p_(j)=dot(dfdx(j,:),p);
+end
+end
+
+	

@@ -1,0 +1,26 @@
+
+
+
+// Verified ODE solver solution for u_min control
+for (int i=0; i<m ; i++){
+ myad= new FADBAD_AD(n,drift,drift,&p2[i]);
+ Solver= new VNODE(myad);
+ Solver->integrate(t,y,t2[i]);
+ if(!Solver->successful()){
+    cout<<"VNODE-LP could not reach t = "<<t2[i-1]<<endl;
+    break;
+ }
+ delete myad, Solver; 
+}
+
+// print results
+res=0.0;
+//cout<<"Minimum reachable point enclosure at t = "<<t_[m-1] <<endl;
+cout<<"Minimum reachable point enclosure at t = "<<t2[m-1] <<endl;
+for (int i=0;i<n;i++)
+   res += coef[i]*y[i];
+cout << res << endl;
+
+return 0;
+}
+
