@@ -46,7 +46,6 @@
    <vm>
    </vm>
 
-
    <plugins>
       <plugin id="com.ibm.icu"/>
       <plugin id="it.imt.erode.crn.product"/>
@@ -146,7 +145,7 @@
    </configurations>
 
    <repositories>
-      <repository location="http://github.com/IMTAltiStudiLucca/ERODE-updatesites/raw/master/repository-macosx" enabled="true" />
+      <repository location="http://https://www.erode.eu/distr/repository-macosx" enabled="true" />
    </repositories>
 
    <preferencesInfo>

@@ -145,7 +145,7 @@
    </configurations>
 
    <repositories>
-      <repository location="http://github.com/IMTAltiStudiLucca/ERODE-updatesites/raw/master/repository-win64" enabled="true" />
+      <repository location="http://https://www.erode.eu/distr/repository-win" enabled="true" />
    </repositories>
 
    <preferencesInfo>
