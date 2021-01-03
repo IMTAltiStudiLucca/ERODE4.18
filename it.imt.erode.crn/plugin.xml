@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+	<extension point="org.eclipse.emf.ecore.generated_package">
+		<package 
+			uri = "http://www.imt.it/erode/crn/ChemicalReactionNetwork"
+			class = "it.imt.erode.crn.chemicalReactionNetwork.ChemicalReactionNetworkPackage"
+			genModel = "model/generated/ChemicalReactionNetwork.genmodel" />
+	</extension>
+</plugin>

@@ -1,0 +1,305 @@
+Sundials does not work on my laptop at santanna (windows64, java 32)
+	-The fact is that I downloaded erode-java-32 in my Windows 64 bits. Probably I distributed sundials 32 there, while I should have sundials 64
+//TODO: SyntacticMarkovianBisimilarityNary
+	REMOVE ARRAY speciesCounters[] AND PUT HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM AS IN CRNBISIMULATIONNARY
+
+load() has problems with more species in the same line.
+	The problem is that it is difficult to handle both
+		s1 s2
+	and
+		s1 = 3 * 2 s2
+	A separator ';' at the end of each species would help		
+I have to absolutely clean the code about exportLNA
+
+JACOBIAN DOES NOT WORK!
+The problem is with ODE format (or, more in general, non mass-action).
+For now, I have added a check to rise an exception in case one tries to use it on non supported models. 
+	I might implement an implicit MA-RN conversion
+		begin model runningSymm
+		begin init
+		x1 = 200
+		x2 = 100
+		x3 = 100
+		end init
+		begin ODE
+		d(x1) = -4*x1 + x2 + x3
+		d(x2) = 2.00*x1 - x2
+		d(x3) = 2.00*x1 - x3
+		end ODE
+		exportMatlab(fileOut="pino.m",tEnd=1,writeJacobian=true)
+		write(fileOut="works.ode",format=MA-RN)
+		end model
+	
+
+##########
+###DAEs###
+##########
+Manual
+	sundials
+		cvode
+		dae
+	dae
+		reduction via exporting
+Create sample DAE		
+Hand-written importer for ._ode with DAE
+Write models in files 
+	(simple: if a species is algebraic, write it as an algebraic species)
+Initialpartition
+	algebraicvariables
+ModelDefKind.DAE?
+	Do we need it?
+		In case, it has to be done/used here: MyParserUtil	
+Forbid reductions and analysis for DAE (if you have an algebraic species)
+	in xtext
+	in the core
+	
+What happens when we create a reduced model?
+	each 'algebraic block' should become an algebraic variable?
+		CRNReducerCommandLine.computeReducedCRN_DSBSMB
+		CRNReducerCommandLine.computeReducedCRN_EFSB
+	For the moment we disable the generation of the reduced model	
+	
+Stefano's checks for DAE in xtext	
+##########
+###DAEs###
+##########
+
+
+
+
+
+
+	 
+
+
+reversible reactions
+transform fake arbitrary reactions in
+
+http://commons.apache.org/proper/commons-math/userguide/linear.html
+http://commons.apache.org/proper/commons-math/userguide/leastsquares.html
+
+How to force the use of a particular version of Java:
+Pass the following option using the ini file of Eclipse
+-vm /Library/Java/JavaVirtualMachines/jdk1.8.0_144.jdk/Contents/Home/bin/java
+
+URGENT:
+	preserva i parametri che vuoi mantanere facendo currying
+	fai checkUniqueParameterToCurry simile a checkUniqueParameterToPerturb(with bound). And check if it has been done also for the parameters without bound 	
+	
+	Handle java.lang.outofmemoryerror: GC overhead exceeded
+	Non generare file ridotto se non trovi riduzione
+	Customize parser: http://www.euclideanspace.com/software/development/eclipse/xtext/grammar/index.htm
+	BDE does not work with this model (because we can have 2-a = 0 or 2-b=0) 
+		d(a) = 1/(2 - a)  
+  		d(b) = 1/(2 - b) 
+	CompactCSVMatrixImporter: //TODO: complete the creation of the prepartiti USER using b (maybe also a tolerance?)
+	this view fails: test = max(species , 0)
+	BNG BENCHMARKS (webpage with all the used BNG files)
+	Expose exception: Hill not supported when loading BNG
+	Expose exception: functions not supported when loading BNG
+	consider simhya of Bortolussi for stochastic simulation. Apparently it is much more efficient than FERN (bikes model from Laura). Check performance of Bike733 mass action (delete min, and compute massaction), so to check if ERODE is slow due to arbitrary.
+	CRNVectorField is now much more efficient for non-massaction CRNs. However, it will not work for species with names not supported by MathEval. Also, there might be problems with ODEs imported from MATLAB. rateLawsString has to be pre-processed in order to replace the names with the supported ones 
+	RN encoding of power (x^2) does not work. Transform it in x*x
+	export symbolic jacobian 
+	Suppose you have an arbitrary reaction X1 + X2 -> X3 arbitrary X1*X2*k1
+		This is actually a mass action CRN.
+		Can we discover this and transform the reaction in mass action? Or at least raise a warning?
+	
+
+	Put libz3.dylib and libz3java.dylib in erode.app/Contents/MacOS
+	check concentrations>0 (due to Jacobian) for pointryagin
+	Exception not caught when exporting in matlab symmetricBindingSites8 and sx_EGFR.ode
+	Fix creation of reactions in CRNImporter (and censequently in GUICRNImprter: create composite only for n-ary)
+	Terminate loading of MRMC
+	Generazione modello ridotto troppo lento
+	Se carichi MRMC dando un .lab che non esiste si blocca	
+	
+	//Non fare sparire i parametri = 1.
+	//I cannot use parameters as expononents!
+	//Quando chiediamo di scrivere un file in una cartella che non esiste otteniamo una eccezione. Gestiscila e mostrala nel dialog! Cosa succede quando leggiamo un file che non esiste?	
+	//The "multimodel" seems to work. However, all commands are executed in parallel. Sequenzialize them!
+	//If we do the z3 partition refinement for regulatory boolean networks, forbid all things that cannot be used with a boolean network
+	//Remove check "Source is in the hierarchy of the destination."
+	//When creating .crn or ._ode files, we should use the short names format.
+	//NO: Divide by multinomial in stochastic simulation
+	//usa sirius per disegnare CRNs: https://eclipse.org/sirius/getstarted.html
+	disable automatic validation after every change. Force it after save only.
+	forbid symbolicparameters in views. We can use ReferenceToParameterOrSpecies
+	export LBS: views and commands
+	1. 
+		FEM -> Jacobi
+		AX -> affine
+		importAffine(AMatrix="pippo.csv",bVector="")
+		importJacobi(AMatrix="pippo.csv",bVector="")
+		
+		2. terminate reduced model
+		
+		3. 300 species e 300 reazioni sono ancora gestibili
+		
+		4 non creare .crn, ma ._ode. Serve poi un importer per leggerlo.
+		
+		5. opzione per scrivere ._ode disabilitato. Usa opzione per abilitarlo
+		
+
+	//Terminate ode
+	//Problemi con file? importBNG(fileIn="BNGNet/pippo.net") does not work. Also, the relative path should start from the folder where the file il located    
+	//buttons for reductions (bb=ic,fb=user). buttons for new project, new file
+	//tell about termination button in the manual
+	//per "disegnare" la crn, guarda post it: petri net + short cut per 1 -> 1, + short cut per catalytic
+	//show error to user if unrecognized command
+	//check outline/validation, because we are getting exception with importlbs
+	//forbid var for non mass action 
+	//Now, if we are asked to write a .ode file with more than 300 species/reactions we do a small model importing a .crn file.
+		Instead of the .crn, we should write a ._ode, which is just a .ode with some constraints (each "line" should stay in a line) to allow for our direct parsing.
+		We should implemented the parsing for ._ode files, and add a comment about these constraints at the beginning of the file. 
+	//Syntactic check for preventing the user to use covariances or jacobians of non-mass action CRNs.x
+	//Inject the terminator in other time-consuming operations (odes, and maybe also import)
+	//Check PALOMAMomentClosureImporter, it is written terribly 
+	//Generate Matlab file for allbdes/allfdes 
+	//Confidence intervals, and copy new observer in a file of its own.
+	//Button to close all the plotviews
+	//K N1 N2 etc of Hill became keywords
+	//Problem with p2 = 2*p1*p2 (recursion): check if a parameter appears in its own equation, and forbid it. We have problems with circular dependency... Thus, we should check if a parameter is defined in terms of a parameter defined later.
+	//Problem with p = p2 p2 = p (cyclic definition)
+	//Decrease number of parenthesis as done in GUICRNImporter
+	//Synchronize file name with model name. When a file is renamed, rename the model... error if differ
+	
+	//In order to open a perspective: 
+	try {
+        IWorkbench workbench = PlatformUI.getWorkbench();
+        workbench.showPerspective(EapPerspective.ID,
+                workbench.getActiveWorkbenchWindow());
+    } catch (WorkbenchException e) {
+        e.printStackTrace();
+    }
+	
+	
+	//I obtain an exception with this:
+	begin model myBotellon
+	 begin parameters
+	  ic1 = 10 				//Population in square 1
+	  ic2 = 11 				//Population in square 2
+	  N   = ic1+ic2         // Total population 
+	  socialisation = 2					// Socialisation factor: avg number of friends
+	  //Transition matrix
+	           q12 =  1  
+	  q21 =  1                     
+	   
+	  q1Out = q12
+	  q2Out = q21
+	 end parameters
+	 /*
+	  * We have one species per square, representing the number of people in that square
+	  */
+	 begin init
+	  s1 = ic1
+	  s2 = ic2
+	end init
+	 /*
+	  * The dynamics of people in each square
+	  */
+	 begin ODE
+	  d(s1) = (2/**socialisation / N*/) * ( -s1*s1*q1Out +          s2*s2*q21)
+	  d(s2) = (2/**socialisation / N*/) * ( -s2*s2*q2Out + s1*s1*q12         )
+	 end ODE
+	 simulateCTMC(tEnd=1.0 , viewPlot=true , viewLabels=true,repeats=10)
+	end model
+
+
+LESS URGENT:
+	//Indent
+	//Animation when drawing plot
+	//Shall we handle "this" in a better way?
+	//Flag polynomialODEs in ODE? So that we can use reduceBB/reduceFB and reduceNBB/reduceNFB?
+	//We almost have a proper import. Select which formats we want to support. Also, maybe auto-completion might suggest the user to replace the load/import with the crn itself as we do now upon execution
+	//I didn't manage to import the new crn format. Hence, I disabled "load" and "fileIn". The idea is that we use only the "importXXX" to use the other formats. While there is no reason to load other crn files. In case, I could implement some importing functionalities via xtext for the files in the same project.
+
+
+//Define template to automatically provide begin parameters/species/views - end parameters/species/views: https://www.eclipse.org/Xtext/documentation/304_ide_concepts.html#templates
+//Improve warning of reductions: can we check when we have polynomial ODEs?
+//Use images for the quickfixes etc
+//Collapse expressions and expressionswithspecies and withcov
+
+
+
+//we need to define a perspective/view for erode: the button (and any other view) should appear only there.
+
+//Nice guide https://sewiki.iai.uni-bonn.de/teaching/lectures/atsc/2012/xtext#third_iterationvalidation_unique_names
+
+//New examples:
+	boolcube
+	chemkin
+	
+//z3 releases: https://github.com/Z3Prover/z3/releases
+
+update site: it.imt.erode.crn.updatesite
+Category of update site
+	erode
+	ERODE
+	ERODE: a fully featured Eclipse plugin for the Evaluation and Reduction of Ordinary Differential Equations
+	
+	
+Tutorials:
+Create RCP
+	https://kthoms.wordpress.com/2010/11/12/setting-up-a-rcp-product-for-a-dsl/
+	http://www.vogella.com/tutorials/EclipseRCP/article.html
+	http://www.vogella.com/tutorials/EclipsePlugIn/article.html
+
+Eclipse RCP and  update sites
+	http://www.vogella.com/tutorials/EclipseP2Update/article.html	
+
+Hide wizards:
+	https://www.eclipse.org/forums/index.php/t/160373/
+	http://stackoverflow.com/questions/4056957/eclipse-rcp-app-how-to-disable-specific-extenstions
+	http://blog.vogella.com/2009/07/13/eclipse-activities/
+	http://stackoverflow.com/questions/19654245/how-to-remove-unwanted-menu-contributions-in-eclipse-rcp-application
+	<activityPatternBinding
+     activityId="it.imt.erode.crn.ui.activityDisable"
+     pattern=".*/org.eclipse.ui.run.*">
+
+Export RCP to different platforms:
+	https://wiki.eclipse.org/Building
+		use this update site: http://download.eclipse.org/releases/neon/, untick "group", and select the following plugins: Eclipse RCP, Eclipse RCP Plug-in Developer Resources, Equinox Target Components
+     
+Executables/installer
+	http://www.eclipsecon.org/europe2012/sessions/how-compile-microsoft-windows-rcp-installer-nsis-using-linux.html
+	https://openchrom.wordpress.com/2011/09/06/microsoft-windows-users-love-setup-files/     
+  
+how to create dmg:
+	Rename macos... in Contents
+	Rename the folder ERODE in ERODE.app
+	hdiutil create -srcfolder ERODE.app ERODE.dmg
+	
+GIT
+	http://www.vogella.com/tutorials/EclipseGit/article.html	     	
+	
+Splash screen
+	https://eclipse.org/articles/Article-Branding/branding-your-application.html
+	http://www.files-conversion.com/file-convert/converted.php?nom=erodelogo256.xpm
+	https://iconverticons.com/online/
+	
+This is necessari in the plugin.xml of it.imt.erode.crn.ui to do the launcher:
+<extension
+         point="org.eclipse.debug.core.launchConfigurationTypes">
+      <launchConfigurationType
+            delegate="it.imt.erode.crn.ui.launcher.ERODELaunchConfigurationDelegate"
+            delegateDescription="The ERODE Launcher allows to execute an ERODE program"
+            delegateName="ERODE Launcher"
+            id="it.imt.erode.crn.ui.ERODElaunchConfigurationType"
+            modes="run"
+            name="ERODE Program">
+      </launchConfigurationType>
+   </extension>
+   <extension
+         point="org.eclipse.debug.ui.launchConfigurationTabGroups">
+      <launchConfigurationTabGroup
+            class="it.imt.erode.crn.ui.launcher.ERODETabGroup"
+            id="it.imt.erode.crn.ui.ERODElaunchConfigurationTabGroup"
+            type="it.imt.erode.crn.ui.ERODElaunchConfigurationType">
+            <launchMode
+                  mode="run"
+                  description="%localJavaApplicationTabGroupDescription.run">
+            </launchMode>
+      </launchConfigurationTabGroup>
+   </extension>	
+  http://help.eclipse.org/mars/index.jsp?topic=%2Forg.eclipse.platform.doc.isv%2Fguide%2Fdebug_launch_adding.htm 

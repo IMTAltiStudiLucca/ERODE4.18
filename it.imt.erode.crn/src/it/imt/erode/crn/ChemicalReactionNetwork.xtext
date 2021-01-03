@@ -1,0 +1,1900 @@
+grammar it.imt.erode.crn.ChemicalReactionNetwork with org.eclipse.xtext.common.Terminals
+
+generate chemicalReactionNetwork "http://www.imt.it/erode/crn/ChemicalReactionNetwork"
+
+import "http://www.eclipse.org/emf/2002/Ecore" as ecore
+ 
+Model :
+//modelDefinitions = ModelDefinition
+(settings += Settings)*
+modelDefinitions += ModelDefinition*
+;
+
+//I override the ID terminal to remove the initial '^?'
+//This allowed me to solve the problems with the power operator (I was forced to use parenthesis when the exponent was not a number)
+@Override 
+terminal ID: ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|'_'|'0'..'9')*;
+
+Settings:
+	UniqueReagents|Precision
+;
+
+UniqueReagents:
+	'unique' 'reagents' '=' uniqueReagents = BooleanValue 
+;
+Precision:
+	'precision' '=' precision = NAT
+;
+
+ModelDefinition : 	
+(	
+	'begin' 'model' name = ID ('[' 'logger' '=' log=BooleanValue ']')?
+		(
+			(
+				(
+					(
+						(
+							(elements += SymbolicParametersList)
+							(elements += ConstraintsOnSymbolicParametersList)?
+						)?
+						(elements += ParametersList)?
+						(elements += ICList)
+						(elements += AlgICList)?
+						(elements += InitPartition)?
+						((elements += ReactionsList) | (elements += ODEsList (elements += AlgebraicList)?) /*| (elements += RegulatoryNetwork)*/)  
+						(elements += ViewsList)?
+					)
+						| 	elements+= Import
+				)
+				(elements += Command)*
+			)
+		|  elements+=ImportFolder
+		)
+	'end' 'model'	
+)
+|
+(	
+	'begin' 'Boolean' ('Network'|'network') name = ID ('[' 'logger' '=' log=BooleanValue ']')?
+		(
+			(
+				elements += NodeDeclarations
+				(elements += InitPartition)?
+				elements += NodeDefinitions
+				(elements += BooleanCommand)*
+			)
+			|  elements+=BooleanImportFolder
+		)
+	'end' 'Boolean' ('Network'|'network')	
+)
+;
+
+ImportFolder:
+	importSBMLFolder
+;
+
+BooleanImportFolder:
+	importBNetFolder
+;
+importBNetFolder:
+	'importBNetFolder' '(' params = ParametersImportFolder ')'
+	//'importSBMLFolder' '(' 'folderIn' '=' folderIn = STRING ',' 'folderOut' '=' folderOut = STRING (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
+;
+
+/*ModelDefinition:	
+'begin model' name = ID
+	(
+		((elements += ParametersList)?
+			//'begin parameters' (parameters += Parameter)+ 'end parameters'
+			(
+				('begin net' //name = ID
+			    	(elements += SpeciesList)
+		 	    	(elements += ReactionsList)
+			     'end net')
+			 	|
+				('begin ODE'
+			  		(elements += ODEsList)
+			  		(elements += ICList)?
+			 	'end ODE')
+			)
+			//(elements += ViewListsOrCommands)*
+			//(elements += ICList)?
+			(elements += ViewsList)?
+		)
+		| 
+		elements+= Import
+	)
+	(elements += Command)*
+'end model'	
+;*/
+
+//ViewListsOrCommands:
+//	//ICList |
+//	ViewsList |
+//	Command
+//;
+
+AlgICList: {AlgICList}
+	('begin' 'alginit') (allAlgSpecies += AlgSpecies)+ ('end' 'alginit')
+;
+
+ICList : {ICList} 
+  //('begin initialConcentrations'|'begin IC') (allIC += InitialConcentration)+ ('end initialConcentrations'|'end IC')
+  //('begin initialConcentrations') (allIC += InitialConcentration)* ('end initialConcentrations')
+  ('begin' 'init') (allSpecies += Species)+ ('end' 'init')
+;
+
+InitPartition : {InitPartition} 
+  ('begin' 'partition') ((allBlocks += Block) (',' allBlocks += Block)*)? ('end' 'partition')
+;
+
+Block:
+	//'{' (allSpecies+=[Species]) (',' allSpecies+=[Species])* '}'
+	//'{' (allSpecies+=ReferenceToSpeciesOrNode) (',' allSpecies+=ReferenceToSpeciesOrNode)* '}'
+	'{' (allSpecies+=[SpeciesOrNode]) (',' allSpecies+=[SpeciesOrNode])* '}'
+	//'{' (allSpecies+=[Species|IDorSTRING]) (',' allSpecies+=[Species|IDorSTRING])* '}'
+;
+
+/*InitialConcentration:
+	//name=[SpeciesForODE] '=' ic = ArithmeticExpression //';'
+	name=[Species] '=' ic = ArithmeticExpression //';'
+;*/
+
+ODEsList: {ODEsList}
+	'begin' 'ODE' (odes += ODE)* 'end' 'ODE'	 
+;
+
+ODE:
+ 'd' '(' name = [Species] ')' '=' drift = ArithmeticExpressionWithSpecies
+ //'d' '(' name = [Species|IDorSTRING] ')' '=' drift = ArithmeticExpressionWithSpecies	
+	
+  //'[' name = [Species] ']' '=' drift = ArithmeticExpressionWithSpecies ';'
+ // name = SpeciesForODE '=' drift = ArithmeticExpressionWithSpecies //';'
+;
+
+BasicConstraint:
+	symbolicParameter = [SymbolicParameter] comp = Comp constraint = ArithmeticExpressionWithSymbPar //NAT
+;
+
+AlgebraicList: {AlgebraicList}
+	'begin' 'algebraic' (algs += ALG)* 'end' 'algebraic'
+;
+
+ALG:
+	name = [AlgSpecies] '=' drift = ArithmeticExpressionWithSpecies
+;
+
+/*ODEDef :
+	 //'[' allSpecies += Species ']'
+	 //'[' species = Species ']'
+	 //'[' Species ']'
+	//'d' ID
+	//'d' '(' allSpecies += SpeciesForODE ')'
+	allSpecies += SpeciesForODE
+;*/
+
+
+
+ConstraintsOnSymbolicParametersList: {ConstraintsOnSymbolicParametersList}
+	'begin' 'constraints' (constraints += Constraint)* 'end' 'constraints'
+;
+
+//OR DEVE VENIRE PRIMA DI AND. ALTRIMENTI NON FUNZIONANO LE PRECEDENZE
+Constraint returns BoolExpr:
+	AndBoolConstraintExpr	
+;
+
+AndBoolConstraintExpr returns BoolExpr: 
+	OrBoolConstraintExpr ({AndBoolConstraintExpr.left=current} 'and' right=OrBoolConstraintExpr)* 
+;
+OrBoolConstraintExpr returns BoolExpr: 
+	ImpliesBoolConstraintExpr ({OrBoolConstraintExpr.left=current} 'or' right=ImpliesBoolConstraintExpr)* 
+;
+ImpliesBoolConstraintExpr returns BoolExpr: 
+	PrimaryOrNotPrimaryBooleanConstraintExpr ({ImpliesBoolConstraintExpr.left=current} 'implies' right=PrimaryOrNotPrimaryBooleanConstraintExpr)* 
+;
+
+PrimaryOrNotPrimaryBooleanConstraintExpr returns BoolExpr:
+	PrimaryBooleanConstraintExpr | NotConstraintExpr 
+;
+
+NotConstraintExpr returns BoolExpr:
+	'!' PrimaryBooleanConstraintExpr {NotConstraintExpr.left=current}
+;
+
+PrimaryBooleanConstraintExpr returns BoolExpr:
+ PrimaryConstraint   
+ | '(' AndBoolConstraintExpr ')' 
+ ;
+
+PrimaryConstraint: 
+	FalseConstraint | TrueConstraint
+	| BasicConstraint
+	//| DisequationOfPredicateExpr
+;
+
+TrueConstraint: {TrueConstraint} //; returns STRING:{STRING}
+	"true"
+;
+FalseConstraint: {FalseConstraint} //; returns STRING:{STRING}
+	"false"
+;
+
+/*BasicConstraint:
+	symbolicParameter = [SymbolicParameter] comp = Comp constraint = ArithmeticExpressionWithSymbPar //NAT
+;*/
+
+Comp:
+	('<' | '>' | '<=' | '>=' | '=' | '!=') 
+;
+
+SymbolicParametersList : {SymbolicParametersList}
+  	'begin' 'symbolic' 'parameters' (symbolicParameters += SymbolicParameter)* 'end' 'symbolic' 'parameters'
+;
+
+SymbolicParameter:
+	name = ID
+;
+
+ParametersList : {ParametersList}
+  	'begin' 'parameters' (parameters += Parameter)* 'end' 'parameters'
+;
+
+Parameter:
+	name = ID '=' paramValue=ArithmeticExpression //';'
+;
+
+/*SpeciesList : {SpeciesList}
+  //'begin species' (allSpecies += Species)+ 'end species'
+  'begin species' (allSpecies += SpeciesForCRN)+ 'end species'
+;*/
+
+AlgSpecies:
+	name = ID (('=' ic = ArithmeticExpression)?) (('(' originalName = STRING ')')?)
+;
+
+//A species and its (optional) initial concentration 
+Species:
+	name = ID (('=' ic = ArithmeticExpression)?) (('(' originalName = STRING ')')?)
+	//name = IDorSTRING (('=' ic = ArithmeticExpression)?)
+	
+	//SpeciesForODE |SpeciesForCRN
+	//name = ID (ic=ArithmeticExpression)?
+	//name = ID (ic=ArithmeticExpression?)
+	//name = ID ic=ArithmeticExpression
+	//name = ID (('=' ic = ArithmeticExpression)?)
+	//name = ID //'text' text = STRING
+;
+
+/*IDorSTRING:
+	ID|STRING
+;*/
+   
+
+/*SpeciesForCRN:
+	name = ID (('=' ic = ArithmeticExpression)?)
+;
+
+SpeciesForODE:
+	//name = ID
+	'd' '(' name = ID ')'
+;*/
+
+/*
+ParameterOrSpecies:
+	Parameter|Species
+;
+
+ReferenceToParameterOrSpecies: {ReferenceToParameterOrSpecies} 
+	reference=[ParameterOrSpecies]
+;
+*/
+
+ParameterOrSymbolicParameterOrSpecies:
+	SymbolicParameter|Parameter|Species|AlgSpecies
+	//SymbolicParameter|ParameterOrSpecies
+;
+
+ReferenceToParameterOrSymbolicParameterOrSpecies: {ReferenceToParameterOrSymbolicParameterOrSpecies} 
+	//reference=[ParameterOrSymbolicParameterOrSpecies|IDorSTRING]
+	reference=[ParameterOrSymbolicParameterOrSpecies]
+;
+
+ReactionsList: {ReactionsList} 
+  'begin' 'reactions' (allReactions += Reaction)* 'end' 'reactions'	
+;
+
+Reaction:
+	//reagents = Composite '->' products = Composite ',' rate=ArithmeticExpression ';'
+	//reagents = ID '->' products = ID ',' rate=[Parameter]
+	reagents = Composite '->' products = Composite ',' rate=RateOfReaction ('[' (name += ID)* ']')? //';' 	
+;
+
+RateOfReaction:
+	MassActionRate //value=ArithmeticExpression 
+	|
+	ArbitraryRate
+	|
+	HillRate
+	/*'arbitrary' rate=ArithmeticExpressionWithSpecies |
+	'Hill' K = ArithmeticExpression R1 = ArithmeticExpression R2 = ArithmeticExpression n1 = ArithmeticExpression n2 = ArithmeticExpression*/
+;
+
+HillRate:
+	'Hill' 'h_K' K = ArithmeticExpression 'h_R1' R1 = ArithmeticExpression 'h_R2' R2 = ArithmeticExpression 'h_n1' n1 = NAT 'h_n2' n2 = NAT	
+;
+
+MassActionRate:
+	rate= ArithmeticExpressionWithSymbPar//ArithmeticExpression
+;
+
+ArbitraryRate:
+	'arbitrary' rate=ArithmeticExpressionWithSpecies
+;
+
+//SpeciesValue:
+//	value=[Species]
+//	//value=[Species|IDorSTRING]
+//;
+
+/*SpeciesOrSpeciesValue: 
+	Species | SpeciesValue
+;	*/
+
+SpeciesWithMultiplicity:
+	(multiplicity=NAT '*')?species=[Species]
+	//(multiplicity=NAT '*')?species=[Species|IDorSTRING]
+	
+	//(multiplicity=NAT '*')?species=[Species]
+	//(multiplicity=NAT '*')?species=[Species] |
+	//(multiplicity=NAT '*')?species=allSpecies+=ID
+	//(multiplicity=NAT '*')? (allSpecies+= ID | species=[Species]) 
+	//(multiplicity=NAT '*')?species=[SpeciesForCRN] 
+	//(multiplicity=NAT '*')? (species=[Species] | allSpecies += Species)
+	//(multiplicity=NAT '*')? allSpecies += Species |(multiplicity=NAT '*')? species = SpeciesValue
+	//(multiplicity=NAT '*')?species=SpeciesOrSpeciesValue 
+;
+
+Composite:
+	speciesOfComposite+= SpeciesWithMultiplicity ('+' speciesOfComposite+= SpeciesWithMultiplicity)* 
+	//speciesOfComposite+= [Species]+
+;
+
+ViewsList : {ViewsList}
+  'begin' 'views' (allViews += View)* 'end' 'views'
+;
+
+View:
+	name = ID '=' expr=ArithmeticExpressionWithSpeciesAndCov //';'
+;
+
+
+Command :
+	//(('this=')? Reduction) |
+	UpdateStatusCommand |
+	//UpdateStatusReduction |
+	Reduction |
+	Approximation|
+	Analysis |
+	//Import |
+	Export |
+	setParam |
+	setIC |
+	//manOrhelp |
+	newline
+	//| print
+	| onTheFlyBR | onTheFlyBRRecursive
+	| onTheFlyFR
+;
+
+onTheFlyBR : {onTheFlyBR}
+	'onTheFlyBR' '(' 
+		parameters=ParametersOnTheFly
+	 ')'
+;
+
+ParametersOnTheFly:
+	('Q'|'query') '=' Q = pairsOrMeta ','
+	('Qbar'|'constraints') '=' Qbar=pairsOrMeta 
+	(',' 'upTo' '=' upTo=UpToOptions)?
+	(',' ('QminusQbar'|'QueryMinusConstraints') '=' QeqQminusQbar=BooleanValue)?
+	(',' 'avoidUnbalancedPairs' '=' avoidUnbalancedPairs=BooleanValue)?
+	//',''fileOut' '=' fileOut = STRING
+	(',' fileRed=FileRed)?
+	(',' csvFile=CSVFile)?
+;
+
+UpToOptions:
+	'NO'|
+	'Reflexivity'|'Symmetry'|'Transitivity'|
+	'ReflexivitySymmetry'|
+	'Equivalence'
+;
+
+onTheFlyBRRecursive : {onTheFlyBRRecursive}
+	'onTheFlyBRRecursive' '(' 
+		'Q' '=' Q = pairsOrMeta ','
+		'Qbar' '=' Qbar=pairsOrMeta 
+		(',' 'QeqQminusQbar' '=' QeqQminusQbar=BooleanValue)?
+		//',''fileOut' '=' fileOut = STRING
+	 ')'
+;
+
+onTheFlyFR : {onTheFlyFR}
+	'onTheFlyFR' '(' 
+		parameters=ParametersOnTheFly
+//		('Q'|'query') '=' Q = pairsOrMeta ','
+//		('Qbar'|'constraints') '=' Qbar=pairsOrMeta 
+//		(',' 'upTo' '=' upTo=UpToOptions)?
+//		(',' ('QminusQbar'|'QueryMinusConstraints') '=' QeqQminusQbar=BooleanValue)?
+//		(',' 'avoidUnbalancedPairs' '=' avoidUnbalancedPairs=BooleanValue)?
+//		//',''fileOut' '=' fileOut = STRING
+	 ')'
+;
+
+pairsOrMeta:{pairsOrMeta}
+	( (pairs=setOfPairs      )|
+	  (metaPairs=('ALL'|'NONE'))|
+	  (crossProduct=crossProduct)
+	) ;
+
+crossProduct:
+	'cartesianProduct' '(' first=setOfSpeciesOrID 'X' 
+					   second=setOfSpeciesOrID 
+					   (',' 'avoidReflexivePairs' '=' avoidReflexivePairs=BooleanValue)? ')'
+;
+setOfSpeciesOrID:
+	//'{' species+= [Species] (',' species+= [Species])* '}'
+	'{' species+= RefToSpeciesOrID (',' species+= RefToSpeciesOrID)* '}'
+;
+
+setOfPairs:
+	'{' pairs+= pairOfSpecies (',' pairs+= pairOfSpecies)* '}'
+;
+
+pairOfSpecies:
+	//'(' first=[Species] ',' second=[Species] ')'
+	'(' first=RefToSpeciesOrID ',' second=RefToSpeciesOrID ')'
+;
+
+RefToSpeciesOrID:
+(species = [Species]|id=(ZERO|NAT))	
+;
+
+//manOrhelp:
+//	help |
+//	man
+//;
+
+Import:
+	load |
+	importBNG |
+	importSBML |
+	importKonect |
+	importMatlab |
+	importLinearSystemAsCCSVMatrix |
+	importChemKin |
+	importUMIST|
+	importOSU|
+	importLBS |
+	importMRMC |
+	importBoolCubeSBML|
+	importCRN|
+	importAffineSystem|
+	importLinearSystemWithInputs|
+	importBioLayout|
+	importSpaceEx
+;
+
+ParametersImport:
+	'fileIn' '=' fileIn = STRING
+	//(',' 'copyInEditor' '=' synchEditor = BooleanValue)?
+;
+ParametersImportFolder:
+	'folderIn' '=' folderIn = STRING ',' 
+	'folderOut' '=' folderOut = STRING
+;
+
+
+importBoolCubeSBML:
+	'importBoolCubeSBML' '(' params = ParametersImport ')'
+;
+
+importMRMC:
+	'importMRMC' '(' params = ParametersImport ((',' 'labellingFile' '=' labellingFile = STRING ')')?) //If provided, it contains the name of the file containing the labelling function of the Markov chain. If the value \"same\" is provided, then fileIn is used (after replacing .tra with .label). Such information will be encoded as views, which can in turn be used to prepartition the initial partition	
+;
+
+importLBS:
+	'importLBS' '(' params = ParametersImport ')'
+;
+
+importChemKin:
+	'importChemKin' '(' params = ParametersImport (',' 'thermoDynamicFile' '=' thermoDynamicFile = STRING)? ')' //If provided, it contains the name of the file containing thermodynamic data. If not provided, fileIn is used (after replacing .inp or .CKI with .dat)
+;
+importUMIST:
+	'importUMIST' '(' params = ParametersImport ',' 'fileInSpecies' '=' fileInSpecies = STRING ')' //Params contains the file with the reactions. fileInSpecies contains the file with the species
+;
+importOSU:
+	'importOSU' '(' params = ParametersImport (',' 'linesToSkip' '=' linesToSkip = (ZERO|NAT) )? ')'
+;
+
+importAffineSystem:
+	'importAffineSystem' '(' params = ParametersImport ',' 'BFile' '=' bFile = STRING ',' 'ICFile' '=' icFile = STRING (',' 'parameters' '=' createParams=BooleanValue )?  ')'	
+;
+
+importLinearSystemWithInputs:
+	'importLinearSystemWithInputs' '(' params = ParametersImport ',' 'BFile' '=' bFile = STRING')'
+;
+
+importLinearSystemAsCCSVMatrix:
+	'importLinearSystemAsCCSVMatrix' '(' params = ParametersImport ',' 'form' '=' matrixForm= MatrixForm ')' //Can be either A*X (linear systems), P*Q (Markov chain) or FEM (finite element methods). 
+;
+
+importBioLayout:
+	'importBioLayout' '(' params = ParametersImport ')'
+;
+
+importSpaceEx:
+	'importSpaceEx' '(' params = ParametersImport (',' 'mainComponent' '=' mainComponent = STRING)?  (',' 'odes' '=' odes= BooleanValue)? ')'
+;
+
+
+MatrixForm :
+'AX' | 'PQ' | 'FEM'	
+;
+
+importMatlab:
+	//'importMatlabODEs' '(' params = ParametersImport ',' 'polynomialODEs' '=' polynomialODEs= BooleanValue ')' //Specifies if the ODEs are actually polynomial ODEs: composed by sums of products of reals and variables. These ODEs will then be transformed in mass-action reaction networks, for which efficient partition refinement algorithms are implemented.
+	'importMatlab' '(' params = ParametersImport ')' 
+;
+
+load:
+	'load' '(' params = ParametersImport ')'
+;
+
+importCRN:
+	'importCRN' '(' params = ParametersImport ')'
+;
+importKonect:
+	'importKonect' '(' params = ParametersImport (',' 'doNotPreProcessEdges' '=' doNotPreProcessEdges = BooleanValue)? ')'
+;
+importBNG:
+	'importBNG' '(' params = ParametersImport (',' 'fullSpeciesNames' '=' fullSpeciesNames = BooleanValue)? (',' 'highMemory' '=' highMemory = BooleanValue)? ')'
+;
+
+importSBML:
+	'importSBML' '(' params = ParametersImport (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
+;
+importSBMLFolder:
+	'importSBMLFolder' '(' params = ParametersImportFolder (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
+	//'importSBMLFolder' '(' 'folderIn' '=' folderIn = STRING ',' 'folderOut' '=' folderOut = STRING (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
+;
+
+Reduction:
+	MassActionReduction |
+	SMTReduction 
+;
+
+SMTReduction:
+	reduceBDE | //nary EFL (POPL)
+	reduceFDE 	//nary OFL (POPL)
+;
+
+MassActionReduction:
+	reduceBE | //reduceNBB | //nary BB (extension of CONCUR+TACAS presented at PNAS)
+	reduceFE | //reduceNFB |	//nary FB, fully characterizing OFL (extension of CONCUR+TACAS presented at PNAS)
+	reduceSMB | //binary Markovian OL, sufficient condition only
+	reduceSE | //nary Markovian OL, characterizes multi-set lifting lumping 
+	//reduceEMSB | //binary products (n-ary reagents) Markovian EL, sufficient condition only
+	reduceBB |	//binary BB (TACAS)
+	reduceFB | 	//binary FB, sufficient condition only (TACAS)
+	//MassActionEpsilonReduction
+	reduceDSB | //binary FB, sufficient condition only, less efficient (CONCUR15)
+	reduceEFL |	//binary BB, less efficient (CONCUR15)
+	reduceUncertainFE | // Uncertain Forward Equivalence: FE for linear systems with uncertain parameters. Old rejected at CONCUR2019
+	reduceUCTMCFE| // UCTMC Lumping: FE for CTMCs where transitions are i -[mij,Mij]-> j. Rates are uncertain and non-deterministically variate in the interval [mij,Mij]. Submitted at FOSSACS2020
+	reduceBE_AAt
+;
+
+/*MassActionEpsilonReduction:
+	reduceEpsNBB | //epsilon-NBB
+	reduceEpsNFB 	//epsilon-NFB
+;*/
+
+Approximation:
+	approximateFDE |
+	approximateBDE 
+;
+
+approximateFDE : {approximateFDE}
+	'approximateFDE' '('params=ParamsApprox ')'
+;
+approximateBDE : {approximateBDE}
+	'approximateBDE' '('params=ParamsApprox ')'
+;
+
+ParamsApprox:
+	'epsilon' '=' epsilon=ArithmeticExpression 
+	(',' prep=Prep)?
+	',' 'matlabScript' '=' matalbScript=STRING
+	',' ( ( 'paramsToPerturb' '=' '['  (paramsToPerturb += [Parameter] (',' paramsToPerturb += [Parameter])*)?  ']') | ('paramsToPerturb' '=' metaParamsToPerturb = ('NONE'|'ALL')) ) 
+;	
+
+UpdateStatusCommand:
+	'this' '=' ((reduction = Reduction) | (currying = curry))
+;
+
+//UpdateStatusReduction:
+//	'this' '=' reduction = Reduction
+//;
+
+
+
+//reduceEpsNBB : {reduceEpsNBB}
+//	'reduceEpsNBB' '(' 'epsilon' '=' epsilon=ArithmeticExpression/*POSITIVEINTORREAL*/ (',' optionalParametersFormatted=FormattedOptionalParametersReductions)? ')'
+//;
+//
+//reduceEpsNFB : {reduceEpsNFB}
+//	'reduceEpsNFB' '(' 'epsilon' '=' epsilon=ArithmeticExpression/*POSITIVEINTORREAL*/ (',' optionalParametersFormatted=FormattedOptionalParametersReductions)? ')'
+//;
+
+reduceBE : {reduceBE}
+	'reduceBE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceFE : {reduceFE}
+	'reduceFE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceBB : {reduceBB}
+	'reduceBB' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceFB : {reduceFB}
+	'reduceFB' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceEFL : {reduceEFL}
+	'reduceEFL' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceDSB : {reduceDSB}
+	'reduceDSB' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceBDE : {reduceBDE}
+	//'reduceBDE({' (optionalParameters += OptionalParametersReductions*) ')'
+	//'reduceBDE({' (optionalParameters += OptionalParametersReductions (',' optionalParameters += OptionalParametersReductions*))? ')'
+	'reduceBDE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceBE_AAt : {reduceBE_AAt}
+	'reduceBE_AAt' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+
+curry :
+	'curry' '(' 
+		paramsToCurry=paramsToCurry
+		','
+		'singleoutParams' '=' singleoutParams = BooleanValue
+		','
+		'preserveUserPartion' '=' preserveUserPartion = BooleanValue
+		')'
+;
+
+reduceFDE : {reduceFDE}
+	'reduceFDE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceSMB : {reduceSMB}
+	'reduceSMB' '(' optionalParametersFormatted=FormattedOptionalParametersReductions (',' 'halveRatesOfHomeoReactions' '=' halveRatesOfHomeoReactions= BooleanValue)? ')'
+;
+
+reduceSE : {reduceSE}
+	'reduceSE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceUncertainFE : {reduceUncertainFE}
+	('reduceUncertainFE'|'reduceUFE') '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceUCTMCFE : {reduceUCTMCFE}
+	('reduceUCTMCFE') '(' (('delta' '=' delta = ArithmeticExpression)|('modelWithBigM' '=' modelWithBigM =STRING)) (',' optionalParametersFormatted=FormattedOptionalParametersReductions)? ')'
+;
+
+//reduceEMSB : {reduceEMSB}
+//	'reduceEMSB' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+//;
+
+FormattedOptionalParametersReductions: {FormattedOptionalParametersReductions} 
+	(optionalParameters += OptionalParametersReductions (',' optionalParameters += OptionalParametersReductions)*)?
+;
+
+/*OptionalParametersReductions: {OptionalParametersReductions}
+	(',prePartition=>' prep = Prepartitioning)?	 //If set to IC, the initial partition is first refined in blocks of species with same initial concentrantions. If set to VIEWS, the initial partition is coherent with the specified groups/views in the original file (if they correspond to a partition, i.e. views are just disjoint sums of distinct species)");  
+	(',reducedFile=>' fileOut = STRING)?		 //If this parameter is specified, the reduced CRN is written in the file with the provided name.
+	(',groupedFile=>' fileGrouped = STRING)?	 //If this parameter is specified, the original CRN is written in the file with the provided name. Also, a view per block of the obtained partition is created, grouping (i.e., summing) all species belonging to the block.
+	(',sameICFile=>' fileSameIC = BooleanValue)? //If this parameter is specified, the original CRN is written in the file with the provided name. However, the same population is assigned to all the species of each block of the obtained partition.
+	(',fileIn=>' fileIn = STRING)?				 //If provided, the file is first loaded, and the operation is performed on the resulting CRN. Otherwise, the operation is performed on the current CRN.");
+	(',computeOnlyPartition=>' onlyPartition = BooleanValue)? //If true, the reduced CRN is not actually computed, but only the corasest EFL partition.\n");
+	(',fileWhereToStorePartition=>' filePartition = STRING)?  //If specified, information on the computed partition will be stored in the given text file.
+	(',printInfo=>' print = BooleanValue)? //If set to true, some information is print in the console.
+;*/
+/*OptionalParametersReductions: //{OptionalParametersReductions}
+	'prePartition=>' prep = Prepartitioning|	 //If set to IC, the initial partition is first refined in blocks of species with same initial concentrantions. If set to VIEWS, the initial partition is coherent with the specified groups/views in the original file (if they correspond to a partition, i.e. views are just disjoint sums of distinct species)");  
+	'reducedFile=>' fileOut = STRING|		 //If this parameter is specified, the reduced CRN is written in the file with the provided name.
+	'groupedFile=>' fileGrouped = STRING|	 //If this parameter is specified, the original CRN is written in the file with the provided name. Also, a view per block of the obtained partition is created, grouping (i.e., summing) all species belonging to the block.
+	'sameICFile=>' fileSameIC = STRING| //If this parameter is specified, the original CRN is written in the file with the provided name. However, the same population is assigned to all the species of each block of the obtained partition.
+	'fileIn=>' fileIn = STRING|				 //If provided, the file is first loaded, and the operation is performed on the resulting CRN. Otherwise, the operation is performed on the current CRN.");
+	'computeOnlyPartition=>' onlyPartition = StringBooleanValue| //If true, the reduced CRN is not actually computed, but only the corasest EFL partition.\n");
+	'fileWhereToStorePartition=>' filePartition = STRING|  //If specified, information on the computed partition will be stored in the given text file.
+	'printInfo=>' print = StringBooleanValue //If set to true, some information is print in the console.
+;*/
+
+OptionalParametersReductions: //{OptionalParametersReductions}
+	Prep |	   
+	FileRed
+	/* | FileGrouped |
+	FileSameIC |
+	PrintInfo | 
+	OnlyPart |
+	| FilePart*/  
+	//FileIn |
+	| ReductionAlgorithm
+	| CSVFile
+	| SMTTimesCSVFile
+	| AddSelfLoops
+	| OneLabelAtATime
+;
+
+AddSelfLoops:
+	'addSelfLoops' '=' selfLoops = BooleanValue  
+;
+
+OneLabelAtATime:
+	'oneLabelAtAtTime' '=' oneLabel = BooleanValue  
+;
+
+ReductionAlgorithm:
+	'reductionAlgorithm' '=' redAlgorithm=('OLD' | 'NEW')
+;
+
+/*Prep:
+	//'prePartition=' prep = Prepartitioning	 //If set to IC, the initial partition is first refined in blocks of species with same initial concentrantions. If set to VIEWS, the initial partition is coherent with the specified groups/views in the original file (if they correspond to a partition, i.e. views are just disjoint sums of distinct species)");
+	'prePartition' '=' prep = BooleanValue
+;*/
+Prep:
+	'prePartition' '=' prep = ("NO"|"USER"|"IC"|"USER_and_IC")
+;
+
+/*PrepForward:
+	'prePartition' '=' prep = ("NO"|"DEFINED")
+;*/
+
+/*PrepForward:
+	//'prePartition' '=' prep = Prepartitioning	 //If set to IC, the initial partition is first refined in blocks of species with same initial concentrantions. If set to VIEWS, the initial partition is coherent with the specified groups/views in the original file (if they correspond to a partition, i.e. views are just disjoint sums of distinct species)");
+	'prePartition' '=' prep = BooleanValue
+;
+
+PrepBackward:
+	//'prePartition' '=' prep = Prepartitioning	 //If set to IC, the initial partition is first refined in blocks of species with same initial concentrantions. If set to VIEWS, the initial partition is coherent with the specified groups/views in the original file (if they correspond to a partition, i.e. views are just disjoint sums of distinct species)");
+	'prePartition' '=' prep = BooleanValue
+;*/
+
+/*Prepartitioning:  
+	  'IC'               //(the initial partition is first refined in blocks of species with same initial concentrantions) 
+	| 'VIEWS'            //(the initial partition is coherent with the specified groups/views in the original file (if they correspond to a partition, i.e. views are just disjoint sums of distinct species)
+	| 'NONE'      		 //(trivial initial partition with one block only) 
+;*/
+
+//PrintInfo:
+//	'printInfo' '=' print = BooleanValue //If set to true, some information is print in the console.
+//;
+//
+FilePart : {FilePart}
+	'fileWhereToStorePartition' '=' filePartition = STRING  //If specified, information on the computed partition will be stored in the given text file.
+;
+//
+//OnlyPart:
+//	'computeOnlyPartition' '=' onlyPartition = BooleanValue //If true, the reduced CRN is not actually computed, but only the corasest EFL partition.\n");	
+//;
+//
+///*
+//FileIn:
+//	'fileIn=' fileIn = STRING				 //If provided, the file is first loaded, and the operation is performed on the resulting CRN. Otherwise, the operation is performed on the current CRN.");
+//; 
+//*/
+//
+//FileSameIC:
+//	'sameICFile' '=' fileSameIC = STRING //If this parameter is specified, the original CRN is written in the file with the provided name. However, the same population is assigned to all the species of each block of the obtained partition.
+//;
+//
+//FileGrouped:
+//	'groupedFile' '=' fileGrouped = STRING	 //If this parameter is specified, the original CRN is written in the file with the provided name. Also, a view per block of the obtained partition is created, grouping (i.e., summing) all species belonging to the block.	
+//;
+
+FileRed:
+	'reducedFile' '=' fileOut = STRING		 //If this parameter is specified, the reduced CRN is written in the file with the provided name.
+;
+
+newline:
+	//nl = ('\n'|'newline'| 'newLine')
+	nl = 'newline'
+;
+
+//print:
+//	//nl = ('\n'|'newline'| 'newLine')
+//	print = 'print'
+//;
+//
+//man:
+//	//man = ('-m'|'--man'|'man')
+//	man = ('man')
+//;
+//
+//help:
+//	//help = ('-h'|'--help'|'help')
+//	help = ('help')
+//;
+
+setIC:
+	'setIC' '(' 'species' '=' species=[Species] ',' 'expr' '=' expr=ArithmeticExpression ')'
+	//'setIC' '(' 'species' '=' species=[Species|IDorSTRING] ',' 'expr' '=' expr=ArithmeticExpression ')'
+;
+
+setParam:
+	//'setParam' '(' 'param' '=' ((paramName=[Parameter])|(paramNameString=STRING)) ',' 'expr' '=' expr=ArithmeticExpression ')'
+	'setParam' '(' 'param' '=' ((paramName=[Parameter])|(paramNameString=STRING)) ',' 'expr' '=' expr=ArithmeticExpression ')'
+;
+ 
+ParametersExport:
+	'fileOut' '=' fileOut = STRING //('fileIn' '=' fileIn = STRING)?  //If provided, the file is first loaded, and the operation is performed on the resulting CRN. Otherwise, the operation is performed on the current CRN.");
+;
+
+Export:
+	write |
+	exportMACRN |
+	exportMARN |
+	exportStoichiometry |
+	exportBNG |
+	exportMRMCCTMCWithSingleUseOfParams |
+	exportAffineSystem |
+	exportZ3 |
+	exportSBML |
+	exportStochKit |
+	exportLBS |
+	exportCRN |
+	exportLNA |
+	exportFlyFast |
+	computeDifferentialHull|
+	generateCME |
+	generateLogs |
+	exportJacobianFunction |
+	exportScriptEpsCLump |
+	exportScriptsEpsCLump | 
+	exportMatlab |
+	exportCERENA |
+	exportEpsilonBoundsScript |
+	exportC2E2 |
+	utopic | utopicOLD | decompress |
+	exportPontryaginPolygonMethod  | 
+	exportCAGEScript |
+	exportModelica |
+	exportCausalGraph 
+;
+
+exportCausalGraph:
+	'exportCausalGraph' '('
+		params = ParametersExport
+	')'
+;
+
+exportCAGEScript:
+	'exportCAGEScript' '(' params = ParametersExport ',' 
+		'compBound' '=' compBound = (ZERO|NAT) ',' 
+		'print' '=' print = BooleanValue 
+		(',' 'unionModel' '=' unionModel = STRING)?
+		//'backward' '=' backward=BooleanValue ','
+	 (',' 'symbolicJacobian' '=' symbolicJacobian = BooleanValue)?
+	 ')'
+;
+exportMatlab:
+	'exportMatlab' '(' params = ParametersExport ',' 'tEnd' '=' tEnd = POSITIVEINTORREAL (',' 'writeJacobian' '=' writeJacobian=BooleanValue)? ')'
+;
+exportLNA:
+	'exportLNA' '(' params = ParametersExport ')'
+;
+exportCERENA:
+	'exportCERENA' '(' params = ParametersExport ')'
+;
+exportAffineSystem:
+	'exportAffineSystem' '('params = ParametersExport ')'
+;
+
+exportModelica:
+	'exportModelica' '('params = ParametersExport (',' 'exportICOfAlgebraic' '=' exportICOfAlgebraic = BooleanValue)? ')'
+;
+
+//exportPontryaginMethod:
+	//'exportPontryaginMethod'
+//rejected from CAV2017
+utopicOLD:
+	'utopicOLD' 
+	'(' params = ParametersExport ',' 'tEnd' '=' tEnd = POSITIVEINTORREAL
+	','  'paramsToPerturb' '=' paramsToPerturb = ListOfParamsToPerturb 
+	',' 'coefficients' '=' coefficients = ListOfCoefficients
+	(','    optionalParams+= OptionalParametersUtopicOld)*
+//	(',' 'kMax' '=' kMax = NAT)?
+//	(',' 'epsilon' '=' epsilon = POSITIVEINTORREAL)?
+//	(',' 'maxStep' '=' maxStep = POSITIVEINTORREAL)?
+//	(',' 'symbolicJacobian' '=' symbolicJacobian = BooleanValue)?
+	')'
+;
+
+utopic:
+	//delta and step mandatory
+	'utopic' 
+	'(' params = ParametersExport ',' 'tEnd' '=' tEnd = POSITIVEINTORREAL
+	','  'paramsToPerturb' '=' paramsToPerturb = ListOfParamsToPerturb
+	//',' 'maximize' '=' maximize = BooleanValue 
+	',' 'coefficients' '=' coefficients = ListOfCoefficients
+	',' 'delta' '=' delta = NONNEGATIVEINTORREAL
+	',' 'step' '=' step = POSITIVEINTORREAL
+	(','    optionalParams+= OptionalParametersUtopic)*
+//	(',' 'kMax' '=' kMax = NAT)?
+//	(',' 'epsilon' '=' epsilon = POSITIVEINTORREAL)?
+//	(',' 'maxStep' '=' maxStep = POSITIVEINTORREAL)?
+//	(',' 'symbolicJacobian' '=' symbolicJacobian = BooleanValue)?
+	')'
+;
+
+OptionalParametersUtopic:
+	utopicKMax|
+	//utopicDelta|
+	utopicIntegrationStep //|
+	//utopicStep
+	//utopicPlot | exitMatlab
+	| utopicRunMatlab | utopicRunAndCompileVNODELP
+;
+
+utopicRunAndCompileVNODELP:
+	'compileAndRunVNODELP' '=' runVNODE = BooleanValue
+;
+
+utopicRunMatlab:
+	'runMatlab' '=' runMatlab = BooleanValue
+;
+
+exitMatlab:
+	'exitMatlab' '=' exitMatlab = BooleanValue 
+;
+
+OptionalParametersUtopicOld:
+	utopicKMax|
+	utopicEpsilon|
+	utopicMaxStep|
+	utopicSymbolicJacobian
+;
+
+utopicKMax:
+	('kMax' '=' kMax = NAT)
+;
+utopicPlot:
+	('plot' '=' plot = BooleanValue)
+;
+//utopicDelta:
+//	('delta' '=' delta = NONNEGATIVEINTORREAL)
+//;
+//utopicStep:
+//	('step' '=' step = POSITIVEINTORREAL)
+//;
+utopicEpsilon:
+	('epsilon' '=' epsilon = POSITIVEINTORREAL)
+;
+utopicMaxStep:
+	('maxStep' '=' maxStep = POSITIVEINTORREAL)
+;
+utopicIntegrationStep:
+	('integrationStep' '=' integrationStep = POSITIVEINTORREAL)
+;
+utopicSymbolicJacobian:
+	('symbolicJacobian' '=' symbolicJacobian = BooleanValue)
+;
+ListOfCoefficients:
+	 '{' coefficients+= SpeciesAndExpression (',' coefficients+= SpeciesAndExpression)* '}'
+;
+
+ListOfParamsToPerturb:{ListOfParamsToPerturb}
+	'{'  (paramsToPerturb += ParameterWithBound (',' paramsToPerturb += ParameterWithBound)*)?  '}'
+;
+
+SpeciesAndExpression:
+	species = [Species] ':' coeff=ArithmeticExpression
+;
+
+
+exportPontryaginPolygonMethod:
+	'exportPontryaginPolygonMethod' '(' params = ParametersExport ',' 'tEnd' '=' tEnd = POSITIVEINTORREAL 
+	','  'paramsToPerturb' '=' paramsToPerturb = ListOfParamsToPerturb 
+	',' 'species' '=' firstSpecies = [Species] ',' secondSpecies = [Species]
+	(',' 'slopes' '=' sl1= ArithmeticExpression ',' sl2= ArithmeticExpression)?
+	(',' 'cora' '=' cora = BooleanValue (',' 'coraLibrary' '=' coraLibrary = STRING)? )? 
+	')'
+;
+
+ParameterWithBound:{ParameterWithBound}
+	param = [Parameter] 'in' '[' low = ArithmeticExpression ',' high = ArithmeticExpression ']'
+;
+
+exportC2E2:
+	'exportC2E2' '(' 
+	params = ParametersExport ','
+	//'delta' '=' delta = POSITIVEINTORREAL ',' 
+	//'taylorOrder' '=' taylorOrder = POSITIVEINTORREAL ','
+	'kvalue' '=' kvalue = POSITIVEINTORREAL ','
+	'tEnd' '=' tEnd = POSITIVEINTORREAL ',' 
+	'timeStep' '=' timeStep = POSITIVEINTORREAL ',' 
+	//( ( 'paramsToPerturb' '=' '['  (paramsToPerturb += [Parameter] (',' paramsToPerturb += [Parameter])*)?  ']') | ('paramsToPerturb' '=' metaParamsToPerturb = ('NONE'|'ALL')) )
+	'paramsToPerturb' '=' paramsToPerturb = ListOfParamsToPerturb ',' 
+	'unsafeSet' '=' unsafeSet = UnsafeSet
+    //(',' 'defaultIC' '=' defaultIC = NONNEGATIVEINTORREAL )?
+ ')'
+;
+
+UnsafeSet:
+	 '{' conjuncts+= SpeciesCompExpression (',' conjuncts+= SpeciesCompExpression)* '}'
+;
+
+SpeciesCompExpression:
+	species = [Species] comp=Comp expr=ArithmeticExpression
+;
+
+
+exportEpsilonBoundsScript:
+	//'exportEpsilonBoundsScript' '(' params = ParametersExport ',' 'tEnd' '=' tEnd = POSITIVEINTORREAL ',' 'deltat' '=' deltat = POSITIVEINTORREAL  (',' 'paramsToPerturb' '=' paramsToPerturb += [Parameter] (',' paramsToPerturb += [Parameter])*)? ',' 'epsilon' '=' epsilon=ArithmeticExpression ')'
+	'exportEpsilonBoundsScript' '(' 
+	params = ParametersExport ',' 
+	'tEnd' '=' tEnd = POSITIVEINTORREAL ',' 
+	'deltat' '=' deltat = ArithmeticExpression
+	',' ( ( 'paramsToPerturb' '=' '['  (paramsToPerturb += [Parameter] (',' paramsToPerturb += [Parameter])*)?  ']') | ('paramsToPerturb' '=' metaParamsToPerturb = ('NONE'|'ALL')) )  
+	// 
+	//(',' 'paramsToPerturb' '=' '['  paramsToPerturb += [Parameter] (',' paramsToPerturb += [Parameter])*  ']')
+    //furtherParams = FurtherParamsEpsilonBoundsScript
+    ',' 'epsilon' '=' epsilon=ArithmeticExpression
+    ',' 'reduction' '=' red = ("forward"|"backward"|"both"|"NO")
+    (',' 'prePartition' '=' prep = ("NO"|"USER"|"IC"|"USER_and_IC") )?
+    (',' 'defaultIC' '=' defaultIC = NONNEGATIVEINTORREAL )?
+ ')'
+;
+
+exportJacobianFunction:
+	'exportJacobianFunction' '(' params = ParametersExport ')'
+;
+exportScriptEpsCLump:
+	'exportScriptEpsCLump' '(' params = ParametersExport ',' 
+//	'epsilon' ( ('=' epsilon=ArithmeticExpression )|
+//				('from' '=' fromEps = ArithmeticExpression
+//				 'to'   '=' toEps   = ArithmeticExpression
+//				 'step' '=' stepEps = ArithmeticExpression  )
+//			   )
+	'epsilon' '=' epsilon=ArithmeticExpression
+	','
+	'M0' '=' 
+	//M0Rows += ListOfCoefficients (',' M0Rows += ListOfCoefficients )* ')'
+	( (M0Rows += ListOfCoefficientsSpNat (',' M0Rows += ListOfCoefficientsSpNat )*)
+			|
+	   (prep="USER")	
+	)
+	
+	(',' 'maxPercPerturb' '=' maxPerturb=(ZERO|NAT))?
+	(',' 'writeMainScript' '=' writeMainScript = BooleanValue)?
+	')'	
+;
+
+exportScriptsEpsCLump:
+	'exportScriptsEpsCLump' '(' params = ParametersExport /*',' 'epsilon' '=' epsilon=ArithmeticExpression*/ ',' 
+		'M0' '=' 
+	//M0Rows += ListOfCoefficients (',' M0Rows += ListOfCoefficients )* ')'
+		( (M0Rows += ListOfCoefficientsSpNat (',' M0Rows += ListOfCoefficientsSpNat )*)
+			|
+		  (prep="USER")	
+		)
+	','
+	//'cLump' '=' clump = NAT
+			//The nRows obtained for eps=0. This allows you to ask: what is the eps to get the same as clump on a perturbed model?
+		(	( 'excactCLump' '=' clump = NAT                              )| 
+			//Compute epsClump for these epsilons
+			( 'epsilon' 'from' '=' fromEps = ArithmeticExpression
+						'to'   '=' toEps   = ArithmeticExpression
+						'step' '=' stepEps = ArithmeticExpression  )|
+			//( 'slope_max_error' '=' slope = ArithmeticExpression )
+						//( 'slope_max_error' '=' slope = ArithmeticExpression )
+			//Compute epsCLump for the largest epsilon such that the introduced error is below the one given by the slope				
+			( 'slope_max_error' 'from' '=' fromSlope = ArithmeticExpression
+								'to'   '=' toSlope   = ArithmeticExpression
+								'step' '=' stepSlope = ArithmeticExpression  )
+		)
+	 
+	 //Compute epsClump on all the models perturbed as given below	
+	 ',' 'maxPercPerturb' 'from' '=' fromMaxPerturb=(ZERO|NAT) 
+					  'to'   '=' toMaxPerturb=(ZERO|NAT)
+					  'step' '=' stepMaxPerturb=(ZERO|NAT)
+	',' csvFile = CSVFile
+	(',' 'writeInnerScript' '=' writeInnerScript = BooleanValue)?
+	')'	
+;
+
+
+ListOfCoefficientsSpNat:
+	 '{' coefficients+= SpeciesOrNatAndExpression (',' coefficients+= SpeciesOrNatAndExpression)* '}'
+;
+SpeciesOrNatAndExpression:
+	(species = [Species]|id=(ZERO|NAT)) ':' coeff=ArithmeticExpression
+;
+
+//ParamsEpsilonBoundsScript:
+//	
+//	',' 'epsilon' '=' epsilon=ArithmeticExpression
+//    //(',' 'reductionddd' '=' redddd = ("FW"|"BW"|"BOTH") )
+//    //(',' 'pino' '=' pluto = NAT )
+//	//
+//	(',' 'prePartition' '=' prep = ("NO"|"USER"|"IC"|"USER_and_IC") )?
+//	//
+//	(',' 'defaultIC' '=' defaultIC = NONNEGATIVEINTORREAL )?
+//	//
+//;
+
+generateCME:
+	'generateCME' '(' params = ParametersExport /*(',' 'limits' '=' limits=Limits)?*/ ')'
+;
+
+generateLogs:
+	'generateLogs' '(' params = ParametersExport ',' 'seedOfTheSeeds' '=' sots=(ZERO|NAT) ',' 'simulations' '=' simulations=NAT ',' 'steps' '=' steps=(ZERO|NAT) ')'
+;
+
+exportFlyFast:
+	'exportFlyFast' '(' params = ParametersExport ')'
+;
+
+exportLBS:
+	'exportLBS' '(' params = ParametersExport ')'
+;
+
+exportCRN:
+	'exportCRN' '(' params = ParametersExport ')'
+;
+
+exportStochKit:
+	'exportStochKit' '(' params = ParametersExport ')'
+;
+
+exportSBML:
+	'exportSBML' '(' params = ParametersExport ')'
+;
+
+exportZ3:
+	'exportZ3' '(' params = ParametersExport (',' 'question' '=' question=SMTQuestion)?  ')'
+;
+
+decompress:
+	('decompress'|'fse') '(' 
+		params = ParametersExport
+		','
+		'limits' '=' limits=Limits
+		
+	')'
+;
+
+Limits:
+	'['  limitOfSpecies += SpeciesWithNumber  (',' limitOfSpecies += SpeciesWithNumber)*  ']'
+;
+
+SpeciesWithNumber:
+	species = [Species] ':' number= NAT
+;
+
+write:
+	'write' '(' params = ParametersExport
+	 			(',' 'format' '=' format=ODEorNET)?
+	 			(',' 'deterministicCorrection' '=' deterministicCorrection=BooleanValue)?
+				(',' paramsToCurry=paramsToCurry)?
+				(',' 'originalNames' '=' originalNames=BooleanValue)?
+	  ')'
+;
+
+paramsToCurry: {paramsToCurry}
+( ( 'paramsToCurry' '=' '['  (paramsToCurry += [Parameter] (',' paramsToCurry += [Parameter])*)?  ']') | ('paramsToCurry' '=' metaParamsToCurry = ('NONE'|'ALL')) )
+;
+
+computeDifferentialHull:
+	'computeDifferentialHull' '(' params = ParametersExport ',' 'strict' '=' strict = BooleanValue (',' 'delta' '=' delta = POSITIVEINTORREAL)?  ')'
+;
+
+ODEorNET:
+//'ODE' | 'NET' | 'MA-NET'	
+  'ODE' | 'RN' |  'MA-RN'
+;
+
+SMTQuestion:
+'FDE' | 'BDE'	
+;
+
+exportMACRN:
+	'exportMACRN' '(' params = ParametersExport 
+	 ')'
+;
+
+exportMARN:
+	'exportMARN' '(' params = ParametersExport 
+	 ')'
+;
+
+exportBNG:
+	'exportBNG' '(' params = ParametersExport 
+				   (',' paramsToCurry=paramsToCurry)?
+	 ')'	
+;
+
+exportStoichiometry:
+	'exportStoichiometry' '('
+		params = ParametersExport
+	')'
+;
+
+exportMRMCCTMCWithSingleUseOfParams:
+	'exportMRMCCTMCWithSingleUseOfParams' '(' params = ParametersExport 
+	 ')'
+;
+
+Analysis :
+	simulateODE
+	| simulateCTMC
+	//| multivestaSMC
+	| simulateDAE
+;
+
+simulateCTMC: //{SimulateCTMC}
+	//'simulateCTMC({' 'tEnd=>' tEnd = ArithmeticExpression (optionalParametersCommon = OptionalParametersSimulateCommon)? (optionalParametersStochastic = OptionalParametersSimulateStochastic)? ')'
+	//'simulateCTMC({' 'tEnd=>' tEnd = ArithmeticExpression optionalParametersCommon = OptionalParametersSimulateCommon optionalParametersStochastic = OptionalParametersSimulateStochastic ')'
+	//'simulateCTMC({tEnd=>200,visualizePlot=>true})'
+	//'simulateCTMC' '(' 'tEnd' '=' tEnd = POSITIVEINTORREAL params+= ParametersSimulateCTMC* ')'
+	'simulateCTMC' '(' 'tEnd' '=' tEnd = POSITIVEINTORREAL (',' params+= ParametersSimulateCTMC)* ')'
+;
+
+ParametersSimulateCTMC:
+	OptionalParametersSimulateCommon |
+	OptionalParametersSimulateStochastic	
+;
+
+/*TEnd:
+	'tEnd=>' tEnd = ArithmeticExpression
+;*/
+
+OptionalParametersSimulateCommon: //{OptionalParametersSimulateCommon}
+	//FileIn | //(',fileIn=>' fileIn = STRING)?  
+	Steps | //(',steps=>' steps = NAT)?
+	StepSize |
+	VisualizePlot | //(',visualizePlot=>' plot = BooleanValue)?
+	ShowLabels |
+	CSVFile //(',csvFile=>' csv = STRING)?
+	| DefaultIC
+;
+
+DefaultIC:
+	'defaultIC' '=' defaultIC = NONNEGATIVEINTORREAL 
+;
+
+CSVFile:
+	'csvFile' '=' csv = STRING
+;
+SMTTimesCSVFile:
+	'smtTimeCSVFile' '=' csv = STRING
+;
+VisualizePlot:
+	//'viewPlot' '=' plot = BooleanValue
+	'viewPlot' '=' plot = ("VARS&VIEWS"|"VARS"|"VIEWS"|"NO")
+;
+
+ShowLabels:
+	'viewLabels' '=' plotLabels = BooleanValue
+;
+
+Steps:
+	'steps' '=' steps = NAT
+;
+
+StepSize:
+	'stepSize' '=' stepSize = POSITIVEINTORREAL
+;
+
+OptionalParametersSimulateStochastic: //{OptionalParametersSimulateStochastic}
+	Method | //(',method=>' method = TypeOfStochasticSimulator)?
+	Repeats //| //(',repeats=>' repeats = NAT)?
+	//TEnd //(',tEnd=>' tEnd = REAL)?
+;
+
+Repeats:
+	'repeats' '=' repeats = NAT
+;
+
+Method:
+	'method' '=' method = TypeOfStochasticSimulator
+;
+
+TypeOfStochasticSimulator: 
+	  'ssa'               //(direct method by Gillepsie) 
+	| 'ssa+'              //(uses dependency graphs to improve the runtime of the original Gillepsie algorithm)
+	| 'nextReaction'      //(next reaction method by Gibson and Bruck) 
+	| 'tauLeapingAbs'     //(Tau-leaping algorithm. The error is bounded by the sum of all propensity functions)
+	| 'tauLeapingRelProp' //(Tau-leaping algorithm. The error is bounded by the relative change in the individual propensity functions)
+	| 'tauLeapingRelPop'  //(Tau-leaping algorithm. The error is bounded by the relative changes in the molecular populations) 
+	| 'maximalTimeStep'   //(Maximal time step method by Puchalka. Automatic paritioning into slow and fast reactions, which are fired according to an exact and tau leaping method, respectively).
+;
+
+simulateODE: //{SimulateODE}
+	//'simulateODE({' optionalParametersCommon = OptionalParametersSimulateCommon optionalParametersODE = OptionalParametersSimulateODEs ')'
+	//'simulateODE' '(' 'tEnd=' tEnd = ArithmeticExpression params+= ParametersSimulateODE* ')'
+	'simulateODE' '(' 'tEnd' '=' tEnd = POSITIVEINTORREAL (',' params+= ParametersSimulateODE)* ')'
+;
+
+simulateDAE: //{SimulateODE}
+	//'simulateODE({' optionalParametersCommon = OptionalParametersSimulateCommon optionalParametersODE = OptionalParametersSimulateODEs ')'
+	//'simulateODE' '(' 'tEnd=' tEnd = ArithmeticExpression params+= ParametersSimulateODE* ')'
+	'simulateDAE' '(' 'tEnd' '=' tEnd = POSITIVEINTORREAL (',' params+= ParametersSimulateODE)* ')'
+;
+
+
+ParametersSimulateODE:
+	OptionalParametersSimulateCommon |
+	OptionalParametersSimulateODEs
+;
+
+//simulateODE({minStep=>1.0e-8,maxStep=>100.0,absTol=>1.0e-10,relTol=>1.0e-10,covariances=>true});
+OptionalParametersSimulateODEs:
+	MinStep |//(',minStep=>' minStep = REAL)?
+	MaxStep |//(',maxStep=>' maxStep = REAL)?
+	AbsTol |//(',absTol=>' absTol = REAL)?
+	RelsTol //(',relsTol=>' relTol = REAL)?
+	//Cov //|//(',covariances=>' cov = BooleanValue)?
+	//TEnd //(',tEnd=>' tEnd = REAL)?
+	| ComputeJacobian
+	| SolverLibrary
+;
+
+SolverLibrary:
+	'library' '=' library = ('APACHE'|'SUNDIALS') 
+;
+
+ComputeJacobian:
+	'computeJacobian' '=' jacobian = BooleanValue
+;
+
+/*Cov:
+	'covariances=>' cov = BooleanValue
+;*/
+
+RelsTol:
+	'relsTol' '=' relTol = POSITIVEINTORREAL
+;
+
+AbsTol:
+	'absTol' '=' absTol = POSITIVEINTORREAL
+;
+
+MaxStep:
+	'maxStep' '=' maxStep = POSITIVEINTORREAL
+;
+
+MinStep:
+	'minStep' '=' minStep = POSITIVEINTORREAL
+;
+
+//BEGIN MULTIVESTA
+//multivestaSMC:
+//	//'multivestaSMC({' 'alpha=>' alpha = REAL ',delta=>' delta = REAL optionalParametersCommon = OptionalParametersSimulateCommon optionalParametersSMC = OptionalParametersSMC ')'
+//	//'multivestaSMC' '(' 'alpha=' alpha = POSITIVEINTORREAL 'delta=' delta = POSITIVEINTORREAL params+= ParametersMultiVeStA* ')'
+//	'multivestaSMC' '(' 'alpha' '=' alpha = POSITIVEINTORREAL ',' 'delta' '=' delta = POSITIVEINTORREAL (',' params+= ParametersMultiVeStA)* ')'
+//;
+//
+//ParametersMultiVeStA:
+//	OptionalParametersSimulateCommon |
+//	OptionalParametersSMC 
+//;
+//
+//
+//OptionalParametersSMC: //{OptionalParametersSMC}
+//	Method | //(',method=>' method = TypeOfStochasticSimulator)?
+//	QueryFile | //(',queryFile=>' query = STRING)?
+//	Parallelism |//(',parallelism=>' parallelism = NAT)?
+//	MaxTime //(',maxTime=>' maxTime = REAL)?
+//;
+//
+//MaxTime:
+//	'maxTime' '=' maxTime = POSITIVEINTORREAL
+//;
+//
+//Parallelism:
+//	'parallelism' '=' parallelism = NAT	
+//;
+//
+//QueryFile:
+//	'queryFile' '=' query = STRING
+//;
+//END MULTIVESTA
+
+ArithmeticExpression returns Expression:
+	//value = Addition
+	Addition 
+;
+
+/*Addition returns Expression:
+ Multiplication ({Addition.left=current} '+' right=Multiplication)*;*/
+
+Addition returns Expression:
+ Subtraction ({Addition.left=current} '+' right=Subtraction)* 
+ ; 
+ 
+Subtraction returns Expression:
+ Multiplication ({Subtraction.left=current} '-' right=Multiplication)*; 
+
+/*Multiplication returns Expression:
+ Primary ({Multiplication.left=current} '*' right=Primary)*;*/
+
+Multiplication returns Expression:
+ Division ({Multiplication.left=current} '*' right=Division)*; 
+
+/*Division returns Expression:
+ Primary ({Division.left=current} '/' right=Primary)*;*/
+
+Division returns Expression:
+ Power ({Division.left=current} '/' right=Power)*; 
+  
+Power returns Expression:
+ PrimaryOrMinusPrimary ({Power.left=current} '^' right=PrimaryOrMinusPrimary)* ; 
+
+PrimaryOrMinusPrimary returns Expression:
+	Primary | MinusPrimary
+;
+
+MinusPrimary returns Expression:
+	'-' Primary {MinusPrimary.left=current}
+;
+
+Primary returns Expression:
+ NumberLiteral
+ | ParameterValue
+ //| ReferenceToParameterOrSymbolicParameter
+ //| ReferenceToParameterOrSymbolicParameterOrSpecies  
+ | Min | Max | Abs //| Log
+ | '(' Addition ')' ;
+
+Max returns Expression:
+ 'max' '(' Addition ({Max.left=current}','right=Addition) ')'  
+ ;   
+
+Min returns Expression:
+ 'min' '(' Addition ({Min.left=current}','right=Addition) ')' ;
+ 
+Abs returns Expression:
+	//'|' Addition {Abs.left=current} '|'
+	'abs' '(' Addition {Abs.left=current} ')'
+; 
+
+//Log returns Expression:
+//	//'|' Addition {Abs.left=current} '|'
+//	'log' '(' Addition {Abs.left=current} ')'
+//; 
+
+NumberLiteral:
+ //value=REAL
+ //value=NEGATIVEINTORREAL
+ //value=POSITIVEINTORREAL
+ value = NONNEGATIVEINTORREAL
+;
+ 
+ParameterValue:
+	value=[Parameter]
+;
+
+ArithmeticExpressionWithSymbPar returns Expression:
+	//value = Addition
+	AdditionWithSymbPar 
+;
+
+/*Addition returns Expression:
+ Multiplication ({Addition.left=current} '+' right=Multiplication)*;*/
+
+AdditionWithSymbPar returns Expression:
+ SubtractionWithSymbPar ({AdditionWithSymbPar.left=current} '+' right=SubtractionWithSymbPar)* 
+ ; 
+ 
+SubtractionWithSymbPar returns Expression:
+ MultiplicationWithSymbPar ({SubtractionWithSymbPar.left=current} '-' right=MultiplicationWithSymbPar)*; 
+
+/*Multiplication returns Expression:
+ Primary ({Multiplication.left=current} '*' right=Primary)*;*/
+
+MultiplicationWithSymbPar returns Expression:
+ DivisionWithSymbPar ({MultiplicationWithSymbPar.left=current} '*' right=DivisionWithSymbPar)*; 
+
+/*Division returns Expression:
+ Primary ({Division.left=current} '/' right=Primary)*;*/
+
+DivisionWithSymbPar returns Expression:
+ PowerWithSymbPar ({DivisionWithSymbPar.left=current} '/' right=PowerWithSymbPar)*; 
+  
+PowerWithSymbPar returns Expression:
+ PrimaryOrMinusPrimaryWithSymbPar ({PowerWithSymbPar.left=current} '^' right=PrimaryOrMinusPrimaryWithSymbPar)* ; 
+
+PrimaryOrMinusPrimaryWithSymbPar returns Expression:
+	PrimaryWithSymbPar | MinusPrimaryWithSymbPar
+;
+
+MinusPrimaryWithSymbPar returns Expression:
+	'-' PrimaryWithSymbPar {MinusPrimaryWithSymbPar.left=current}
+;
+
+PrimaryWithSymbPar returns Expression:
+ NumberLiteral
+ //| ParameterValue
+ | ReferenceToParameterOrSymbolicParameter //| ReferenceToParameterOrSymbolicParameterOrSpecies  
+ | MinWithSymbPar | MaxWithSymbPar | AbsWithSymbPar //| LogWithSymbPar
+ | '(' AdditionWithSymbPar ')' ;
+
+MaxWithSymbPar returns Expression:
+ 'max' '(' AdditionWithSymbPar ({MaxWithSymbPar.left=current}','right=AdditionWithSymbPar) ')'  
+ ;   
+
+MinWithSymbPar returns Expression:
+ 'min' '(' AdditionWithSymbPar ({MinWithSymbPar.left=current}','right=AdditionWithSymbPar) ')' ;
+ 
+AbsWithSymbPar returns Expression:
+	//'|' Addition {Abs.left=current} '|'
+	'abs' '(' AdditionWithSymbPar {AbsWithSymbPar.left=current} ')'
+;  	
+
+//LogWithSymbPar returns Expression:
+//	//'|' Addition {Abs.left=current} '|'
+//	'log' '(' AdditionWithSymbPar {AbsWithSymbPar.left=current} ')'
+//;  	
+
+
+/*SymbolicParameterValue:
+	value=[SymbolicParameter]
+; 	
+
+ParameterOrSymbolicParameterValue:
+	value=([Parameter]|[SymbolicParameter])
+; 	*/
+	
+ParameterOrSymbolicParameter:
+	SymbolicParameter|Parameter
+;
+
+ReferenceToParameterOrSymbolicParameter: {ReferenceToParameterOrSymbolicParameter} 
+	reference=[ParameterOrSymbolicParameter]
+;	
+	
+ArithmeticExpressionWithSpecies returns Expression:
+	//value = AdditionWithSpecies
+	AdditionWithSpecies 
+;
+
+AdditionWithSpecies returns Expression:
+ SubstractionWithSpecies ({AdditionWithSpecies.left=current} '+' right=SubstractionWithSpecies)* 
+ ;
+ 
+SubstractionWithSpecies returns Expression:
+ MultiplicationWithSpecies ({SubstractionWithSpecies.left=current} '-' right=MultiplicationWithSpecies)*;
+ 
+MultiplicationWithSpecies returns Expression:
+ DivisionWithSpecies ({MultiplicationWithSpecies.left=current} '*' right=DivisionWithSpecies)*;
+ 
+ 
+DivisionWithSpecies returns Expression:
+ PowerWithSpecies ({DivisionWithSpecies.left=current} '/' right=PowerWithSpecies)* 
+ ; 
+ 
+/*PowerWithSpecies returns Expression:
+ PrimaryWithSpecies ({PowerWithSpecies.left=current} '^' right=PrimaryWithSpecies)* ;*/
+PowerWithSpecies returns Expression:
+ PrimaryOrMinusPrimaryWithSpecies ({PowerWithSpecies.left=current} '^' right=PrimaryOrMinusPrimaryWithSymbPar//PrimaryOrMinusPrimary//right=PrimaryOrMinusPrimaryWithSpecies
+ 																												 )* ; 
+//QUI
+
+PrimaryOrMinusPrimaryWithSpecies returns Expression:
+	PrimaryWithSpecies | MinusPrimaryWithSpecies
+;
+
+MinusPrimaryWithSpecies returns Expression:
+	'-' PrimaryWithSpecies {MinusPrimaryWithSpecies.left=current}
+;  
+  
+PrimaryWithSpecies returns Expression:
+  NumberLiteral
+  //| ReferenceToParameterOrSpecies |
+  | ReferenceToParameterOrSymbolicParameterOrSpecies |  
+  MinWithSpecies | MaxWithSpecies | AbsWithSpecies |
+  '(' AdditionWithSpecies ')'  ;
+     
+MaxWithSpecies returns Expression:
+ 'max' '(' AdditionWithSpecies ({MaxWithSpecies.left=current} ',' right=AdditionWithSpecies) ')' ;   
+
+MinWithSpecies returns Expression:
+ 'min' '(' AdditionWithSpecies ({MinWithSpecies.left=current} ',' right=AdditionWithSpecies) ')' ;
+
+AbsWithSpecies returns Expression:
+	//'|' AdditionWithSpecies {AbsWithSpecies.left=current} '|' 
+	'abs' '(' AdditionWithSpecies {AbsWithSpecies.left=current} ')'
+;	
+
+
+	
+ArithmeticExpressionWithSpeciesAndCov returns Expression:
+	//value = AdditionWithSpeciesAndCov
+	AdditionWithSpeciesAndCov
+;
+
+/*AdditionWithSpeciesAndCov returns Expression:
+ ReferenceToParameterOrSpecies ({AdditionWithSpeciesAndCov.left=current} '+' right=ReferenceToParameterOrSpecies)* 
+ ;*/
+AdditionWithSpeciesAndCov returns Expression:
+ SubstractionWithSpeciesAndCov ({AdditionWithSpeciesAndCov.left=current} '+' right=SubstractionWithSpeciesAndCov)* 
+ ;
+/* AdditionWithSpeciesAndCov returns Expression:
+ ReferenceToSpeciesOrVariances ({AdditionWithSpeciesAndCov.left=current} '+' right=ReferenceToSpeciesOrVariances)* 
+ ;
+ ReferenceToSpeciesOrVariances returns Expression:
+	ReferenceToSpecies | VarExpr | CovExpr
+;
+ReferenceToSpecies: {ReferenceToSpecies} reference=[Species];*/
+ 
+SubstractionWithSpeciesAndCov returns Expression:
+ MultiplicationWithSpeciesAndCov ({SubstractionWithSpeciesAndCov.left=current} '-' right=MultiplicationWithSpeciesAndCov)*;
+ 
+MultiplicationWithSpeciesAndCov returns Expression:
+ DivisionWithSpeciesAndCov ({MultiplicationWithSpeciesAndCov.left=current} '*' right=DivisionWithSpeciesAndCov)*;
+ 
+ 
+DivisionWithSpeciesAndCov returns Expression:
+ PowerWithSpeciesAndCov ({DivisionWithSpeciesAndCov.left=current} '/' right=PowerWithSpeciesAndCov)* 
+ ; 
+  
+PowerWithSpeciesAndCov returns Expression:
+ PrimaryOrMinusPrimaryWithSpeciesAndCov ({PowerWithSpeciesAndCov.left=current} '^' right=PrimaryOrMinusPrimaryWithSpeciesAndCov)* ; 
+
+PrimaryOrMinusPrimaryWithSpeciesAndCov returns Expression:
+	PrimaryWithSpeciesAndCov | MinusPrimaryWithSpeciesAndCov
+;
+
+MinusPrimaryWithSpeciesAndCov returns Expression:
+	'-' PrimaryWithSpeciesAndCov {MinusPrimaryWithSpeciesAndCov.left=current}
+;  
+  
+PrimaryWithSpeciesAndCov returns Expression:
+  NumberLiteral
+  //| ReferenceToParameterOrSpecies |
+  | ReferenceToParameterOrSymbolicParameterOrSpecies | 
+  MinWithSpeciesAndCov | MaxWithSpeciesAndCov | AbsWithSpeciesAndCov | 
+  CovExpr | VarExpr |
+  '(' AdditionWithSpeciesAndCov ')'  ;
+
+VarExpr returns Expression hidden(ML_COMMENT,SL_COMMENT,WS): {VarExpr}
+	'var' '(' leftSpecies=[Species]  ')'
+	//'var' '(' leftSpecies=[Species|IDorSTRING]  ')'
+;
+
+CovExpr returns Expression hidden(ML_COMMENT,SL_COMMENT,WS): {CovExpr}
+	'covar' '(' leftSpecies=[Species] ',' rightSpecies=[Species] ')'
+	//'covar' '(' leftSpecies=[Species|IDorSTRING] ',' rightSpecies=[Species|IDorSTRING] ')'
+;
+
+/*VarExpr returns Expression:
+	'var' '(' AdditionWithSpeciesAndCov {VarExpr.left=current}')'
+;
+
+CovExpr returns Expression:
+	'covar' '(' AdditionWithSpeciesAndCov {CovExpr.left=current} ')'
+;*/
+
+MaxWithSpeciesAndCov returns Expression:
+ 'max' '(' AdditionWithSpeciesAndCov ({MaxWithSpeciesAndCov.left=current} ',' right=AdditionWithSpeciesAndCov) ')' ;   
+
+MinWithSpeciesAndCov returns Expression:
+ 'min' '(' AdditionWithSpeciesAndCov ({MinWithSpeciesAndCov.left=current} ',' right=AdditionWithSpeciesAndCov) ')' ;
+
+AbsWithSpeciesAndCov returns Expression:
+	//'|' AdditionWithSpeciesAndCov {AbsWithSpeciesAndCov.left=current} '|' 
+	'abs' '(' AdditionWithSpeciesAndCov {AbsWithSpeciesAndCov.left=current} ')'
+;
+
+
+  
+  
+//NEGATIVEINTORREAL returns ecore::EDouble: '-'? NONNEGATIVEINTORREAL;
+NONNEGATIVEINTORREAL returns ecore::EDouble: ZERO | POSITIVEINTORREAL;
+POSITIVEINTORREAL returns ecore::EDouble: NAT | NONNEGATIVEREAL;
+/*INTORREAL returns ecore::EDouble: ZERO | NATORREAL;
+NATORREAL returns ecore::EDouble: REAL | NAT;*/  
+//terminal NONNEGATIVEREAL returns ecore::EDouble: (INT '.' INT);//terminal REAL returns ecore::EDouble: (('0'..'9')+ ('.' ('0'..'9')+));
+terminal NONNEGATIVEREAL returns ecore::EDouble: 
+	(
+		(INT '.' INT) |
+		//
+		/*(INT '.' ('0'..'9') (('0'..'9')?) 'e' INT ) |
+		(INT '.' ('0'..'9') (('0'..'9')?) 'E' INT ) |
+		(INT '.' ('0'..'9') (('0'..'9')?) 'e' SIGN INT ) |
+		(INT '.' ('0'..'9') (('0'..'9')?) 'E' SIGN INT ) |*/
+		(INT '.' INT 'e' INT ) |
+		(INT '.' INT 'E' INT ) |
+		(INT '.' INT 'e' SIGN INT ) |
+		(INT '.' INT 'E' SIGN INT ) |
+		//
+		(INT  'e' INT ) |
+		(INT  'E' INT ) |
+		(INT  'e' SIGN INT ) |
+		(INT  'E' SIGN INT )
+		)	
+;
+terminal SIGN :
+	'-' | '+' 
+;
+terminal NAT returns ecore::EInt: (('1'..'9') (INT?));//terminal NAT returns ecore::EInt: (('1'..'9') ('0'..'9')*);
+terminal ZERO returns ecore::EInt: '0';
+//terminal ONE returns ecore::EInt: '1';
+BooleanValue returns ecore::EBoolean: "true" | "false";
+//terminal REAL returns ecore::EDouble: '-'? (('0'..'9')* '.' ('0' .. '9')+);
+//terminal REAL returns ecore::EDouble: '-'? (INT '.' (INT)+);
+//terminal REAL returns ecore::EDouble: '-'? (INT '.' INT);
+
+
+
+//BEGIN REGULATORY NETWORK
+NodeDeclarations : {NodeDeclarations} 
+  ('begin' 'init') 
+  	(allNodes += Node)*
+  ('end' 'init')
+;
+
+//A Boolean species and its (optional) initial truth value 
+Node:
+	name = ID (('=' ic = BooleanValue)?) (('(' originalName = STRING ')')?)
+;
+
+NodeDefinitions: {NodeDefinitions}
+  ('begin' 'update' 'functions')		
+	(nodeDefinitions += NodeDefinition)*
+  ('end' 'update' 'functions')
+;
+
+NodeDefinition:  	
+  //name = [Node] ('='|':') updateFunction = BooleanUpdateFunction
+  name = [Node] ('='|':'|',') updateFunction = BooleanUpdateFunction
+;
+
+BooleanUpdateFunction returns BoolExpr:
+	ImpliesBooleanExpr	
+;
+
+ ImpliesBooleanExpr returns BoolExpr: 
+	OrBooleanExpr ({ImpliesBooleanExpr.left=current}  ('implies'|'->') right=OrBooleanExpr)* 
+;
+OrBooleanExpr returns BoolExpr: 
+	AndBooleanExpr ({OrBooleanExpr.left=current} ('or'|'|') right=AndBooleanExpr)* 
+;
+AndBooleanExpr returns BoolExpr: 
+	PrimaryOrNotPrimaryBooleanExpr ({AndBooleanExpr.left=current} ('and'|'&') right=PrimaryOrNotPrimaryBooleanExpr)* 
+;
+
+/*
+BooleanUpdateFunction returns BoolExpr:
+	AndBooleanExpr	
+;
+
+AndBooleanExpr returns BoolExpr: 
+	OrBooleanExpr ({AndBooleanExpr.left=current} ('and'|'&') right=OrBooleanExpr)* 
+;
+OrBooleanExpr returns BoolExpr: 
+	ImpliesBooleanExpr ({OrBooleanExpr.left=current} ('or'|'|') right=ImpliesBooleanExpr)* 
+;
+ImpliesBooleanExpr returns BoolExpr: 
+	PrimaryOrNotPrimaryBooleanExpr ({ImpliesBooleanExpr.left=current} ('implies'|'->') right=PrimaryOrNotPrimaryBooleanExpr)* 
+;
+* 
+*/
+
+PrimaryOrNotPrimaryBooleanExpr returns BoolExpr:
+	PrimaryBooleanExpr | NotBooleanExpr 
+;
+
+NotBooleanExpr returns BoolExpr:
+	('not'|'!') PrimaryBooleanExpr {NotBooleanExpr.left=current}
+;
+
+PrimaryBooleanExpr returns BoolExpr:
+ PrimaryBoolean   
+ | '(' ImpliesBooleanExpr ')' 
+ ;
+
+PrimaryBoolean: 
+	False | True
+	| ReferenceToNode
+;
+
+True: {True} //; returns STRING:{STRING}
+	"true" //| ONE
+	//ONE
+;
+False: {False} //; returns STRING:{STRING}
+	"false" //| ZERO
+	//"false" | ZERO
+	//ZERO
+;
+
+ReferenceToNode: {ReferenceToNode} 
+	reference=[Node]
+;
+
+SpeciesOrNode:
+	Species|Node
+;
+
+BooleanCommand:
+	UpdateStatusBooleanCommand |
+	BooleanReduction |
+	ExportBN
+;
+
+ExportBN:
+	writeBN |
+	exportBoolNet
+;
+
+writeBN:
+	'write' '(' params = ParametersExport
+	 			//(',' 'format' '=' format=ODEorNET)?
+				(',' 'originalNames' '=' originalNames=BooleanValue)?
+	  ')'
+;
+exportBoolNet:
+	'exportBoolNet' '(' params = ParametersExport
+	 			//(',' 'format' '=' format=ODEorNET)?
+				(',' 'originalNames' '=' originalNames=BooleanValue)?
+	  ')'
+;
+
+UpdateStatusBooleanCommand:
+	'this' '=' (reduction = BooleanReduction)
+;
+
+BooleanReduction: 
+	//SMTBooleanReduction
+	reduceBBE | 
+	reduceFBE 	
+;
+//SMTBooleanReduction:
+//	reduceBBE | 
+//	reduceFBE 	
+//;
+
+reduceBBE : {reduceBBE}
+	'reduceBBE' '(' optionalParametersFormatted=FormattedOptionalParametersBooleanReductions ')'
+;
+
+reduceFBE : {reduceFBE}
+	'reduceFBE' '(' optionalParametersFormatted=FormattedOptionalParametersBooleanReductions ')'
+;
+
+FormattedOptionalParametersBooleanReductions: {FormattedOptionalParametersBooleanReductions}
+	(optionalParameters += OptionalParametersBooleanReductions (',' optionalParameters += OptionalParametersBooleanReductions)*)?
+;
+
+OptionalParametersBooleanReductions: 
+	Prep 	
+	| FilePart   
+	| CSVFile
+	|FileRed
+	//| ReductionAlgorithm
+	//| SMTTimesCSVFile
+;
+//END REGULATORY NETWORK

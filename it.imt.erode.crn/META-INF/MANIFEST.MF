@@ -1,0 +1,29 @@
+Manifest-Version: 1.0
+Automatic-Module-Name: it.imt.erode.crn
+Bundle-ManifestVersion: 2
+Bundle-Name: it.imt.erode.crn
+Bundle-Vendor: My Company
+Bundle-Version: 1.0.0.qualifier
+Bundle-SymbolicName: it.imt.erode.crn; singleton:=true
+Bundle-ActivationPolicy: lazy
+Require-Bundle: org.eclipse.xtext,
+ org.eclipse.xtext.xbase,
+ org.eclipse.equinox.common;bundle-version="3.5.0",
+ org.eclipse.emf.ecore,
+ org.eclipse.xtext.xbase.lib;bundle-version="2.14.0",
+ org.eclipse.xtext.util,
+ org.eclipse.emf.common,
+ org.antlr.runtime;bundle-version="[3.2.0,3.2.1)"
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Export-Package: it.imt.erode.crn,
+ it.imt.erode.crn.services,
+ it.imt.erode.crn.parser.antlr.internal,
+ it.imt.erode.crn.parser.antlr,
+ it.imt.erode.crn.generator,
+ it.imt.erode.crn.scoping,
+ it.imt.erode.crn.chemicalReactionNetwork.impl,
+ it.imt.erode.crn.validation,
+ it.imt.erode.crn.chemicalReactionNetwork,
+ it.imt.erode.crn.chemicalReactionNetwork.util,
+ it.imt.erode.crn.serializer
+Import-Package: org.apache.log4j
