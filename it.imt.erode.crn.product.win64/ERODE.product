@@ -145,7 +145,7 @@
    </configurations>
 
    <repositories>
-      <repository location="http://https://www.erode.eu/distr/repository-win" enabled="true" />
+      <repository location="http://www.erode.eu/distr/repository-win" enabled="true" />
    </repositories>
 
    <preferencesInfo>
