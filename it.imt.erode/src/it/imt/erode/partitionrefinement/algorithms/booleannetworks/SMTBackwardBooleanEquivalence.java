@@ -88,11 +88,15 @@ public class SMTBackwardBooleanEquivalence {
 
 		//checkBDE(crn, partition, verbose,out,printInfo,terminator, messageDialogShower);
 		
-		/*(define-fun absolute ((x Int)) Int
+		/*
+		(define-fun absolute ((x Int)) Int
 		(ite (>= x 0) x (- x)))
 		
 		(define-fun myMin ((x Real) (y Real)) Real
-		  (ite (< x y) x y))*/
+		  (ite (< x y) x y))
+		 */
+		
+
 		
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,"Boolean BDE Reducing: "+bn.getName()+" using Microsoft z3");

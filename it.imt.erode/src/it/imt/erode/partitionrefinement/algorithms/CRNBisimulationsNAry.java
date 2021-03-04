@@ -266,6 +266,7 @@ public class CRNBisimulationsNAry {
 		long begin = System.currentTimeMillis();
 		//ArrayListOfReactions[] reactionsToConsiderForEachSpecies =  new ArrayListOfReactions[crn.getSpeciesSize()];
 		
+		
 		HashMap<ICRNReaction,Integer> consideredAtIteration=null;
 //		if(red.equals(Reduction.FE)) {
 //			addToReactionsWithNonZeroStoichiometry(crn, reactionsToConsiderForEachSpecies);
@@ -291,9 +292,41 @@ public class CRNBisimulationsNAry {
 		}
 		
 		
+		/*
+		ISpecies species1=null;
+		ISpecies species2=null;
+		//Smallest model
+		//String n1="s4Y0_2Z0_2Y2_4Z2";
+		//String n2="s4x0_2x2";
+		//Largest model
+		//String n1="s22Y0_16Z0_16Y2_22Z2";
+		//String n2="s22x0_16x2";
+		//MI1616_1010
+		String n1="s16Y0_10Z0_10Y2_16Z2";
+		String n2="s16x0_10x2";
+		//MI11_11 AM2_2
+		//String n1="sY0_Z0_Y2_Z2";
+		//String n2="s2x0_2x2";
+		for(ISpecies species : crn.getSpecies()) {
+			if(species.getName().equals(n1)) {
+				species1=species;
+			}
+			else if(species.getName().equals(n2)) {
+				species2=species;
+			} 
+			if(species1!=null && species2!=null) {
+				break;
+			}
+		}
+		*/
+		
+		//long beginPT = System.currentTimeMillis();
+		//boolean split=false;
+		
+		
 		Integer iteration=1;
 		if(print) {
-		CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\tPerforming the actual "+red+" partition refinement ... ");
+			CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\tPerforming the actual "+red+" partition refinement ... ");
 		}
 		//CRNReducerCommandLine.println(out,bwOut,);
 		while(splittersGenerator.hasSplittersToConsider()){
@@ -308,6 +341,20 @@ public class CRNBisimulationsNAry {
 			iteration++;
 			//System.out.println(" "+iteration);
 			splittersGenerator.skipSplittersWhichShouldBeIgnored();
+			/*
+			if(!split) {
+				IBlock block1=partition.getBlockOf(species1);
+				IBlock block2=partition.getBlockOf(species2);
+				if(!block1.equals(block2)) {
+					String time = String.format( CRNReducerCommandLine.MSFORMAT, ((System.currentTimeMillis()-beginPT)/1000.0))+" (s)";
+					CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\tSpecies "+n1+ " and " +n2+" split at iteration "+iteration +" in "+time +" current partition size "+partition.size());
+					split=true;
+				}
+			}
+			*/
+		}
+		if(print) {
+			CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\t"+iteration+" iterations performed");
 		}
 
 	}

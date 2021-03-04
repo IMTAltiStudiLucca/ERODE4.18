@@ -1083,7 +1083,9 @@ exportScriptEpsCLump:
 	//M0Rows += ListOfCoefficients (',' M0Rows += ListOfCoefficients )* ')'
 	( (M0Rows += ListOfCoefficientsSpNat (',' M0Rows += ListOfCoefficientsSpNat )*)
 			|
-	   (prep="USER")	
+	   (prep="USER")
+	   		|
+	  (M0View = NAT)		
 	)
 	
 	(',' 'maxPercPerturb' '=' maxPerturb=(ZERO|NAT))?
@@ -1092,12 +1094,15 @@ exportScriptEpsCLump:
 ;
 
 exportScriptsEpsCLump:
-	'exportScriptsEpsCLump' '(' params = ParametersExport /*',' 'epsilon' '=' epsilon=ArithmeticExpression*/ ',' 
-		'M0' '=' 
+	'exportScriptsEpsCLump' '(' params = ParametersExport /*',' 'epsilon' '=' epsilon=ArithmeticExpression*/ 
+		',' 'tEnd' '=' tEnd = POSITIVEINTORREAL
+		',' 'M0' '=' 
 	//M0Rows += ListOfCoefficients (',' M0Rows += ListOfCoefficients )* ')'
 		( (M0Rows += ListOfCoefficientsSpNat (',' M0Rows += ListOfCoefficientsSpNat )*)
 			|
-		  (prep="USER")	
+		  (prep="USER")
+		  	|
+	  	  (M0View = NAT)	
 		)
 	','
 	//'cLump' '=' clump = NAT

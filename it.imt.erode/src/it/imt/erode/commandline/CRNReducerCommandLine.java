@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map.Entry;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -67,6 +68,7 @@ import it.imt.erode.importing.ImporterOfSupportedNetworks;
 import it.imt.erode.importing.LBSImporter;
 import it.imt.erode.importing.MatlabODEsImporter;
 import it.imt.erode.importing.ModelicaImporter;
+import it.imt.erode.importing.MutableLong;
 import it.imt.erode.importing.ODEorNET;
 import it.imt.erode.importing.StochKitExporter;
 import it.imt.erode.importing.StoichiometricMatrixExporter;
@@ -2638,7 +2640,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		begin = System.currentTimeMillis();
 		CRNReducerCommandLine.println(out,bwOut,"Computing on-the-fly BR recursively for\n\tQ ("+Q.size()+qpairs+")="+Q+"\n\tQbar ("+Qbar.size()+qbarpairs+")="+Qbar);
 		br = brComputerRecursive.onTheFlyBR(crn, Q, Qbar, out, bwOut, terminator, messageDialogShower);
-		printOnTheFlyBR(out, bwOut, begin, brComputerRecursive, br,"BR");
+		printOnTheFlyBR(out, bwOut, begin, brComputerRecursive, br,"BR",null);
 		
 //		CRNReducerCommandLine.println(out,bwOut,"Computing on-the-fly BR iteratively for\n\tQ ("+Q.size()+qpairs+")="+Q+"\n\tQbar ("+Qbar.size()+qbarpairs+")="+Qbar);
 //		begin = System.currentTimeMillis();
@@ -2806,9 +2808,10 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			beginBegin=begin;
 			OnTheFlyBRIterative brComputerIterative = new OnTheFlyBRIterative();
 			//OnTheFlyBRIterativeDouble brComputerIterative = new OnTheFlyBRIterativeDouble();
-			R = brComputerIterative.onTheFlyBR(crn, Q, Qbar, upTo,avoidUnbalancedPairs,out, bwOut, terminator, messageDialogShower,printIntermediate);
+			MutableLong pre_comp = new MutableLong(0);
+			R = brComputerIterative.onTheFlyBR(crn, Q, Qbar, upTo,avoidUnbalancedPairs,out, bwOut, terminator, messageDialogShower,printIntermediate,pre_comp);
 			if(R!=null)
-				printOnTheFlyBR(out, bwOut, begin, brComputerIterative, R,"BR");
+				printOnTheFlyBR(out, bwOut, begin, brComputerIterative, R,"BR",pre_comp);
 		}
 		else {
 			begin = System.currentTimeMillis();
@@ -2816,7 +2819,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			OnTheFlyFRIterative frComputer = new OnTheFlyFRIterative();
 			R = frComputer.onTheFlyFR(crn, Q, Qbar, upTo,avoidUnbalancedPairs, out, bwOut, terminator, messageDialogShower,false,printIntermediate);
 			if(R!=null)
-				printOnTheFlyBR(out, bwOut, begin, frComputer, R,"FR");
+				printOnTheFlyBR(out, bwOut, begin, frComputer, R,"FR",null);
 		}
 		
 		boolean considerEquivalenceClosure=false;
@@ -2874,11 +2877,17 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		}
 	}
 	public void printOnTheFlyBR(MessageConsoleStream out, BufferedWriter bwOut, long begin,
-			IOnTheFly RComputer, ArrayList<Pair> R, String name) {
+			IOnTheFly RComputer, ArrayList<Pair> R, String name, MutableLong pre_comp) {
 		if(R!=null) {
 			Collections.sort(R);
 			long end = System.currentTimeMillis();
-			CRNReducerCommandLine.println(out,bwOut,"\tCompleted in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)");
+			CRNReducerCommandLine.print(out,bwOut,"\tCompleted in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)");
+			if(pre_comp!=null) {
+				CRNReducerCommandLine.println(out,bwOut," - "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-pre_comp.getValue())/1000.0) )+ " (s) ignoring pre-computation");
+			}
+			else {
+				CRNReducerCommandLine.println(out,bwOut,"");
+			}
 			String p="pairs";
 			if(R.size()==1) {
 				p="pair";
@@ -3514,6 +3523,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 	}
 
 	private void handleExportJacobianFunctionCommand(String command, MessageConsoleStream out, BufferedWriter bwOut,boolean epsCLump) throws UnsupportedFormatException {
+		double tEnd=0.0;
 		String parameters[] = CRNReducerCommandLine.getParameters(command);
 		String fileName=null;
 		String epsilonString=null;
@@ -3527,6 +3537,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		ArrayList<LinkedHashMap<String, Double>> M0=null;
 		String csvFile=null;
 		String M0String=null;
+		int M0view=-1;
 		int cLump=0;
 		//double slope=-1;
 		String fromSlope=null;
@@ -3593,6 +3604,14 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 					return;
 				}
 				stepEpsString = parameter.substring("stepEps=>".length(), parameter.length());
+			}
+			else if(parameter.startsWith("tEnd=>")){
+				if(parameter.length()<="tEnd=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the time horizon. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				tEnd = Double.valueOf(parameter.substring("tEnd=>".length(), parameter.length()));
 			}
 			else if(parameter.startsWith("fromSlope=>")){
 				if(parameter.length()<="fromSlope=>".length()){
@@ -3716,6 +3735,34 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 				}
 				csvFile = parameter.substring("csvFile=>".length(), parameter.length());
+			}
+			else if(parameter.startsWith("M0view=>")){
+				if(parameter.length()<="M0view=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the view to use as M0 - the constraints according to which we should lump. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				M0view = Integer.parseInt(parameter.substring("M0view=>".length(), parameter.length()));
+				List<HashMap<ISpecies, Integer>> viewsAsMultiSet = crn.getViewsAsMultiset();
+				if(viewsAsMultiSet==null) {
+					CRNReducerCommandLine.println(out,bwOut,"There are no views. Specify M0 differently. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				if(viewsAsMultiSet.size()<M0view || viewsAsMultiSet.get(M0view-1)==null) {
+					CRNReducerCommandLine.println(out,bwOut,"There are no enough views. Specify M0 differently. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				M0 = new ArrayList<>(1);
+				HashMap<ISpecies, Integer> view = viewsAsMultiSet.get(M0view - 1);
+				LinkedHashMap<String, Double> speciesToCoefficient=new LinkedHashMap<String, Double>(view.size());
+				M0.add(speciesToCoefficient);
+				for(Entry<ISpecies, Integer> entry:view.entrySet()) {
+					String name=entry.getKey().getName();
+					double val=entry.getValue();
+					speciesToCoefficient.put(name, val);
+				}
 			}
 			else if(parameter.startsWith("M0=>")){
 				if(parameter.length()<="M0=>".length()){
@@ -3858,7 +3905,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				MatlabODEsImporter moi = new MatlabODEsImporter(fileName, out, bwOut, messageDialogShower);
 				CRNReducerCommandLine.print(out,bwOut,"Writing analysis campaign file "+ fileName+" ...");
 				moi.printEpsCLumpAnalysisCampaignToFile(crn.getName(), fileName, verbose, out, bwOut, messageDialogShower,functionNames,csvFile,
-						writeInnerScript,cLump,fromEps,toEps,stepEps,cLumpGiven,fromSlop,toSlop,stepSlop,slopeGiven);
+						writeInnerScript,cLump,fromEps,toEps,stepEps,cLumpGiven,fromSlop,toSlop,stepSlop,slopeGiven,tEnd);
 				CRNReducerCommandLine.println(out,bwOut," completed");
 
 				//writeCRN(fileName,crn, partition, SupportedFormats.MatlabJacobianFunctionEpsCLump, null, "",null, out,bwOut,false,null);

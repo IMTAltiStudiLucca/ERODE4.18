@@ -1747,10 +1747,15 @@ public class MyParserUtil {
 			if(((exportScriptEpsCLump) exp).getM0Rows()!=null && ((exportScriptEpsCLump) exp).getM0Rows().size()>0) {
 				parseM0(((exportScriptEpsCLump) exp).getM0Rows(), sb);
 			}
-			else {
+			else if(((exportScriptEpsCLump) exp).getPrep()!=null){
 				sb.append("prePartition=>");
 				sb.append(((exportScriptEpsCLump) exp).getPrep());
 			}
+			else {
+				sb.append("M0view=>");
+				sb.append(((exportScriptEpsCLump) exp).getM0View());
+			}
+			
 			sb.append(',');
 			
 			
@@ -1802,14 +1807,21 @@ public class MyParserUtil {
 				sb.append(',');
 			}
 			
-			
+			sb.append("tEnd=>");
+			sb.append(((exportScriptsEpsCLump) exp).getTEnd());
+			sb.append(',');
 			
 			if(((exportScriptsEpsCLump) exp).getM0Rows()!=null && ((exportScriptsEpsCLump) exp).getM0Rows().size()>0) {
 				parseM0(((exportScriptsEpsCLump) exp).getM0Rows(), sb);
 			}
-			else {
+			
+			else if(((exportScriptsEpsCLump) exp).getPrep()!=null){
 				sb.append("prePartition=>");
 				sb.append(((exportScriptsEpsCLump) exp).getPrep());
+			}
+			else {
+				sb.append("M0view=>");
+				sb.append(((exportScriptsEpsCLump) exp).getM0View());
 			}
 			sb.append(',');
 			

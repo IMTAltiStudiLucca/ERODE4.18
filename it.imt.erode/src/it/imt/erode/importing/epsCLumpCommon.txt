@@ -120,6 +120,9 @@ function [et,perc_et,normM_xt]=solve_and_compute_error(M,driftName,tspan,x0,M0,e
     
     plot(T,M0*Y',T_hat,views)
     legend("Original",num2str(epsilon)+"-cLump")
+    if not(isfolder("figures"))
+        mkdir("figures")
+    end
     saveas(gcf,strcat("figures",filesep,driftName,"_nRows"+size(M,1),"_eps"+epsilon,"_max_alw_slope_"+num2str(max_allowed_slope),".jpg"))
     
         

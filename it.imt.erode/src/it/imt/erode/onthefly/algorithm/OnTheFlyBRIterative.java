@@ -16,6 +16,7 @@ import it.imt.erode.commandline.Terminator;
 import it.imt.erode.crn.interfaces.ICRN;
 import it.imt.erode.crn.interfaces.IComposite;
 import it.imt.erode.crn.interfaces.ISpecies;
+import it.imt.erode.importing.MutableLong;
 import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.onthefly.Pair;
 import it.imt.erode.onthefly.linkedlist.MyLinkedList;
@@ -45,7 +46,8 @@ public class OnTheFlyBRIterative extends OnTheFlyCommonAbstract{
 			LinkedHashSet<Pair> query,
 			LinkedHashSet<Pair> constraints, UpToType upTo,
 			boolean avoidUnbalancedPairs,
-			MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower, boolean printIntermediate) { 
+			MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower, 
+			boolean printIntermediate,MutableLong pre_comp) { 
 		//pairToPairsMappedToIByAdj= new HashMap<Pair, HashSet<Pair>>();
 		
 		boolean extraTab=false;
@@ -69,6 +71,7 @@ public class OnTheFlyBRIterative extends OnTheFlyCommonAbstract{
 		}
 		
 		long end = System.currentTimeMillis();
+		pre_comp.setValue(end);
 		CRNReducerCommandLine.println(out,bwOut,"completed in "+ String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0))+" (s)");
 		
 		ArrayList<HashMap<ISpecies,CoefficientToMonomialsPosNeg>> speciesToMonomials_list=new ArrayList<>(1); 

@@ -506,10 +506,22 @@ public class BioNetGenImporter extends AbstractImporter{
 		return expression;
 	}
 	
+	/**
+	 * Visits a string representing a view. E.g., 1,8,2*9 means: s0+s7+2*s8
+	 * @param sb
+	 * @param addend
+	 * @param decrement
+	 * @param supportedByMathEval
+	 * @param allSpecies
+	 */
 	private void visitExpr(StringBuilder sb, String addend, int decrement, boolean supportedByMathEval, List<ISpecies> allSpecies) {
 		if(addend.contains("*")){
 			String[] nodes = addend.split("\\*");
-			for(int i=0;i<nodes.length;i++){
+			//2*9 means 2*s8
+			String multiplier=nodes[0].trim();
+			sb.append(multiplier);
+			sb.append('*');
+			for(int i=1;i<nodes.length;i++){
 				String node=nodes[i].trim();
 				visitExpr(sb, node, decrement,supportedByMathEval,allSpecies);
 				if(i!=nodes.length-1){

@@ -1,4 +1,4 @@
-function epsForMaxError(erodeMatlabScript,csvFile,max_allowed_slopes)
+function epsForMaxError(erodeMatlabScript,csvFile,max_allowed_slopes,tEnd)
     clear(erodeMatlabScript);
     
     fprintf('Loading model at time %s ... ', datestr(now,'HH:MM:SS.FFF'))
@@ -135,7 +135,8 @@ function epsForMaxError(erodeMatlabScript,csvFile,max_allowed_slopes)
         %required in M0. We 'add them back'
         %chosen_M=addBackRequiredRows(M0,chosen_M);
         
-		[et,perc_et,normM_xt]=solve_and_compute_error(chosen_M,driftName,[0 30.0],x0,M0,chosen_epsilon,max_allowed_slope_percentage);   
+		%[et,perc_et,normM_xt]=solve_and_compute_error(chosen_M,driftName,[0 30.0],x0,M0,chosen_epsilon,max_allowed_slope_percentage);   
+		[et,perc_et,normM_xt]=solve_and_compute_error(chosen_M,driftName,[0 tEnd],x0,M0,chosen_epsilon,max_allowed_slope_percentage);
         
         fprintf('The error computation terminated at (%s) with et=%d, perc_et=%d\n',datestr(now,'HH:MM:SS.FFF'),et,perc_et)
         

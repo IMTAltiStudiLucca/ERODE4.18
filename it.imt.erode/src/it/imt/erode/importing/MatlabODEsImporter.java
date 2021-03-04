@@ -896,7 +896,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 				bw.write("function "+derivName+" =  "+odeName+"(t,"+varName+") \n");
 			}
 			else{
-				bw.write("function "+derivName+" =  \"+odeName+\"("+varName+") \n");
+				bw.write("function "+derivName+" =  "+odeName+"("+varName+") \n");
 			}
 		}
 
@@ -1150,7 +1150,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 	public void printEpsCLumpAnalysisCampaignToFile(String crnName,String fileName, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut,IMessageDialogShower msgDialogShower, 
 			ArrayList<String> functionNames, String csvFile, boolean writeInnerScript, int cLump
 			,double fromEps,double toEps,double stepEps,boolean cLumpGiven, 
-			double fromSlope, double toSlope, double stepSlope, boolean slopeGiven) throws UnsupportedFormatException{
+			double fromSlope, double toSlope, double stepSlope, boolean slopeGiven,double tEnd) throws UnsupportedFormatException{
 		/*function runAnalysisCampagin()
 	    csvFile="eiModels.csv";
 	    %erodesMatlabScripts=["e2maxPert0_1","e2maxPert0_2","e2maxPert0_3","e2maxPert0_4","e2maxPert0_5","e2maxPert0_6"];
@@ -1188,6 +1188,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 			bw.write("function "+functionName+"()\n");
 			bw.write("\tbeginTime=now;\n");
 			bw.write("\tfprintf('Script invoked at time %s\\n',datestr(beginTime,'HH:MM:SS.FFF'))\n");
+			bw.write("\ttEnd="+tEnd+";\n");
 			bw.write("\t"+"csvFile=\""+csvFile+"\";"+"\n");
 			bw.write("\t"+"%Delete old version of CSV file if it exists\n");
 			bw.write("\t"+"if isfile(csvFile)\n");
@@ -1219,7 +1220,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 			bw.write("\t"+"\tepsCLump(erodeMatlabScript,csvFile,requiredRows);"+"\n");
 			}
 			else if(slopeGiven) {
-				bw.write("\t\tepsForMaxError(erodeMatlabScript,csvFile,max_allowed_slopes)\n");
+				bw.write("\t\tepsForMaxError(erodeMatlabScript,csvFile,max_allowed_slopes,tEnd)\n");
 			}
 			else {
 				bw.write("\t"+"\tfor epsilon="+fromEps+":"+stepEps+":"+toEps+"\n");
@@ -2980,7 +2981,7 @@ for(String param : crn.getParameters()){
 
 
 
-		//write Pontryagin
+		
 		InputStream is = getClass().getResourceAsStream("epsilonBoundScript.txt");
 		BufferedReader br = new BufferedReader(new InputStreamReader(is));
 		String line=br.readLine();

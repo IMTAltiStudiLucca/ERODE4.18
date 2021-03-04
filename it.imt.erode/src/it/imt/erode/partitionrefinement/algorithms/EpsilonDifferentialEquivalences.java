@@ -524,7 +524,8 @@ public class EpsilonDifferentialEquivalences {
 		MathEval math = crn.getMath();
 		boolean ignoreI=false;
 		for(ICRNReaction reaction : crn.getReactions()) {
-			if(!reaction.hasArbitraryKinetics()) {
+			//If the reaction is MA, and I don't need to keep track of the parameters (e.g. the parameters to do Ax=b for eps-DE), I can do this faster computation. 
+			if(!reaction.hasArbitraryKinetics() && !keepExpressionInMA) {
 				IMonomial ma = reaction.getReagents().toMonomials();
 				if(reaction.getRate().compareTo(BigDecimal.ONE)!=0) {
 					ma=new ProductMonomial(new NumberMonomial(reaction.getRate(), reaction.getRate().toPlainString()), ma);
@@ -550,6 +551,7 @@ public class EpsilonDifferentialEquivalences {
 				}
 			}
 			else {
+				//If the reaction is not MA, or if it is MA but I need to keep the expression in its rate (e.g. the parameters to do Ax=b for eps-DE)
 				String firingRate=reaction.getRateExpression();
 				if(!reaction.hasArbitraryKinetics()){
 					//firingRate =  reaction.getRateExpression()+"*"+reaction.getReagents().getMassActionExpression(false);

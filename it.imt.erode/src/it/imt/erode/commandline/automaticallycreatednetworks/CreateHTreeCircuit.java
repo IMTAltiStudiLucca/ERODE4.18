@@ -31,7 +31,8 @@ public class CreateHTreeCircuit {
 		//for(int N=2;N<=8;N++){
 		for(int copy=1;copy<=10;copy++){
 			//for(int N=8;N<=8;N++){
-			for(int N=2;N<=8;N++){
+			//for(int N=2;N<=8;N++){
+			for(int N=2;N<=2;N++){
 				//for(int N=2;N<=4;N++){
 				System.out.println("\n\n\nN="+N);
 				//createAndWriteCircuit(N,vs,delta[N],false,-1);
@@ -44,7 +45,8 @@ public class CreateHTreeCircuit {
 
 	}
 
-	private static void createAndWriteCircuit(int N, int vs,double delta,boolean perturbParameters, double percentageOfPerturbation, String suffix) throws IOException {
+	private static void createAndWriteCircuit(int N, int vs,double delta,boolean perturbParameters, 
+			double percentageOfPerturbation, String suffix) throws IOException {
 		ICRN crn = HTreeCircuit.createHTreeCiruit(N,vs,delta, null, null,perturbParameters,percentageOfPerturbation,suffix);
 		
 		if(crn!=null){
