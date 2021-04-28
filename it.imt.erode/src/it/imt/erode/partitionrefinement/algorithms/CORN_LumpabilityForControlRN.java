@@ -2,8 +2,8 @@ package it.imt.erode.partitionrefinement.algorithms;
 
 import java.io.BufferedWriter;
 import java.math.BigDecimal;
-import java.math.MathContext;
-import java.math.RoundingMode;
+//import java.math.MathContext;
+//import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -40,7 +40,7 @@ public class CORN_LumpabilityForControlRN {
 	//private static final BigDecimal DELTA_PERCENTAGE = BigDecimal.valueOf(10);
 	private static final BigDecimal TWO = BigDecimal.valueOf(2);
 	private static final BigDecimal ZERO = BigDecimal.ZERO;
-	private static final MathContext MC = new MathContext(CRNBisimulationsNAry.getSCALE(), RoundingMode.HALF_DOWN);
+	//private static final MathContext MC = new MathContext(CRNBisimulationsNAry.getSCALE(), RoundingMode.HALF_DOWN);
 
 	private static int cmpWithTol(BigDecimal key1, BigDecimal key2){
 
@@ -67,14 +67,14 @@ public class CORN_LumpabilityForControlRN {
 			return divisor.divide(dividend, CRNBisimulationsNAry.getSCALE(),CRNBisimulationsNAry.RM);
 		}
 	}
-	private static BigDecimal multiplyWithScale(BigDecimal first, BigDecimal second){
-		if(cmpWithTol(first, ZERO)==0 || cmpWithTol(second, ZERO)==0) {
-			return ZERO;
-		}
-		else {
-			return first.multiply(second, MC);
-		}
-	}
+//	private static BigDecimal multiplyWithScale(BigDecimal first, BigDecimal second){
+//		if(cmpWithTol(first, ZERO)==0 || cmpWithTol(second, ZERO)==0) {
+//			return ZERO;
+//		}
+//		else {
+//			return first.multiply(second, MC);
+//		}
+//	}
 
 
 

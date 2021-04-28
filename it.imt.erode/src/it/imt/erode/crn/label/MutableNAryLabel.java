@@ -1,7 +1,6 @@
 package it.imt.erode.crn.label;
 
 import java.util.HashMap;
-import java.util.List;
 
 import it.imt.erode.auxiliarydatastructures.IntegerAndSpecies;
 import it.imt.erode.crn.implementations.Composite;
