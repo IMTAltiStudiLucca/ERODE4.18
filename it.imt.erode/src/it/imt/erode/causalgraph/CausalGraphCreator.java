@@ -3,6 +3,7 @@ package it.imt.erode.causalgraph;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -16,11 +17,12 @@ import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.crn.implementations.CRNReactionArbitraryGUI;
 import it.imt.erode.crn.interfaces.ICRN;
 import it.imt.erode.crn.interfaces.ICRNReaction;
+import it.imt.erode.crn.interfaces.IComposite;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.importing.AbstractImporter;
 
 public class CausalGraphCreator {
-	
+
 	private LinkedHashMap<ISpecies,LinkedHashSet<ISpecies>> causalGraph;
 	private int edges=0;
 
@@ -30,7 +32,7 @@ public class CausalGraphCreator {
 			bw.write("\t"+source.getName()+"\n");
 		}
 	}
-	
+
 	public void writeCausalGraph(String fileName, String modelName, List<ISpecies> species,MessageConsoleStream out, BufferedWriter bwOut,boolean verbose) {
 		CRNReducerCommandLine.print(out,bwOut,"Writing the causal graph in file "+ fileName+" ...");
 		AbstractImporter.createParentDirectories(fileName);
@@ -47,14 +49,14 @@ public class CausalGraphCreator {
 			bw.write("Causal graph automatically generated from "+modelName+"\n");
 			bw.write("\t"+causalGraph.size()+" nodes and "+edges+" edges.\n");
 			bw.write("\n\n");
-			
+
 			for(Entry<ISpecies, LinkedHashSet<ISpecies>> targetToInfluencing : causalGraph.entrySet()) {
 				//bw.write(influence.toString());
 				writeInfluencesOfTarget(targetToInfluencing,bw);
 				bw.write("\n");
 			}
-			
-			
+
+
 		} catch (IOException e) {
 			CRNReducerCommandLine.println(out,bwOut,"Problems in writeCausalGraph, exception raised while writing in the file: "+fileName);
 			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
@@ -72,10 +74,10 @@ public class CausalGraphCreator {
 				CRNReducerCommandLine.printStackTrace(out,bwOut,e);
 			}
 		}
-		
+
 		CRNReducerCommandLine.println(out,bwOut," completed");
 	}
-	
+
 	public void writeDOTCausalGraph(String fileName, String modelName, List<ISpecies> species,MessageConsoleStream out, BufferedWriter bwOut,boolean verbose) {
 		CRNReducerCommandLine.print(out,bwOut,"Writing the causal graph in DOT file "+ fileName+" ...");
 		AbstractImporter.createParentDirectories(fileName);
@@ -96,7 +98,7 @@ public class CausalGraphCreator {
 			bw.write("/* Causal graph automatically generated from "+modelName+"\n");
 			bw.write(" * "+causalGraph.size()+" nodes and "+edges+" edges.\n");
 			bw.write(" */\n\n");
-			
+
 			bw.write("digraph "+modelName+" {\n");
 			String space="  ";
 			//bw.write(space+"subgraph «diagram.attacker.name» {\n");
@@ -104,7 +106,7 @@ public class CausalGraphCreator {
 			writeTransitions(bw,space);
 			bw.write("}");
 
-			
+
 		} catch (IOException e) {
 			CRNReducerCommandLine.println(out,bwOut,"Problems in writeDOTCausalGraph, exception raised while writing in the file: "+fileName);
 			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
@@ -122,10 +124,10 @@ public class CausalGraphCreator {
 				CRNReducerCommandLine.printStackTrace(out,bwOut,e);
 			}
 		}
-		
+
 		CRNReducerCommandLine.println(out,bwOut," completed");
 	}
-	
+
 	private void writeNodes(BufferedWriter bw,String space) throws IOException {
 		bw.write(space+space+"//States\n" + 
 				space+space+"node [shape=ellipse style=rounded color=blue penwidth=1.0]\n");
@@ -148,35 +150,66 @@ public class CausalGraphCreator {
 	public void createCausalGraphTrivial(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut,boolean verbose) {
 		CRNReducerCommandLine.print(out,bwOut,"Creating the causal graph with trivial approach for model "+ crn.getName()+" ... ");
 		long begin = System.currentTimeMillis();
-		
+
 		HashMap<String, ISpecies> nameToSpecies = new HashMap<>(crn.getSpeciesSize());
 		for(ISpecies species : crn.getSpecies()) {
 			nameToSpecies.put(species.getName(), species);
 		}
-		
+
 		initCausalGraph(crn);
-		
-		for(ICRNReaction r : crn.getReactions()) {
-			CRNReactionArbitraryGUI reaction = (CRNReactionArbitraryGUI)r;
-			ISpecies target = reaction.getReagents().getFirstReagent();
-			List<ASTNode> l =reaction.getSpeciesInRateLaw(reaction.getRateLaw(), nameToSpecies);
-			LinkedHashSet<ISpecies> speciesAffectingTarget = new LinkedHashSet<ISpecies>(l.size());
-			for(ASTNode n : l) {
-				speciesAffectingTarget.add(nameToSpecies.get(n.getName()));
-				edges++;
+
+		if(crn.isMassAction()) {
+			for(ICRNReaction reaction : crn.getReactions()) {
+				if(reaction.getRate().compareTo(BigDecimal.ZERO)!=0) {
+					IComposite reagents = reaction.getReagents();
+					IComposite netStoic = reaction.computeProductsMinusReagents();
+
+					LinkedHashSet<ISpecies> speciesAffectingTarget = new LinkedHashSet<ISpecies>(reagents.getNumberOfDifferentSpecies());
+					for(int s=0;s<reagents.getNumberOfDifferentSpecies();s++) {
+						speciesAffectingTarget.add(reagents.getAllSpecies(s));
+					}
+
+					for(int t=0;t<netStoic.getNumberOfDifferentSpecies();t++) {
+						ISpecies target = netStoic.getAllSpecies(t);
+						LinkedHashSet<ISpecies> prev = causalGraph.get(target);
+						if(prev==null) {
+							prev=speciesAffectingTarget;
+							edges+=speciesAffectingTarget.size();
+						}
+						else {
+							int prevSize=prev.size();
+							prev.addAll(speciesAffectingTarget);
+							edges+= prev.size()-prevSize;
+						}
+						causalGraph.put(target, prev);
+					}
+				}
 			}
-			causalGraph.put(target, speciesAffectingTarget);
-//			String one="1";
-//			for(ISpecies source : involvedSpecies) {
-//				ICRNReaction influence = new CRNReaction(BigDecimal.ONE, (IComposite)source, (IComposite)target, one, null);
-//				causalGraph.add(influence);
-//			}
 		}
-		
+		else {
+			for(ICRNReaction r : crn.getReactions()) {
+				CRNReactionArbitraryGUI reaction = (CRNReactionArbitraryGUI)r;
+				ISpecies target = reaction.getReagents().getFirstReagent();
+				List<ASTNode> l =reaction.getSpeciesInRateLaw(reaction.getRateLaw(), nameToSpecies);
+				LinkedHashSet<ISpecies> speciesAffectingTarget = new LinkedHashSet<ISpecies>(l.size());
+				for(ASTNode n : l) {
+					speciesAffectingTarget.add(nameToSpecies.get(n.getName()));
+					edges++;
+				}
+				causalGraph.put(target, speciesAffectingTarget);
+				//				String one="1";
+				//				for(ISpecies source : involvedSpecies) {
+				//					ICRNReaction influence = new CRNReaction(BigDecimal.ONE, (IComposite)source, (IComposite)target, one, null);
+				//					causalGraph.add(influence);
+				//				}
+			}
+		}
+
+
 		long end = System.currentTimeMillis();
 		CRNReducerCommandLine.print(out,bwOut,causalGraph.size()+" nodes and "+edges+" edges ...");
 		CRNReducerCommandLine.println(out,bwOut," completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s).");
-		
+
 	}
 
 	private void initCausalGraph(ICRN crn) {

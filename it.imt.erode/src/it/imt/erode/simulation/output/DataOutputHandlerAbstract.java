@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.util.ArrayList;
 //import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,6 +26,7 @@ import it.imt.erode.expression.evaluator.MathEval;
 import it.imt.erode.importing.AbstractImporter;
 import it.imt.erode.importing.GUICRNImporter;
 //import vesta.mc.InfoMultiQuery;
+import vesta.mc.InfoMultiQuery;
 
 public abstract class DataOutputHandlerAbstract implements IDataOutputHandler {
 
@@ -768,46 +770,46 @@ public abstract class DataOutputHandlerAbstract implements IDataOutputHandler {
 		return true;
 	}
 
-//	@Override
-//	/**
-//	 * Invoked after solving the statistical analysis with MultiVeStA 
-//	 */ 
-//	public void setData(String minimalDescription, ICRN crn, InfoMultiQuery infoMultiQuery,double alpha, double delta, String command){
-//		setData(crn,minimalDescription,"Means estimations",command);
-//		labelsAll= null;
-//		labelsViews=null;
-//		viewsExpressions=null;
-//		covariances=false;
-//		hasViews= false;
-//		hasSMCVariances=true;
-//
-//		messageSuffix= ". Means estimations. CI=("+alpha+","+delta+")";;
-//		xLabel=infoMultiQuery.getxVariableName();
-//		yLabel="Means estimations";
-//
-//		//Init x
-//		ArrayList<Double> xList = infoMultiQuery.getX();
-//		this.x=new double[xList.size()];
-//		for(int i = 0; i < xList.size();i++){
-//			x[i]=xList.get(i);
-//		}
-//
-//		//init data
-//		labelsAll = new String[infoMultiQuery.getNumberOfYsForEachX()];
-//		plotsAll= new double[labelsAll.length][];
-//		smcVariances = new double[labelsAll.length][];
-//		for(int query=0;query<labelsAll.length;query++){
-//			labelsAll[query]=infoMultiQuery.getLabel(query);
-//			plotsAll[query]=new double[x.length];
-//			smcVariances[query]=new double[x.length];
-//			for(int i = 0; i < x.length;i++){
-//				ArrayList<Double> yi = infoMultiQuery.getY(i);
-//				ArrayList<Double> yVari = infoMultiQuery.getYVar(i);
-//				plotsAll[query][i]=yi.get(query);
-//				smcVariances[query][i]=yVari.get(query);
-//			}
-//		}
-//
-//	}
+	@Override
+	/**
+	 * Invoked after solving the statistical analysis with MultiVeStA 
+	 */ 
+	public void setData(String minimalDescription, ICRN crn, InfoMultiQuery infoMultiQuery,double alpha, double delta, String command){
+		setData(crn,minimalDescription,"Means estimations",command);
+		labelsAll= null;
+		labelsViews=null;
+		viewsExpressions=null;
+		covariances=false;
+		hasViews= false;
+		hasSMCVariances=true;
+
+		messageSuffix= ". Means estimations. CI=("+alpha+","+delta+")";;
+		xLabel=infoMultiQuery.getxVariableName();
+		yLabel="Means estimations";
+
+		//Init x
+		ArrayList<Double> xList = infoMultiQuery.getX();
+		this.x=new double[xList.size()];
+		for(int i = 0; i < xList.size();i++){
+			x[i]=xList.get(i);
+		}
+
+		//init data
+		labelsAll = new String[infoMultiQuery.getNumberOfYsForEachX()];
+		plotsAll= new double[labelsAll.length][];
+		smcVariances = new double[labelsAll.length][];
+		for(int query=0;query<labelsAll.length;query++){
+			labelsAll[query]=infoMultiQuery.getLabel(query);
+			plotsAll[query]=new double[x.length];
+			smcVariances[query]=new double[x.length];
+			for(int i = 0; i < x.length;i++){
+				ArrayList<Double> yi = infoMultiQuery.getY(i);
+				ArrayList<Double> yVari = infoMultiQuery.getYVar(i);
+				plotsAll[query][i]=yi.get(query);
+				smcVariances[query][i]=yVari.get(query);
+			}
+		}
+
+	}
 
 }

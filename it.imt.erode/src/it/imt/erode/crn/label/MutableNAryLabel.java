@@ -1,7 +1,11 @@
 package it.imt.erode.crn.label;
 
+import java.util.HashMap;
+import java.util.List;
+
 import it.imt.erode.auxiliarydatastructures.IntegerAndSpecies;
 import it.imt.erode.crn.implementations.Composite;
+import it.imt.erode.crn.interfaces.IComposite;
 import it.imt.erode.crn.interfaces.ISpecies;
 
 public class MutableNAryLabel implements ILabel {
@@ -307,6 +311,29 @@ public class MutableNAryLabel implements ILabel {
 		}
 		sb.deleteCharAt(sb.length()-1);
 		return sb.toString();
+	}
+	
+	public IComposite toCompositeAddingSpecies(ISpecies toAdd) {
+		HashMap<ISpecies, Integer> compositeHM= new HashMap<>(allSpecies.length+1);
+		for(int s=0;s<allSpecies.length;s++) {
+			if(s==speciesToDecreaseMultiplicity) {
+				if(multiplicities[s]-1>0) {
+					compositeHM.put(allSpecies[s], multiplicities[s]-1);
+				}
+			}
+			else {
+				compositeHM.put(allSpecies[s], multiplicities[s]);
+			}
+		}
+		Integer mult=compositeHM.get(toAdd);
+		if(mult==null) {
+			mult=1;
+		}
+		else {
+			mult++;
+		}
+		compositeHM.put(toAdd, mult);
+		return new Composite(compositeHM);
 	}
 
 }

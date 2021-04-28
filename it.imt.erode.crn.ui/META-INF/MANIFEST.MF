@@ -20,7 +20,7 @@ Require-Bundle: it.imt.erode.crn,
  org.eclipse.nebula.visualization.xygraph,
  org.eclipse.draw2d,
  org.eclipse.ui.navigator,
- it.imt.erode
+ it.imt.erode;bundle-version="1.0.0"
 Import-Package: org.apache.log4j
 Bundle-RequiredExecutionEnvironment: JavaSE-11
 Export-Package: it.imt.erode.crn.ui.quickfix,

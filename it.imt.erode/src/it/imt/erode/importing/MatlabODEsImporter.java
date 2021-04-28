@@ -544,7 +544,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 	}
 
 	public static void printODEsToMatlabFIle(ICRN crn, String name, Collection<String> preambleCommentLines, boolean verbose, 
-			String icComment,MessageConsoleStream out,BufferedWriter bwOut, String tEnd,String printJacobian, 
+			String icComment,MessageConsoleStream out,BufferedWriter bwOut, String tEnd,String printJacobian,String odeFunc, 
 			IMessageDialogShower msgDialogShower,boolean writeOnlyDrift) throws UnsupportedFormatException{
 
 		String fileName = name;
@@ -602,7 +602,10 @@ public class MatlabODEsImporter  extends AbstractImporter {
 				//ISpecies[] speciesIdToSpecies = new ISpecies[crn.getSpecies().size()];
 				//int s=0;
 				//[T,Y]=ode45(@fluidflow,[0 100],[ 178 142 184 150 12 0 0 13 11 10 0 11 11 0 0 0 0 0 0 0 0 0 12 12 31684 20164 33856 22500 144 0 0 169 121 100 0 121 121 0 0 0 0 0 0 0 0 0 144 144 25276 32752 26700 2136 0 0 2314 1958 1780 0 1958 1958 0 0 0 0 0 0 0 0 0 2136 2136 26128 21300 1704 0 0 1846 1562 1420 0 1562 1562 0 0 0 0 0 0 0 0 0 1704 1704 27600 2208 0 0 2392 2024 1840 0 2024 2024 0 0 0 0 0 0 0 0 0 2208 2208 1800 0 0 1950 1650 1500 0 1650 1650 0 0 0 0 0 0 0 0 0 1800 1800 0 0 156 132 120 0 132 132 0 0 0 0 0 0 0 0 0 144 144 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 143 130 0 143 143 0 0 0 0 0 0 0 0 0 156 156 110 0 121 121 0 0 0 0 0 0 0 0 0 132 132 0 110 110 0 0 0 0 0 0 0 0 0 120 120 0 0 0 0 0 0 0 0 0 0 0 0 0 121 0 0 0 0 0 0 0 0 0 132 132 0 0 0 0 0 0 0 0 0 132 132 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 144]);
-				bw.write(" [T,Y]=ode45(@ode,[0 "+tEnd+"],[ ");
+				//bw.write(" [T,Y]=ode45(@ode,[0 "+tEnd+"],[ ");
+				//ode45 - ode15s
+				//String odeFunc="ode45";
+				bw.write(" [T,Y]="+odeFunc+"(@ode,[0 "+tEnd+"],[ ");
 				for(ISpecies species : crn.getSpecies()){
 					bw.write(" "+species.getInitialConcentration());
 					speciesNameToSpecies.put(species.getName(), species);
@@ -625,6 +628,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 					//writeParams(crn,bw,"");
 
 					boolean first=true;
+					int vv=1;
 					for(int v=0;v<crn.getViewNames().length;v++){
 						//bw.write("% View "+v+":\n");
 						//String vExpr = ;
@@ -633,8 +637,9 @@ public class MatlabODEsImporter  extends AbstractImporter {
 						String vExpr = node.toFormula();//parseViewExpression(vExpr);
 
 						if(vExpr!=null){
-							bw.write("view= "+vExpr+";\n");//"+v+"
-							bw.write("plot(T,"+"view);\n");//"+v+"
+							bw.write("view"+vv+"= "+vExpr+";\n");//"+v+"
+							bw.write("plot(T,"+"view"+vv+");\n");//"+v+"
+							vv++;
 							bw.write("hold on;\n");
 							if(first){
 								first=false;
@@ -1425,7 +1430,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 			if(epsCLump) {
 				String driftFile = overwriteExtensionIfEnabled(fileName, "",true);
 				driftFile+="Drift.m";
-				printODEsToMatlabFIle(crnToConsider, driftFile, preambleCommentLines, verbose, icComment, out,bwOut, "0","false",msgDialogShower,true);
+				printODEsToMatlabFIle(crnToConsider, driftFile, preambleCommentLines, verbose, icComment, out,bwOut, "0","false","ode45",msgDialogShower,true);
 			}
 			
 			return functionNameToReturn;
@@ -1537,7 +1542,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 			
 			String driftFile = overwriteExtensionIfEnabled(fileName, "",true);
 			driftFile+="Drift.m";
-			printODEsToMatlabFIle(crnToConsider, driftFile, preambleCommentLines, verbose, icComment, out,bwOut, "0","false",msgDialogShower,true);
+			printODEsToMatlabFIle(crnToConsider, driftFile, preambleCommentLines, verbose, icComment, out,bwOut, "0","false","ode45",msgDialogShower,true);
 
 			return functionNameToReturn;
 

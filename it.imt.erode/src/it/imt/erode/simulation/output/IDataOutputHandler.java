@@ -7,7 +7,7 @@ import org.eclipse.ui.console.MessageConsoleStream;
 import it.imt.erode.commandline.IMessageDialogShower;
 import it.imt.erode.commandline.SimulationSolutions;
 import it.imt.erode.crn.interfaces.ICRN;
-//import vesta.mc.InfoMultiQuery;
+import vesta.mc.InfoMultiQuery;
 
 public interface IDataOutputHandler {
 
@@ -22,7 +22,7 @@ public interface IDataOutputHandler {
 
 	void setData(String minimalDescription, double[][] result, boolean stepPerSpecies, double[] x, ICRN crn,boolean skipFirstPosOfResult, boolean covariances, boolean computeOnlyJacobian, String command);
 
-	//void setData(String minimalDescription, ICRN crn, InfoMultiQuery infoMultiQuery,double alpha, double delta, String command);
+	void setData(String minimalDescription, ICRN crn, InfoMultiQuery infoMultiQuery,double alpha, double delta, String command);
 
 	MessageConsoleStream getOut();
 	BufferedWriter getBWOut();

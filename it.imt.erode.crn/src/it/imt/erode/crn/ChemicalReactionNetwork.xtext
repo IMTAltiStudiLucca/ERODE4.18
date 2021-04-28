@@ -438,7 +438,7 @@ pairsOrMeta:{pairsOrMeta}
 	) ;
 
 crossProduct:
-	'cartesianProduct' '(' first=setOfSpeciesOrID 'X' 
+	'cartesianProduct' '(' first=setOfSpeciesOrID 'times' 
 					   second=setOfSpeciesOrID 
 					   (',' 'avoidReflexivePairs' '=' avoidReflexivePairs=BooleanValue)? ')'
 ;
@@ -592,7 +592,8 @@ MassActionReduction:
 	reduceEFL |	//binary BB, less efficient (CONCUR15)
 	reduceUncertainFE | // Uncertain Forward Equivalence: FE for linear systems with uncertain parameters. Old rejected at CONCUR2019
 	reduceUCTMCFE| // UCTMC Lumping: FE for CTMCs where transitions are i -[mij,Mij]-> j. Rates are uncertain and non-deterministically variate in the interval [mij,Mij]. Submitted at FOSSACS2020
-	reduceBE_AAt
+	reduceBE_AAt |
+	reduceCoRNFE
 ;
 
 /*MassActionEpsilonReduction:
@@ -643,6 +644,16 @@ reduceBE : {reduceBE}
 
 reduceFE : {reduceFE}
 	'reduceFE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+reduceCoRNFE : {reduceCoRNFE}
+	'reduceCoRNFE' '(' cornParams=CoRNParams ',' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
+CoRNParams:
+	'perturbation'
+	(('absolute' '=' absolute = POSITIVEINTORREAL)|
+	 ('percentage' '=' percentage = POSITIVEINTORREAL)) 
 ;
 
 reduceBB : {reduceBB}
@@ -884,7 +895,7 @@ Export:
 ;
 
 exportCausalGraph:
-	'exportCausalGraph' '('
+	('exportCausalGraph' | 'exportGraphStructure') '('
 		params = ParametersExport
 	')'
 ;
@@ -899,7 +910,10 @@ exportCAGEScript:
 	 ')'
 ;
 exportMatlab:
-	'exportMatlab' '(' params = ParametersExport ',' 'tEnd' '=' tEnd = POSITIVEINTORREAL (',' 'writeJacobian' '=' writeJacobian=BooleanValue)? ')'
+	'exportMatlab' '(' params = ParametersExport ',' 'tEnd' '=' tEnd = POSITIVEINTORREAL 
+		(',' 'writeJacobian' '=' writeJacobian=BooleanValue)? 
+		(',' 'odeFunc' '=' odeFunc=('ode45'|'ode15s'))?
+		')'
 ;
 exportLNA:
 	'exportLNA' '(' params = ParametersExport ')'
@@ -1254,7 +1268,7 @@ exportMRMCCTMCWithSingleUseOfParams:
 Analysis :
 	simulateODE
 	| simulateCTMC
-	//| multivestaSMC
+	| multivestaSMC
 	| simulateDAE
 ;
 
@@ -1395,36 +1409,41 @@ MinStep:
 ;
 
 //BEGIN MULTIVESTA
-//multivestaSMC:
-//	//'multivestaSMC({' 'alpha=>' alpha = REAL ',delta=>' delta = REAL optionalParametersCommon = OptionalParametersSimulateCommon optionalParametersSMC = OptionalParametersSMC ')'
-//	//'multivestaSMC' '(' 'alpha=' alpha = POSITIVEINTORREAL 'delta=' delta = POSITIVEINTORREAL params+= ParametersMultiVeStA* ')'
-//	'multivestaSMC' '(' 'alpha' '=' alpha = POSITIVEINTORREAL ',' 'delta' '=' delta = POSITIVEINTORREAL (',' params+= ParametersMultiVeStA)* ')'
-//;
-//
-//ParametersMultiVeStA:
-//	OptionalParametersSimulateCommon |
-//	OptionalParametersSMC 
-//;
-//
-//
-//OptionalParametersSMC: //{OptionalParametersSMC}
-//	Method | //(',method=>' method = TypeOfStochasticSimulator)?
-//	QueryFile | //(',queryFile=>' query = STRING)?
-//	Parallelism |//(',parallelism=>' parallelism = NAT)?
-//	MaxTime //(',maxTime=>' maxTime = REAL)?
-//;
-//
-//MaxTime:
-//	'maxTime' '=' maxTime = POSITIVEINTORREAL
-//;
-//
-//Parallelism:
-//	'parallelism' '=' parallelism = NAT	
-//;
-//
-//QueryFile:
-//	'queryFile' '=' query = STRING
-//;
+multivestaSMC:
+	//'multivestaSMC({' 'alpha=>' alpha = REAL ',delta=>' delta = REAL optionalParametersCommon = OptionalParametersSimulateCommon optionalParametersSMC = OptionalParametersSMC ')'
+	//'multivestaSMC' '(' 'alpha=' alpha = POSITIVEINTORREAL 'delta=' delta = POSITIVEINTORREAL params+= ParametersMultiVeStA* ')'
+	'multivestaSMC' '(' 'alpha' '=' alpha = POSITIVEINTORREAL ',' 'delta' '=' delta = POSITIVEINTORREAL (',' params+= ParametersMultiVeStA)* ')'
+;
+
+ParametersMultiVeStA:
+	OptionalParametersSimulateCommon |
+	OptionalParametersSMC 
+;
+
+
+OptionalParametersSMC: //{OptionalParametersSMC}
+	FileOfModel | //(',fileIn=>' fileIn = STRING)?
+	Method | //(',method=>' method = TypeOfStochasticSimulator)?
+	QueryFile | //(',queryFile=>' query = STRING)?
+	Parallelism |//(',parallelism=>' parallelism = NAT)?
+	MaxTime //(',maxTime=>' maxTime = REAL)?
+;
+
+FileOfModel:
+	'fileOfModel=' model = STRING	//The file where to find the model
+; 
+
+MaxTime:
+	'maxTime' '=' maxTime = POSITIVEINTORREAL
+;
+
+Parallelism:
+	'parallelism' '=' parallelism = NAT	
+;
+
+QueryFile:
+	'queryFile' '=' query = STRING
+;
 //END MULTIVESTA
 
 ArithmeticExpression returns Expression:

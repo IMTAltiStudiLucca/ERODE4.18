@@ -17,6 +17,15 @@ import it.imt.erode.partition.interfaces.IPartition;
 public class CreateHTreeCircuit {
 
 	public static void main(String[] args) throws IOException {
+		//java -jar hTreeGenerator.jar eta_percentage maxN copies
+		double eta=0.01;
+		int maxN = 7;
+		int copies=3;
+		if(args!=null && args.length>0) {
+			eta=Double.valueOf(args[0]);
+			maxN=Integer.valueOf(args[1]);
+			copies=Integer.valueOf(args[2]);
+		}
 		
 		int vs=2;
 		double[] delta=new double[9];
@@ -29,14 +38,19 @@ public class CreateHTreeCircuit {
 		delta[8]=4.46e-4;
 		
 		//for(int N=2;N<=8;N++){
-		for(int copy=1;copy<=10;copy++){
+		for(int copy=1;copy<=copies;copy++){
+		//for(int copy=1;copy<=3;copy++){
 			//for(int N=8;N<=8;N++){
 			//for(int N=2;N<=8;N++){
-			for(int N=2;N<=2;N++){
+			//for(int N=2;N<=2;N++){
+			for(int N=2;N<=maxN;N++){
 				//for(int N=2;N<=4;N++){
 				System.out.println("\n\n\nN="+N);
 				//createAndWriteCircuit(N,vs,delta[N],false,-1);
-				createAndWriteCircuit(N,vs,delta[N],true,0.01,String.valueOf(copy));
+				//createAndWriteCircuit(N,vs,delta[N],true,0.01,String.valueOf(copy));
+				//createAndWriteCircuit(N,vs,delta[N],true,0.1,String.valueOf(copy));
+				//createAndWriteCircuit(N,vs,delta[N],true,1,String.valueOf(copy));
+				createAndWriteCircuit(N,vs,delta[N],true,eta,String.valueOf(copy));
 				System.out.println("\n\n\n");
 			}
 		}

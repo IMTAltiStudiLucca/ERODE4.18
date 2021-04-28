@@ -26,7 +26,7 @@
 	<classpathentry kind="lib" path="lib/jsundials/jcvode.jar"/>
 	<classpathentry kind="lib" path="lib/jsundials/jIDA.jar"/>
 	<classpathentry kind="lib" path="lib/matlab/engine.jar"/>
-	<classpathentry kind="lib" path="lib/multivesta/multivesta.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/multivesta/multivesta.jar"/>
 	<classpathentry kind="lib" path="lib/sbml/jsbml-1.2-with-dependencies.jar"/>
 	<classpathentry kind="lib" path="lib/drawer/graphviz-java.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/expression/matheval.jar"/>

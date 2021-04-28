@@ -41,3 +41,6 @@ it.imt.erode.crn/bin
 it.imt.erode.crn.tests/test-bin
 it.imt.erode.crn.tests/src-gen/*
 it.imt.erode.crn.tests.ui/src-gen/*
+it.imt.erode/hTreeCircuit21.ode
+it.imt.erode/hTreeCircuit22.ode
+it.imt.erode/hTreeCircuit23.ode

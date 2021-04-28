@@ -403,24 +403,14 @@ public class CRNBisimulationsNAry {
 			ArrayListOfReactions[] reactionsToConsiderForEachSpecies,HashMap<IComposite, BigDecimal> multisetCoefficients, int maxArity) {
 		
 		//For multisetCoefficients
-		int[] factorials = new int[maxArity+1];
-		factorials[0]=1;
-		for(int arity=1;arity<factorials.length;arity++){
-			factorials[arity]=arity*factorials[arity-1];
-		}
+		int[] factorials = computeFactorials(maxArity);
 		
 		for(ICRNReaction reaction : reactions) {
 			if(Terminator.hasToTerminate(terminator)){
 				break;
 			}
 			//For multisetCoefficients
-			if((!reaction.isUnary()) && !multisetCoefficients.containsKey(reaction.getReagents())){
-				int multisetCoefficient =1;
-				for(int i=0;i<reaction.getReagents().getNumberOfDifferentSpecies();i++){
-					multisetCoefficient=multisetCoefficient*factorials[reaction.getReagents().getMultiplicities(i)];
-				}
-				multisetCoefficients.put(reaction.getReagents(), BigDecimal.valueOf(multisetCoefficient));
-			}
+			extractMultisetCoefficients(multisetCoefficients, factorials, reaction);
 			
 			//To add ReactionsWithNonZeroStoichiometry
 			HashMap<ISpecies, Integer> productsMinusReagents = reaction.computeProductsMinusReagentsHashMap();
@@ -431,6 +421,29 @@ public class CRNBisimulationsNAry {
 			}
 		}
 		
+	}
+	static int[] computeFactorials(int maxArity) {
+		int[] factorials = new int[maxArity+1];
+		factorials[0]=1;
+		for(int arity=1;arity<factorials.length;arity++){
+			factorials[arity]=arity*factorials[arity-1];
+		}
+		return factorials;
+	}
+	protected static void extractMultisetCoefficients(HashMap<IComposite, BigDecimal> multisetCoefficients,
+			int[] factorials, ICRNReaction reaction) {
+		if(reaction.isUnary()) {
+			//I should put BigDecimal.ONE but I don't do it to save memory
+		}
+		else {
+			if(!multisetCoefficients.containsKey(reaction.getReagents())){
+				int multisetCoefficient =1;
+				for(int i=0;i<reaction.getReagents().getNumberOfDifferentSpecies();i++){
+					multisetCoefficient=multisetCoefficient*factorials[reaction.getReagents().getMultiplicities(i)];
+				}
+				multisetCoefficients.put(reaction.getReagents(), BigDecimal.valueOf(multisetCoefficient));
+			}
+		}
 	}
 	public static void initializeAllCounters(Collection<ISpecies> consideredSpecies, ISpeciesCounterHandler[] speciesCounters) {
 		for (ISpecies species : consideredSpecies) {

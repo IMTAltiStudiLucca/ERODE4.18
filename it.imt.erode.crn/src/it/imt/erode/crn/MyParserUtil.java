@@ -921,11 +921,13 @@ public class MyParserUtil {
 		
 		
 		
-		//Commands that I want to add
+		//Add here commands that you want to add automatically when  loading a model
 		//
 		//String redFile ="/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/TCS_CMSB/ERODE models/mass-action kinetics/maExplicit/BIOMD0000000002FE.ode";
 		
-		
+		//automatical reduceFE reduceSE reduction generate
+		//generateCommands(mec, absoluteParentPath, commands, new String[]{"SE"},false);
+		//generateCommands(mec, absoluteParentPath, commands, new String[]{"FE"},false);
 		//generateCommands(mec, absoluteParentPath, commands, new String[]{"SMB"},false);
 		/*
 		boolean applyCurrying=false;
@@ -969,6 +971,7 @@ public class MyParserUtil {
 		return commands;
 	}
 
+	
 	@SuppressWarnings("unused")
 	private static void generateCommands(final ModelElementsCollector mec, final String absoluteParentPath, final List<String> commands,
 			final String[] reductions,final boolean applyCurrying) {
@@ -1503,6 +1506,13 @@ public class MyParserUtil {
 		else if(exp instanceof exportMatlab){
 			tEnd = ((exportMatlab) exp).getTEnd();
 			sb.append("tEnd=>"+tEnd);
+			sb.append(',');
+			
+			String odeFunc = ((exportMatlab) exp).getOdeFunc();
+			if(odeFunc==null) {
+				odeFunc="ode45";
+			}
+			sb.append("odeFunc=>"+odeFunc);
 			sb.append(',');
 			
 			boolean writeJacobian = ((exportMatlab) exp).isWriteJacobian();
@@ -2400,7 +2410,7 @@ public class MyParserUtil {
 				sb.append(',');
 			}
 		}
-		/*
+		//BEGIN MultiVeStA
 		else if(analysisCommand instanceof multivestaSMC){
 			//multivestaSMC({fileIn=>inputfileName,alpha=>0.05,delta=>0.2,maxTime=>200,query=>query.quatex,steps=>10,method=>ssa,parallelism=>2,visualizePlot=>false,csvFile=>fileNameWhereToSaveCSVValues})
 			multivestaSMC multivestaCommand= (multivestaSMC)analysisCommand;
@@ -2415,8 +2425,11 @@ public class MyParserUtil {
 				if(par instanceof OptionalParametersSimulateCommon){
 					p = parseOptionalParametersSimulateCommon((OptionalParametersSimulateCommon)par,absoluteParentPath);
 				}
+				else if(par instanceof FileOfModel){
+					p="model=>" + computeFileName(((FileOfModel) par).getModel(),absoluteParentPath);
+				}
 				else if(par instanceof MaxTime){
-					sb.append("maxtime=>");
+					sb.append("maxTime=>");
 					p = String.valueOf(((MaxTime) par).getMaxTime());
 				}
 				else if(par instanceof QueryFile){
@@ -2434,7 +2447,8 @@ public class MyParserUtil {
 				sb.append(p);
 				sb.append(',');
 			}
-		}*/
+		}
+		//END MultiVeStA
 		sb.deleteCharAt(sb.length()-1);
 		sb.append("})");
 		//System.out.println(sb.toString());
@@ -2595,6 +2609,17 @@ public class MyParserUtil {
 			if(((reduceSMB) red).isHalveRatesOfHomeoReactions()) {
 				sb.append("halveRatesOfHomeoReactions=>true,");
 			}
+		}
+		if(red instanceof reduceCoRNFE) {
+			sb.append("computeOnlyPartition=>true,");
+			CoRNParams cornParams = ((reduceCoRNFE)red).getCornParams();
+			if(cornParams.getPercentage()>0) {
+				sb.append("percentagePerturbation=>"+cornParams.getPercentage());
+			}
+			else {
+				sb.append("absolutePerturbation=>"+cornParams.getAbsolute());
+			}
+			sb.append(",");
 		}
 		if(red instanceof reduceUCTMCFE){
 			String modelWithBigM = ((reduceUCTMCFE)red).getModelWithBigM();

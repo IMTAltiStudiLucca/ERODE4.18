@@ -93,6 +93,7 @@ import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
+import it.imt.erode.partitionrefinement.algorithms.CORN_LumpabilityForControlRN;
 import it.imt.erode.partitionrefinement.algorithms.CRNBisimulations;
 import it.imt.erode.partitionrefinement.algorithms.CRNBisimulationsNAry;
 import it.imt.erode.partitionrefinement.algorithms.ControlEquivalences;
@@ -117,11 +118,13 @@ import it.imt.erode.simulation.stochastic.fern.ControllerWithTerminator;
 import it.imt.erode.simulation.stochastic.fern.FernNetworkFromLoadedCRN;
 import it.imt.erode.simulation.stochastic.fern.observer.AmountIntervalObserverAVGBugFixed;
 import it.imt.erode.simulation.stochastic.fern.observer.IntervalObserverAVGBugFixed;
+import it.imt.erode.smc.multivesta.FERNState;
 //import it.imt.erode.smc.multivesta.FERNState;
 import it.imt.erode.utopic.MatlabODEPontryaginExporter;
 import it.imt.erode.utopic.vnodelp.VNODELPExporter;
 //import umontreal.iro.lecuyer.stat.Tally;
 //import vesta.mc.InfoMultiQuery;
+import vesta.mc.InfoMultiQuery;
 
 // load({file=>./CRNNetworks/am.crn})
 // load({file=>./BNGNetworks/dsbGroupedBioNetGen_CCP.net}) reduce({technique=>dsb,reducedFile=>outputFileNameOfReducedCRN.net,groupedFile=>outputFileNameOfGroupedCRN.net})
@@ -722,6 +725,9 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				else if(command.startsWith("reduceFE(")){
 					handleReduceCommand(command,updateCRN,"fe",out,bwOut);
 				}
+				else if(command.startsWith("reduceCoRNFE(")){
+					handleReduceCommand(command,updateCRN,"CoRNFE",out,bwOut);
+				}
 				else if(command.startsWith("reduceUncertainFE(")||command.startsWith("reduceUFE(")){
 					handleReduceCommand(command,updateCRN,"ufe",out,bwOut);
 				}
@@ -860,9 +866,9 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				else if(command.startsWith("simulateCTMC(")){
 					handleSimulateCTMCCommand(command,out,bwOut);
 				}
-//				else if(command.startsWith("multivestaSMC(")){
-//					handleSMCCommand(command,out,bwOut);
-//				}
+				else if(command.startsWith("multivestaSMC(")){
+					handleSMCCommand(command,out,bwOut);
+				}
 				else if(command.startsWith("print")){
 					handlePrintCommand(out,bwOut);
 				}
@@ -2170,27 +2176,28 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 	}
 
 
-//	private void handleSMCCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
-//		double maxTime=0;//100.0;
-//		int steps=100;
-//		int simulationSteps=1;
-//		String method = "nextReaction";//"ssa";
-//		String csvFile = null;
-//		boolean visualizePlot=true;
-//		boolean showLabels=true;
-//		String model="";
-//		double alpha=0.0;
-//		double delta=0.0;
-//		String parallelism="1";	
-//
-//		String query=FERNState.allPopulationsMultiQuaTExExpressionFileNameWithoutExtension;
-//
-//		String parameters[] = CRNReducerCommandLine.getParameters(command);
-//		if(parameters==null){
-//			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
-//			return;
-//		}
-//		for(int p=0;p<parameters.length;p++){
+	private void handleSMCCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
+		double maxTime=0;//100.0;
+		int steps=100;
+		int simulationSteps=1;
+		String method = "nextReaction";//"ssa";
+		String csvFile = null;
+		boolean visualizePlot=true;
+		boolean showLabels=true;
+		String model="";
+		double alpha=0.0;
+		double delta=0.0;
+		String parallelism="1";	
+
+		String query=FERNState.allPopulationsMultiQuaTExExpressionFileNameWithoutExtension;
+		
+
+		String parameters[] = CRNReducerCommandLine.getParameters(command);
+		if(parameters==null){
+			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			return;
+		}
+		for(int p=0;p<parameters.length;p++){
 //			if(parameters[p].startsWith("fileIn=>")){
 //				boolean loadingSuccessful = invokeLoad(parameters[p],out,bwOut);
 //				model=parameters[p].substring("fileIn=>".length());
@@ -2199,217 +2206,226 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 //					return;
 //				}
 //			}
-//			else if(parameters[p].equals("")){
-//				continue;
-//			}
-//			else if(parameters[p].startsWith("maxTime=>")){
-//				if(parameters[p].length()<="maxTime=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximum simulation time. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				maxTime = Double.valueOf(parameters[p].substring("maxTime=>".length(), parameters[p].length()));
-//			}
-//			else if(parameters[p].startsWith("parallelism=>")){
-//				if(parameters[p].length()<="parallelism=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the degree of parallelism. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				parallelism = parameters[p].substring("parallelism=>".length(), parameters[p].length());
-//			}
-//			else if(parameters[p].startsWith("alpha=>")){
-//				if(parameters[p].length()<="alpha=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the alpha component of the confidence interval. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				alpha= Double.valueOf(parameters[p].substring("alpha=>".length(), parameters[p].length()));
-//			}
-//			else if(parameters[p].startsWith("delta=>")){
-//				if(parameters[p].length()<="delta=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the alpha component of the confidence interval. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				delta= Double.valueOf(parameters[p].substring("delta=>".length(), parameters[p].length()));
-//			}
-//			else if(parameters[p].startsWith("steps=>")){
-//				if(parameters[p].length()<="steps=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the number of observed steps. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				//The number of points in the output (one per 0, plus one per simulation step)
-//				steps = Integer.valueOf(parameters[p].substring("steps=>".length(), parameters[p].length()));
-//				simulationSteps=steps-1;
-//			}
-//			/*else if(parameters[p].startsWith("repeats=>")){
-//				if(parameters[p].length()<="repeats=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the number of simulations to be performed. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				repeats = Integer.valueOf(parameters[p].substring("repeats=>".length(), parameters[p].length()));
-//			}*/
-//			else if(parameters[p].startsWith("method=>")){
-//				method = parameters[p].substring("method=>".length(), parameters[p].length());
-//				if(!( 	method.equalsIgnoreCase("ssa")|| 
-//						method.equalsIgnoreCase("ssa+")||
-//						method.equalsIgnoreCase("nextReaction")||
-//						method.equalsIgnoreCase("tauLeapingAbs")||
-//						method.equalsIgnoreCase("tauLeapingRelProp")||
-//						method.equalsIgnoreCase("tauLeapingRelPop")||
-//						method.equalsIgnoreCase("maximalTimeStep")
-//						)){
-//					CRNReducerCommandLine.println(out,bwOut,"Unknown simulation method \""+method+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
-//					return;
-//				}
-//			}
-//			else if(parameters[p].startsWith("csvFile=>")){
-//				if(parameters[p].length()<="csvFile=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write the analysis data. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				csvFile = parameters[p].substring("csvFile=>".length(), parameters[p].length());
-//			}
-//			else if(parameters[p].startsWith("query=>")){
-//				if(parameters[p].length()<="query=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write the analysis data. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				query = parameters[p].substring("query=>".length(), parameters[p].length());
-//			}
-//			else if(parameters[p].startsWith("visualizePlot=>")){
-//				if(parameters[p].length()<="visualizePlot=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the plot has to be visualized. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				visualizePlot = Boolean.valueOf(parameters[p].substring("visualizePlot=>".length(), parameters[p].length()));
-//			}
-//			else if(parameters[p].startsWith("showLabels=>")){
-//				if(parameters[p].length()<="showLabels=>".length()){
-//					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the plot labels have to be visualized. ");
-//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//					return;
-//				}
-//				showLabels = Boolean.valueOf(parameters[p].substring("showLabels=>".length(), parameters[p].length()));
-//			}
-//			else{
-//				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
-//				return;
-//			}
-//		}
-//
-//		if(model.equals("")){
-//			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the model to analyse. ");
-//			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//			return;
-//		}
-//		if(maxTime==0.0){
-//			CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximum simulated time. ");
-//			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//			return;
-//		}
-//		if(alpha<=0.0||alpha>=1.0){
-//			CRNReducerCommandLine.println(out,bwOut,"Please, specify a value in (0,1) for the alpha component of the required confidence interval. ");
-//			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//			return;
-//		}
-//		if(delta<=0.0){
-//			CRNReducerCommandLine.println(out,bwOut,"Please, specify a positive value for the delta component of the required confidence interval. ");
-//			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//			return;
-//		}
-//		if(crn==null){
-//			CRNReducerCommandLine.println(out,bwOut,"Before analysing with statistical model checking a model it is necessary to load it. "); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
-//			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//			return;
-//		}
-//		if(crn.getSpecies().size()==0){
-//			CRNReducerCommandLine.println(out,bwOut,"It is not possible to analyse with statistical model checking a model with no species. ");
-//			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//			return;
-//		}
-//		if(crn.getReactions().size()==0){
-//			CRNReducerCommandLine.println(out,bwOut,"It is not possible to analyse with statistical model checking a model with no reactions. ");
-//			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//			return;
-//		}
-//
-//		double interval;
-//		interval = maxTime / (double)(simulationSteps);
-//
-//		if(query.equals(FERNState.allPopulationsMultiQuaTExExpressionFileNameWithoutExtension) ||
-//				query.equals(FERNState.allPopulationsAndViewsMultiQuaTExExpressionFileNameWithoutExtension) ||
-//				query.equals(FERNState.allViewsMultiQuaTExExpressionFileNameWithoutExtension)){
-//			if(steps<=1.0){
-//				CRNReducerCommandLine.println(out,bwOut,"Please, specify a number of observed steps greater than one. ");
-//				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//				return;
-//			}
-//			try{
-//				FERNState.createMultiQuaTExQuery(crn,maxTime,interval,query);
-//			}catch(IOException e){
-//				CRNReducerCommandLine.println(out,bwOut,"Problems while writing the MultiQuaTEx expression. ");
-//				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-//				return;
-//			}
-//			query=query+".quatex";
-//		}
-//		smc(model, maxTime, steps, interval, alpha, delta, method,csvFile, visualizePlot,parallelism,query,showLabels,out,bwOut,command);
-//	}
-//
-//	private void smc(String model, double maxTime, int steps, double interval, double alpha, double delta, String method, String csvFile, boolean visualizePlot, String parallelism, String query, boolean showLabels, MessageConsoleStream out, BufferedWriter bwOut, String command) throws IOException  {
-//
-//		int maxSimulations=0;
-//		int seedOfTheSeeds=-1;
-//		String multiVeStAServerList=parallelism;//"serverlist1";
-//		String otherParams = "--maxTime "+maxTime + " --method "+method;
-//		String[] argsMultiVeStA = parametersForMultiVeStAFERNClient(model, query, multiVeStAServerList, 
-//				otherParams , maxSimulations, alpha, delta, seedOfTheSeeds);
-//
-//		CRNReducerCommandLine.println(out,bwOut,"Launching the MultiVeStA client."); // to evaluate the obtained MultiQuaTEx expression against the CRN.");
-//		CRNReducerCommandLine.println(out,bwOut,ANSI_CYAN);
-//		long begin = System.currentTimeMillis();
-//		InfoMultiQuery result = vesta.NewVesta.invokeClient(argsMultiVeStA);
-//		long end = System.currentTimeMillis();
-//		CRNReducerCommandLine.println(out,bwOut,ANSI_RESET);
-//		CRNReducerCommandLine.println(out,bwOut,"MultiVeStA analysis completed. Time necessary "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+" (s). Total simulations "+result.getNumberOfSimulations());
-//
-//		String minimalDescription = "Statistical Model Checking. Query: "+query;//
-//		//dog = new DataOutputHandler(minimalDescription,crn, result,alpha,delta);
-//		dog.setData(crn.getName()+" - "+minimalDescription,crn, result,alpha,delta,command);
-//		
-//		dog.setShowLabels(showLabels);
-//
-//		boolean writeCSV = csvFile!=null;
-//		if(visualizePlot){
-//			if(result.getNumberOfX()<=3){
-//				CRNReducerCommandLine.println(out,bwOut,"The used graphical library does not allow to draw lines basing on less than four points.");
-//			}
-//			else{
-//				dog.showPlots(false,null,true,false);
-//			}
-//		}
-//
-//		if(writeCSV){
-//			dog.writeCSV(csvFile);
-//		}
-//
-//	}
+			if(parameters[p].equals("")){
+				continue;
+			}
+			else if(parameters[p].startsWith("maxTime=>")){
+				if(parameters[p].length()<="maxTime=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximum simulation time. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				maxTime = Double.valueOf(parameters[p].substring("maxTime=>".length(), parameters[p].length()));
+			}
+			else if(parameters[p].startsWith("parallelism=>")){
+				if(parameters[p].length()<="parallelism=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the degree of parallelism. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				parallelism = parameters[p].substring("parallelism=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("alpha=>")){
+				if(parameters[p].length()<="alpha=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the alpha component of the confidence interval. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				alpha= Double.valueOf(parameters[p].substring("alpha=>".length(), parameters[p].length()));
+			}
+			else if(parameters[p].startsWith("delta=>")){
+				if(parameters[p].length()<="delta=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the alpha component of the confidence interval. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				delta= Double.valueOf(parameters[p].substring("delta=>".length(), parameters[p].length()));
+			}
+			else if(parameters[p].startsWith("steps=>")){
+				if(parameters[p].length()<="steps=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the number of observed steps. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				//The number of points in the output (one per 0, plus one per simulation step)
+				steps = Integer.valueOf(parameters[p].substring("steps=>".length(), parameters[p].length()));
+				simulationSteps=steps-1;
+			}
+			/*else if(parameters[p].startsWith("repeats=>")){
+				if(parameters[p].length()<="repeats=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the number of simulations to be performed. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				repeats = Integer.valueOf(parameters[p].substring("repeats=>".length(), parameters[p].length()));
+			}*/
+			else if(parameters[p].startsWith("method=>")){
+				method = parameters[p].substring("method=>".length(), parameters[p].length());
+				if(!( 	method.equalsIgnoreCase("ssa")|| 
+						method.equalsIgnoreCase("ssa+")||
+						method.equalsIgnoreCase("nextReaction")||
+						method.equalsIgnoreCase("tauLeapingAbs")||
+						method.equalsIgnoreCase("tauLeapingRelProp")||
+						method.equalsIgnoreCase("tauLeapingRelPop")||
+						method.equalsIgnoreCase("maximalTimeStep")
+						)){
+					CRNReducerCommandLine.println(out,bwOut,"Unknown simulation method \""+method+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+					return;
+				}
+			}
+			else if(parameters[p].startsWith("csvFile=>")){
+				if(parameters[p].length()<="csvFile=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write the analysis data. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				csvFile = parameters[p].substring("csvFile=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("query=>")){
+				if(parameters[p].length()<="query=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write the analysis data. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				query = parameters[p].substring("query=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("model=>")){
+				if(parameters[p].length()<="model=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to find the model. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				model = parameters[p].substring("model=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("visualizePlot=>")){
+				if(parameters[p].length()<="visualizePlot=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the plot has to be visualized. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				visualizePlot = Boolean.valueOf(parameters[p].substring("visualizePlot=>".length(), parameters[p].length()));
+			}
+			else if(parameters[p].startsWith("showLabels=>")){
+				if(parameters[p].length()<="showLabels=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the plot labels have to be visualized. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				showLabels = Boolean.valueOf(parameters[p].substring("showLabels=>".length(), parameters[p].length()));
+			}
+			else{
+				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+				return;
+			}
+		}
+
+		if(model.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the model to analyse. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(maxTime==0.0){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximum simulated time. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(alpha<=0.0||alpha>=1.0){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify a value in (0,1) for the alpha component of the required confidence interval. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(delta<=0.0){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify a positive value for the delta component of the required confidence interval. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(crn==null){
+			CRNReducerCommandLine.println(out,bwOut,"Before analysing with statistical model checking a model it is necessary to load it. "); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(crn.getSpecies().size()==0){
+			CRNReducerCommandLine.println(out,bwOut,"It is not possible to analyse with statistical model checking a model with no species. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(crn.getReactions().size()==0){
+			CRNReducerCommandLine.println(out,bwOut,"It is not possible to analyse with statistical model checking a model with no reactions. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+
+		double interval;
+		interval = maxTime / (double)(simulationSteps);
+
+		if(query.equals(FERNState.allPopulationsMultiQuaTExExpressionFileNameWithoutExtension) ||
+				query.equals(FERNState.allPopulationsAndViewsMultiQuaTExExpressionFileNameWithoutExtension) ||
+				query.equals(FERNState.allViewsMultiQuaTExExpressionFileNameWithoutExtension)){
+			if(steps<=1.0){
+				CRNReducerCommandLine.println(out,bwOut,"Please, specify a number of observed steps greater than one. ");
+				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+				return;
+			}
+			try{
+				FERNState.createMultiQuaTExQuery(crn,maxTime,interval,query);
+			}catch(IOException e){
+				CRNReducerCommandLine.println(out,bwOut,"Problems while writing the MultiQuaTEx expression. ");
+				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+				return;
+			}
+			query=query+".quatex";
+		}
+		smc(model, maxTime, steps, interval, alpha, delta, method,csvFile, visualizePlot,parallelism,query,showLabels,out,bwOut,command);
+	}
+
+	private void smc(String model, double maxTime, int steps, double interval, double alpha, double delta, String method, String csvFile, boolean visualizePlot, String parallelism, String query, boolean showLabels, MessageConsoleStream out, BufferedWriter bwOut, String command) throws IOException  {
+
+		int maxSimulations=0;
+		int seedOfTheSeeds=-1;
+		String multiVeStAServerList=parallelism;//"serverlist1";
+		String otherParams = "--maxTime "+maxTime + " --method "+method;
+		String[] argsMultiVeStA = parametersForMultiVeStAFERNClient(model, query, multiVeStAServerList, 
+				otherParams , maxSimulations, alpha, delta, seedOfTheSeeds);
+
+		CRNReducerCommandLine.println(out,bwOut,"Launching the MultiVeStA client."); // to evaluate the obtained MultiQuaTEx expression against the CRN.");
+		//CRNReducerCommandLine.println(out,bwOut,ANSI_CYAN);
+		long begin = System.currentTimeMillis();
+		InfoMultiQuery result = vesta.NewVesta.invokeClient(argsMultiVeStA);
+		long end = System.currentTimeMillis();
+		CRNReducerCommandLine.println(out,bwOut,ANSI_RESET);
+		CRNReducerCommandLine.println(out,bwOut,"MultiVeStA analysis completed. Time necessary "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+" (s). Total simulations "+result.getNumberOfSimulations());
+
+		String minimalDescription = "Statistical Model Checking. Query: "+query;//
+		//dog = new DataOutputHandler(minimalDescription,crn, result,alpha,delta);
+		dog.setData(crn.getName()+" - "+minimalDescription,crn, result,alpha,delta,command);
+		
+		dog.setShowLabels(showLabels);
+
+		boolean writeCSV = csvFile!=null;
+		if(visualizePlot){
+			if(result.getNumberOfX()<=3){
+				CRNReducerCommandLine.println(out,bwOut,"The used graphical library does not allow to draw lines basing on less than four points.");
+			}
+			else{
+				dog.showPlots(false,null,true,false);
+			}
+		}
+
+		if(writeCSV){
+			dog.writeCSV(csvFile);
+		}
+
+	}
 
 	public static String[] parametersForMultiVeStAFERNClient(String CRNFileName, String multiQuaTExExpressionFileName, String serverAddressesFileName, 
-			String optionalBioPEPAParameters, int maxSimulations, double alpha, double delta, int seedOfTheSeeds){
+			String optionalFERNParameters, int maxSimulations, double alpha, double delta, int seedOfTheSeeds){
 		/*if(CRNFileName.startsWith("./")){
 			CRNFileName=CRNFileName.substring(2);
 		}
 		if(multiQuaTExExpressionFileName.startsWith("./")){
 			multiQuaTExExpressionFileName=multiQuaTExExpressionFileName.substring(2);
 		}*/
+		/*
 		String argsMultiVeStAStr = "-sd it.imt.erode.smc.multivesta.FERNState -m " + CRNFileName 
 				+ " -f "+ multiQuaTExExpressionFileName  
 				+ " -l " + serverAddressesFileName 
@@ -2427,9 +2443,44 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		if(maxSimulations > 0){
 			argsMultiVeStAStr = argsMultiVeStAStr + "-ms " + maxSimulations; 
 		}
+		*/
+		ArrayList<String> params = new ArrayList<String>();
+		params.add("-sd");
+		params.add("it.imt.erode.smc.multivesta.FERNState");
+		params.add("-m");
+		params.add(CRNFileName);
+		
+		params.add("-f");
+		params.add(multiQuaTExExpressionFileName);  
+		params.add("-l");
+		params.add(""+serverAddressesFileName);
+		params.add("-a");
+		params.add(""+alpha);
+		params.add("-sots");
+		params.add(""+seedOfTheSeeds);
+		params.add("-d1");
+		params.add(""+delta);
+		params.add("-vp");
+		params.add("false"); 
+		params.add("-bs");
+		params.add("30");
+		params.add("-verbose");
+		params.add("false");
+		params.add("-osws");
+		params.add("ONESTEP");
+		//+ " -osws WHOLESIMULATION"
+		//+ " -jn " + CRNReducerCommandLine.NameOfTheJar 
+		params.add("-distr");
+		params.add("false");
+		if(maxSimulations > 0){
+			//argsMultiVeStAStr = argsMultiVeStAStr + "-ms " + maxSimulations;
+			params.add("-ms");
+			params.add(""+maxSimulations);
+		}
+		
 
-		String[] argsMultiVeStA = argsMultiVeStAStr.trim().split(" ");
-		String handledOptionalFERNParameters = handleOptionalParameters(optionalBioPEPAParameters);
+		String[] argsMultiVeStA = params.toArray(new String[]{});//.trim().split(" ");
+		String handledOptionalFERNParameters = handleOptionalParameters(optionalFERNParameters);
 		if (handledOptionalFERNParameters.equals(""))
 			return argsMultiVeStA;
 		else {
@@ -3367,6 +3418,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		double tEnd=100;
 		String parameters[] = CRNReducerCommandLine.getParameters(command);
 		String fileName=null;
+		String odeFunc="ode45";
 		boolean writeJacobian=false;
 		
 		if(parameters==null){
@@ -3403,6 +3455,14 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				//writeCRN(fileName,crn, partition, SupportedFormats.MatalbArbitraryODEs, null, "", String.valueOf(tEnd), out,false);
 				//break;
 			}
+			else if(parameter.startsWith("odeFunc=>")){
+				if(parameter.length()<="odeFunc=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the ode solver to use. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				odeFunc = parameter.substring("odeFunc=>".length(), parameter.length());
+			}
 			else if(parameter.startsWith("writeJacobian=>")){
 				if(parameter.length()<="writeJacobian=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the Jacobian matrix has to be written. ");
@@ -3428,9 +3488,10 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 			return;
 		}
-		List<String> furtherParameters = new ArrayList<>(2);
+		List<String> furtherParameters = new ArrayList<>(3);
 		furtherParameters.add(String.valueOf(tEnd));
 		furtherParameters.add(String.valueOf(writeJacobian));
+		furtherParameters.add(odeFunc);
 		writeCRN(fileName,crn, partition, SupportedFormats.MatlabArbitraryODEs, null, "", furtherParameters, out,bwOut,false,null);
 	}
 	
@@ -3948,7 +4009,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			return;
 		}
 		
-		if(!crn.getMdelDefKind().equals(ODEorNET.ODE)) {
+		if((!crn.getMdelDefKind().equals(ODEorNET.ODE)) && !crn.isMassAction()) {
 			CRNReducerCommandLine.print(out,bwOut,"This command should be invoked on ODE models.");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 			return;
@@ -4521,10 +4582,13 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			return;
 		}
 		
+		long begin = System.currentTimeMillis();
 		CRNReducerCommandLine.print(out,bwOut,"Decompressing the model " + crn.getName());
 		Decode decode = new Decode();
 		ICRN decodedCRN = decode.decode(crn, fileName, verbose, out, bwOut, messageDialogShower, terminator, speciesToLimit);
-		CRNReducerCommandLine.println(out,bwOut," completed");
+		long end = System.currentTimeMillis();
+		CRNReducerCommandLine.println(out,bwOut,"\tCompleted in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".\n\t  Variables: "+decodedCRN.getSpecies().size() +"\n\t  Transitions: "+decodedCRN.getReactions().size()+".");
+		//CRNReducerCommandLine.println(out,bwOut," completed");
 		
 		//CRNReducerCommandLine.print(out,bwOut,"Writing the decompressed model in "+ fileName+" ...");
 		//WE HAVE TO CREATE A NEW PARTITION FOR THE DECODED MODEL
@@ -7718,6 +7782,9 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		boolean 	halveRatesOfHomeoReactions = false;
 		String csvFile=null;
 		
+		double percentagePertCoRN=-1;
+		double absolutePertCoRN=-1;
+		
 		/*if(reduction.equalsIgnoreCase("EFL")||reduction.equalsIgnoreCase("BDE")||reduction.equalsIgnoreCase("BB")||reduction.equalsIgnoreCase("NBB")){
 			prePartitionWRTIC="true";
 		}
@@ -7775,7 +7842,13 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 					return null;
 				}
-				reducedFileName = parameters[p].substring("reducedFile=>".length(), parameters[p].length());
+				if(reduction.equals("CoRNFE")) {
+					partitionInfoFileName = parameters[p].substring("reducedFile=>".length(), parameters[p].length());
+				}
+				else {
+					reducedFileName = parameters[p].substring("reducedFile=>".length(), parameters[p].length());
+				}
+				
 			}
 			else if(parameters[p].startsWith("epsilon=>")){
 				if(parameters[p].length()<="epsilon=>".length()){
@@ -7785,6 +7858,22 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				}
 				epsilonString = parameters[p].substring("epsilon=>".length(), parameters[p].length());
 				epsilonSpecified=true;
+			}
+			else if(parameters[p].startsWith("percentagePerturbation=>")){
+				if(parameters[p].length()<="percentagePerturbation=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the percentage perturbation for CoRN. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				percentagePertCoRN = Double.valueOf(parameters[p].substring("percentagePerturbation=>".length(), parameters[p].length()));
+			}
+			else if(parameters[p].startsWith("absolutePerturbation=>")){
+				if(parameters[p].length()<="absolutePerturbation=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the percentage perturbation for CoRN. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				absolutePertCoRN = Double.valueOf(parameters[p].substring("absolutePerturbation=>".length(), parameters[p].length()));
 			}
 			else if(parameters[p].startsWith("delta=>")){
 				if(parameters[p].length()<="delta=>".length()){
@@ -8192,7 +8281,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		long begin = System.currentTimeMillis();
 		boolean succeeded=true;
 		String smtTime=null;
-		if(reduction.equalsIgnoreCase("DSB")||reduction.equalsIgnoreCase("smb")||reduction.equalsIgnoreCase("se")||/*reduction.equalsIgnoreCase("EMSB")||*/reduction.equalsIgnoreCase("fb")||reduction.equalsIgnoreCase("fe")||reduction.equalsIgnoreCase("enfb")||reduction.equalsIgnoreCase("ufe") || reduction.equalsIgnoreCase("uctmcfe")){
+		if(reduction.equalsIgnoreCase("DSB")||reduction.equalsIgnoreCase("smb")||reduction.equalsIgnoreCase("se")||/*reduction.equalsIgnoreCase("EMSB")||*/reduction.equalsIgnoreCase("fb")||reduction.equalsIgnoreCase("fe")||reduction.equalsIgnoreCase("enfb")||reduction.equalsIgnoreCase("ufe") || reduction.equalsIgnoreCase("uctmcfe") || reduction.equalsIgnoreCase("CoRNFE")){
 			IPartitionAndBoolean obtainedPartitionAndBool=null;
 			
 			//FB, slower algorithm at time of CONCUR
@@ -8268,6 +8357,12 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			else if(reduction.equalsIgnoreCase("se"))
 			{
 				obtainedPartitionAndBool = SyntacticMarkovianBisimilarityNary.computeSE(crnToConsider, /*labels,*/ initial, verbose,out,bwOut,terminator, messageDialogShower,/*addSelfLoops,*/halveRatesOfHomeoReactions);
+			}
+			else if(reduction.equalsIgnoreCase("CoRNFE"))
+			{
+				//Control FE for Uncertain MAR-RN
+				CORN_LumpabilityForControlRN CoRN = new CORN_LumpabilityForControlRN();
+				obtainedPartitionAndBool =CoRN.computeCoarsest(crnToConsider, initial, verbose, out, bwOut, terminator, messageDialogShower,percentagePertCoRN,absolutePertCoRN);
 			}
 			//2-to-2 Bisimulation for Exact CTMC lumpability
 			else //if(reduction.equalsIgnoreCase("EMSB"))
@@ -8837,7 +8932,12 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			FlyFastImporter.printCRNToFlyFastFile(crnToWrite, fileName, false,out,bwOut);
 		}
 		else if(format.equals(SupportedFormats.MatlabArbitraryODEs)){
-			MatlabODEsImporter.printODEsToMatlabFIle(crnToWrite, fileName, preambleCommentLines, verbose, icComment, out,bwOut, furtherParameters.get(0),(furtherParameters==null||furtherParameters.size()==1)?"false":furtherParameters.get(1),messageDialogShower,false);
+			MatlabODEsImporter.printODEsToMatlabFIle(crnToWrite, fileName, preambleCommentLines, verbose, icComment, out,bwOut, 
+					furtherParameters.get(0),
+					(furtherParameters==null||furtherParameters.size()==1)?"false":furtherParameters.get(1),
+					furtherParameters.get(2),
+					messageDialogShower,
+					false);
 		}
 		else if(format.equals(SupportedFormats.MatlabJacobianFunction)){
 			MatlabODEsImporter.printJacobianFunctionToMatlabFIle(crnToWrite, fileName, preambleCommentLines, verbose, icComment, out,bwOut,messageDialogShower);

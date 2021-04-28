@@ -35,7 +35,7 @@ public class HTreeCircuit {
 			return null;
 		}
 		MathEval math = new MathEval();
-		String name="hTreeCircuit"+N+suffix;
+		String name="hTreeCircuit"+N+"_"+suffix;
 		ICRN crn = new CRN(name, math, out, bwOut);
 		
 		int[] maxK= new int[N+1];
@@ -113,7 +113,7 @@ public class HTreeCircuit {
 		double[] Cp = C;
 		if(perturbParameters){
 			Rp=perturbArray(actualPerturbationFactor, randomGenerator, R);
-			Cp=perturbArray(actualPerturbationFactor, randomGenerator, R);
+			Cp=perturbArray(actualPerturbationFactor, randomGenerator, C);
 		}
 				
 		//Create parameters
@@ -133,7 +133,7 @@ public class HTreeCircuit {
 				Cp = C;
 				if(perturbParameters){
 					Rp=perturbArray(actualPerturbationFactor, randomGenerator, R);
-					Cp=perturbArray(actualPerturbationFactor, randomGenerator, R);
+					Cp=perturbArray(actualPerturbationFactor, randomGenerator, C);
 				}
 				double aik=setNumberOfDigitsIfC2E2(1.0/(Rp[i]*Cp[i]));
 				crn.addParameter("a"+suffix(i,k), String.valueOf(aik));
@@ -224,8 +224,8 @@ public class HTreeCircuit {
 	public static double[] perturbArray(double actualPerturbationFactor, RandomEngine randomGenerator, double[] array) {
 		double[] ret=new double[array.length];
 		for (int i = 0; i < array.length; i++) {
-			//boolean sign = BioNetGenImporter.nextBoolean(randomGenerator, 0.5);//true=+, false=-
-			boolean sign=true;
+			boolean sign = RandomBNG.nextBoolean(randomGenerator, 0.5);//true=+, false=-
+			//boolean sign=true;
 			double maxVariation=array[i]*actualPerturbationFactor;
 			double perturbation = RandomBNG.nextDouble(randomGenerator, maxVariation);
 			if(sign){
