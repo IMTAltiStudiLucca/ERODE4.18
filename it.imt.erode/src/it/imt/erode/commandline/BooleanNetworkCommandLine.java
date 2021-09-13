@@ -358,6 +358,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 		}
 		else{
 			if(reduction.equalsIgnoreCase("BBE")){
+				icWarning="The partition might not be consistent with the initial conditions.\n          Each species in the reduced model has the initial value of the representative of its partition block.";
 //				if(newReductionAlgorithm){
 //					//icWarning="The partition might not be consistent with the initial conditions.\n          Each species in the reduced model has the sum of the initial concentrations of its partition block.";
 //				}
@@ -477,7 +478,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 
 				InfoCRNReduction infoReduction = new InfoCRNReduction(bn.getName(), bn.getSpecies().size(), bn.getSpecies().size(), 0,factor, initial.size(),obtainedPartition.size(), end-begin, reduction);
 				infoReduction.setReducedReactions(obtainedPartition.size());
-				writeReductionInfoInCSVFile(out, bwOut, csvFile, infoReduction);
+				writeReductionInfoInCSVFile(out, bwOut, csvFile, infoReduction,null);
 			}
 			//If I reduce of at least the 20%
 			/*if(factor <= 0.80){
@@ -681,6 +682,10 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 		else{
 			return numberOfBlocks + " blocks";
 		}
+	}
+	
+	public static void main(String[] args) {
+		
 	}
 
 }

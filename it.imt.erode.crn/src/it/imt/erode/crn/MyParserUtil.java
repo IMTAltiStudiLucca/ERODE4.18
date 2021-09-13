@@ -739,7 +739,20 @@ public class MyParserUtil {
 					ArrayList<String> initialConcentration = new ArrayList<>(3);
 					initialConcentrations.add(initialConcentration);
 					initialConcentration.add(ic.getName());
-					initialConcentration.add(String.valueOf(ic.isIc()));
+					//initialConcentration.add(String.valueOf(booleanValueBNToBoolean(ic.getIc())));
+					if(ic.getIc()==null) {
+						initialConcentration.add("false");
+					}
+					else if(ic.getIc() instanceof it.imt.erode.crn.chemicalReactionNetwork.False) {
+						initialConcentration.add("false");
+					}
+					else if(ic.getIc() instanceof it.imt.erode.crn.chemicalReactionNetwork.True) {
+						initialConcentration.add("true");
+					}
+					else {
+						throw new UnsupportedOperationException("The initial condition can be one of false|0|true|1");
+					}
+					//initialConcentration.add(String.valueOf(ic.isIc()));
 					if(ic.getOriginalName()!=null){
 						initialConcentration.add(ic.getOriginalName());
 					}
@@ -767,6 +780,18 @@ public class MyParserUtil {
 	}
 
 	
+//	private static boolean booleanValueBNToBoolean(String ic) {
+//		if(ic==null) {
+//			return false;
+//		}
+//		else if (ic.equalsIgnoreCase("true")||ic.equalsIgnoreCase("1")) {
+//			return true;
+//		}
+//		else{
+//			return false;
+//		}
+//	}
+
 	public static List<String> parseCommands(ModelElementsCollector mec, String absoluteParentPath) {
 		List<String> commands = new ArrayList<String>();
 		commands.add("newline");
@@ -921,9 +946,12 @@ public class MyParserUtil {
 		
 		
 		
-		//Add here commands that you want to add automatically when  loading a model
+		//Add here commands that you want to add automatically when  loading a model addcommands commandstoadd
 		//
 		//String redFile ="/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/TCS_CMSB/ERODE models/mass-action kinetics/maExplicit/BIOMD0000000002FE.ode";
+		
+		//automatic CoRNFE
+		//generateCommands(mec, absoluteParentPath, commands, new String[]{"CoRNFE"},false);
 		
 		//automatical reduceFE reduceSE reduction generate
 		//generateCommands(mec, absoluteParentPath, commands, new String[]{"SE"},false);
@@ -955,9 +983,11 @@ public class MyParserUtil {
 		commands.add(com);
 		*/
 		
-		/*
+		
 		//String folder = "curated_erode_arbitrary_polynomial";
-		String folder = "non_curated_erode_arbitrary_polynomial";
+		//String folder = "non_curated_erode_arbitrary_polynomial";
+		/*
+		String folder = "erode_MARN";
 		String outFile = computeFileName(".."+File.separator+folder+File.separator+mec.getModelName()+".ode",absoluteParentPath);
 		String com ="exportMARN({fileOut=>"+outFile+"})";
 		commands.add(com);
@@ -1007,6 +1037,19 @@ public class MyParserUtil {
 			}
 			else if(red.equals("SMB")) {
 				com+=", oneLabelAtATime=>true,addSelfLoops=>false})";
+			}
+			else if(red.equals("CoRNFE")) {
+				//com+=", computeOnlyPartition=>true,percentagePerturbation=>101.0})";
+				//com+=", computeOnlyPartition=>true,absolutePerturbation=>1.0})";
+				//com+=", computeOnlyPartition=>true,absolutePerturbation=>2.0})";
+				
+				//com+=", computeOnlyPartition=>true,percentagePerturbation=>101.0,prePartition=>Outputs})";
+				//com+=", computeOnlyPartition=>true,absolutePerturbation=>1.0,prePartition=>Outputs})";
+				//com+=", computeOnlyPartition=>true,absolutePerturbation=>2.0,prePartition=>Outputs})";
+				
+				//com+=", computeOnlyPartition=>true,percentagePerturbation=>101.0,prePartition=>Outputs_singleton})";
+				com+=", computeOnlyPartition=>true,absolutePerturbation=>2.0,prePartition=>Outputs_singleton})";
+				
 			}
 			else {
 				com+="})";
@@ -1492,6 +1535,15 @@ public class MyParserUtil {
 			sb.append("format=>");
 			sb.append("CRN");
 			sb.append(',');
+		}
+		else if(exp instanceof exportRndPerturbedRN) {
+			int from=((exportRndPerturbedRN) exp).getFromMaxPerturb();
+			int to=((exportRndPerturbedRN) exp).getToMaxPerturb();
+			int step=((exportRndPerturbedRN) exp).getStepMaxPerturb();
+			
+			sb.append("from=>"+from+",");
+			sb.append("to=>"+to+",");
+			sb.append("step=>"+step+",");
 		}
 		else if(exp instanceof computeDifferentialHull){
 			//',' 'strict' '=' strict = BooleanValue (',' 'delta' '=' delta = POSITIVEINTORREAL)?
@@ -2354,6 +2406,13 @@ public class MyParserUtil {
 					sb.append("library=>");
 					p = String.valueOf(((SolverLibrary) par).getLibrary());
 				}
+				else if(par instanceof SimulationCampaign) {
+					SimulationCampaign sc = (SimulationCampaign)par;
+					sb.append("campaign_n=>"+sc.getN()+",");
+					sb.append("campaign_IC=>"+sc.getIc()+",");
+					sb.append("campaign_Params=>");
+					p=""+sc.getParams();
+				}
 				
 				/*else if(par instanceof Cov){
 					sb.append("covariances=>");
@@ -2613,12 +2672,25 @@ public class MyParserUtil {
 		if(red instanceof reduceCoRNFE) {
 			sb.append("computeOnlyPartition=>true,");
 			CoRNParams cornParams = ((reduceCoRNFE)red).getCornParams();
-			if(cornParams.getPercentage()>0) {
-				sb.append("percentagePerturbation=>"+cornParams.getPercentage());
+			if(cornParams.getPercentagePert()>0) {
+				sb.append("percentagePerturbation=>"+cornParams.getPercentagePert());
 			}
-			else {
-				sb.append("absolutePerturbation=>"+cornParams.getAbsolute());
+			else if(cornParams.getAbsolutePert()>0){
+				sb.append("absolutePerturbation=>"+cornParams.getAbsolutePert());
 			}
+			else if(cornParams.getPercentageClos()>0) {
+				sb.append("percentageClosure=>"+cornParams.getPercentageClos());
+			}
+			else if(cornParams.getAbsoluteClos()>0){
+				sb.append("absoluteClosure=>"+cornParams.getAbsoluteClos());
+			}
+			else if(cornParams.getLowerFactor()>0) {
+				sb.append("lowerFactor=>"+cornParams.getLowerFactor());
+				sb.append(",");
+				sb.append("upperFactor=>"+cornParams.getUpperFactor());
+			}
+			sb.append(",");
+			sb.append("certainConstants=>"+cornParams.isCertainConstants());
 			sb.append(",");
 		}
 		if(red instanceof reduceUCTMCFE){
@@ -2657,6 +2729,12 @@ public class MyParserUtil {
 		} 
 		else if(prep.equals("USER_and_IC")){
 			p="USER_and_IC";
+		}
+		else if(prep.equals("Outputs")) {
+			p="Outputs";
+		}
+		else if(prep.equals("Outputs_singleton")) {
+			p="Outputs_singleton";
 		}
 		return p;
 	}

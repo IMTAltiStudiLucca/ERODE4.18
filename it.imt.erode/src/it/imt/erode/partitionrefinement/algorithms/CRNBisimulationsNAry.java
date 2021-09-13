@@ -59,7 +59,7 @@ public class CRNBisimulationsNAry {
 	//public static final RoundingMode RM = RoundingMode.DOWN;
 	private static int SCALE = 20;
 	public static final int SCALEDefault = 20;
-	protected static BigDecimal TOLERANCE = new BigDecimal("1E-"+(SCALE));
+	private static BigDecimal TOLERANCE = new BigDecimal("1E-"+(SCALE));
 	public static int getSCALE() {
 		return SCALE;
 	}
@@ -211,7 +211,7 @@ public class CRNBisimulationsNAry {
 	
 	
 	
-	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
+	public static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
 			boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
 		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, 
 				extraTab, print, deltaHalf,reactionToRateToConsider,null,null);
@@ -422,7 +422,7 @@ public class CRNBisimulationsNAry {
 		}
 		
 	}
-	static int[] computeFactorials(int maxArity) {
+	public static int[] computeFactorials(int maxArity) {
 		int[] factorials = new int[maxArity+1];
 		factorials[0]=1;
 		for(int arity=1;arity<factorials.length;arity++){
@@ -430,7 +430,7 @@ public class CRNBisimulationsNAry {
 		}
 		return factorials;
 	}
-	protected static void extractMultisetCoefficients(HashMap<IComposite, BigDecimal> multisetCoefficients,
+	public static void extractMultisetCoefficients(HashMap<IComposite, BigDecimal> multisetCoefficients,
 			int[] factorials, ICRNReaction reaction) {
 		if(reaction.isUnary()) {
 			//I should put BigDecimal.ONE but I don't do it to save memory

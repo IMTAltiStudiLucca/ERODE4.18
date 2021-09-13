@@ -20,6 +20,9 @@ public class ParameterMonomial extends Monomial {
 		setCoefficientExpr(parameterName);
 		this.parameterName=parameterName;
 	}
+	public ParameterMonomial(double val, String parameterName) {
+		this(BigDecimal.valueOf(val),parameterName);
+	}
 	
 	@Override
 	public String toString() {
@@ -90,6 +93,15 @@ public class ParameterMonomial extends Monomial {
 		}
 		return getCoefficientParam();
 	}
+	
+	@Override
+	public boolean isParameter() {
+		return true;
+	}
 
+	@Override
+	public boolean needsI() {
+		return true;
+	}
 
 }

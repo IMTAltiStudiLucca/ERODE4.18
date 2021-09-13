@@ -6,5 +6,37 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="/Users/andrea/Dropbox/TOOLS/ERODE/ERODE4_18GIT/.metadata/.plugins/org.eclipse.pde.core/.bundle_pool/plugins/com.ibm.icu_67.1.0.v20200706-1749.jar" sourcepath="/Users/andrea/Dropbox/TOOLS/ERODE/ERODE4_18GIT/.metadata/.plugins/org.eclipse.pde.core/.bundle_pool/plugins/com.ibm.icu.source_67.1.0.v20200706-1749.jar">
+		<accessrules>
+			<accessrule kind="accessible" pattern="com/ibm/icu/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/coll/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/brkitr/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/coll/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/curr/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/lang/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/rbnf/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/region/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/translit/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/unit/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/data/icudt67b/zone/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/duration/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/duration/impl/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/duration/impl/data/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/locale/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/number/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/number/parse/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/number/range/*"/>
+			<accessrule kind="discouraged" pattern="com/ibm/icu/impl/text/*"/>
+			<accessrule kind="accessible" pattern="com/ibm/icu/lang/*"/>
+			<accessrule kind="accessible" pattern="com/ibm/icu/math/*"/>
+			<accessrule kind="accessible" pattern="com/ibm/icu/number/*"/>
+			<accessrule kind="accessible" pattern="com/ibm/icu/text/*"/>
+			<accessrule kind="accessible" pattern="com/ibm/icu/util/*"/>
+			<accessrule ignoreifbetter="true" kind="nonaccessible" pattern="**/*"/>
+		</accessrules>
+	</classpathentry>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

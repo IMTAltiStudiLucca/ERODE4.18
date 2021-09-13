@@ -3,6 +3,7 @@ package it.imt.erode.importing.automaticallygeneratedmodels;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Date;
 
 import org.eclipse.ui.console.MessageConsoleStream;
@@ -10,6 +11,10 @@ import org.eclipse.ui.console.MessageConsoleStream;
 import cern.jet.random.engine.MersenneTwister;
 import cern.jet.random.engine.RandomEngine;
 import it.imt.erode.commandline.CRNReducerCommandLine;
+import it.imt.erode.crn.implementations.CRN;
+import it.imt.erode.crn.interfaces.ICRN;
+import it.imt.erode.crn.interfaces.ICRNReaction;
+import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.importing.BioNetGenImporter;
 
 public class RandomBNG {
@@ -21,6 +26,69 @@ public class RandomBNG {
 		String name=path+"random_S"+numberOfSpecies+"_R"+numberOfReactions+"_NLF"+nonLinearityFactor+"_NLArity"+nlArity+"_MP"+maxNumberOfProducts+"_"+suffix+".net";
 		RandomBNG.printRandomCRNToNetFile(name, numberOfSpecies, numberOfReactions, nonLinearityFactor, nlArity, maxNumberOfProducts, numberOfParameters, maxParameterValue, null, null);
 	}
+	
+	public static ICRN createRndPerturbedCopy(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut,
+			int maxPercPerturb) throws IOException {
+		ICRN crnToConsider;
+		crnToConsider = CRN.copyCRN(crn, out, bwOut);
+		Date d = new Date();
+		RandomEngine randomGenerator = new MersenneTwister(d);
+		for(ICRNReaction reaction : crnToConsider.getReactions()) {
+			boolean plus = RandomBNG.nextBoolean(randomGenerator, 0.5);
+			int percentage =RandomBNG.nextInt(randomGenerator, maxPercPerturb);//nextDouble(randomGenerator, maxPercPerturb);
+			//int percentage=(int) Math.round(dirtyPercentage);
+			double factor=percentage/100.0;
+			
+			BigDecimal actualPert = BigDecimal.valueOf(factor).multiply(reaction.getRate());
+			if(plus) {
+				reaction.setRate(reaction.getRate().add(actualPert), reaction.getRateExpression()+"+"+actualPert.toPlainString());
+			}
+			else {
+				reaction.setRate(reaction.getRate().subtract(actualPert), reaction.getRateExpression()+"-"+actualPert.toPlainString());
+			}
+			
+		}
+		return crnToConsider;
+	}
+	
+	public static void randomlyPerturbIC(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut,
+			int maxPercPerturb) {
+		Date d = new Date();
+		RandomEngine randomGenerator = new MersenneTwister(d);
+		for(ISpecies sp:crn.getSpecies()) {
+			BigDecimal ic=sp.getInitialConcentration();
+			String icExpr=sp.getInitialConcentrationExpr();
+			boolean plus = RandomBNG.nextBoolean(randomGenerator, 0.5);
+			int percentage =RandomBNG.nextInt(randomGenerator, maxPercPerturb);//nextDouble(randomGenerator, maxPercPerturb);
+			double factor=percentage/100.0;
+			BigDecimal actualPert = BigDecimal.valueOf(factor).multiply(ic);
+			BigDecimal newVal=BigDecimal.ZERO;
+			String newExpr;
+			if(plus) {
+				newVal=ic.add(actualPert);
+				newExpr=icExpr+" + "+newVal.toPlainString();
+			}
+			else {
+				newVal=ic.subtract(actualPert);
+				newExpr=icExpr+" - "+newVal.toPlainString();
+			}
+			sp.setInitialConcentration(newVal, newExpr);
+		}
+//		for(String p:crn.getParameters()) {
+//			String[] param = p.split("\\");
+//			double val=crn.getMath().evaluate(param[0]);
+//			boolean plus = RandomBNG.nextBoolean(randomGenerator, 0.5);
+//			int percentage =RandomBNG.nextInt(randomGenerator, maxPercPerturb);//nextDouble(randomGenerator, maxPercPerturb);
+//			//int percentage=(int) Math.round(dirtyPercentage);
+//			double factor=percentage/100.0;
+//			
+//			double actualPert=factor*val;
+//			String newVal=val+((plus)?"+ ":"- ")+actualPert;
+//			crn.setParameter(param[0], newVal);
+//		}
+		
+	}
+
 	
 	/**
 	 * Randomly generates an elementary CRN, and writes it in a file 
@@ -159,8 +227,7 @@ public class RandomBNG {
 		double next = randomGenerator.nextDouble();
 		double ret = next*max;
 		return ret;
-	}
-	
+	}	
 	
 	
 	

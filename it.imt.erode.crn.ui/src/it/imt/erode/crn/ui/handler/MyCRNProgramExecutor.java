@@ -283,14 +283,26 @@ public class MyCRNProgramExecutor {
 	}
 	private IUpdateFunction visitUpdateFunction(BoolExpr booleanUpdateFunctionXText, MessageConsoleStream out,BufferedWriter bwOut) {
 		if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.False){
+			//it.imt.erode.crn.ChemicalReactionNetwork.BooleanValueBN
 			return new FalseUpdateFunction();
 		}
 		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.True){
 			return new TrueUpdateFunction();
 		}
-		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.NotBooleanExpr){
+		else
+		if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.NotBooleanExpr){
 			BoolExpr left = ((it.imt.erode.crn.chemicalReactionNetwork.NotBooleanExpr)booleanUpdateFunctionXText).getLeft();
 			return new NotBooleanUpdateFunction(visitUpdateFunction(left,out,bwOut));
+		}
+		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.NEqBooleanExpr){
+			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) booleanUpdateFunctionXText).getLeft(),out,bwOut);
+			IUpdateFunction visitedRight = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) booleanUpdateFunctionXText).getRight(),out,bwOut);
+			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.NEQ);
+		}
+		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr){
+			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) booleanUpdateFunctionXText).getLeft(),out,bwOut);
+			IUpdateFunction visitedRight = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) booleanUpdateFunctionXText).getRight(),out,bwOut);
+			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.EQ);
 		}
 		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.AndBooleanExpr){
 			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.AndBooleanExpr) booleanUpdateFunctionXText).getLeft(),out,bwOut);
@@ -301,6 +313,11 @@ public class MyCRNProgramExecutor {
 			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.OrBooleanExpr) booleanUpdateFunctionXText).getLeft(),out,bwOut);
 			IUpdateFunction visitedRight = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.OrBooleanExpr) booleanUpdateFunctionXText).getRight(),out,bwOut);
 			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.OR);
+		}
+		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.XorBooleanExpr){
+			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.XorBooleanExpr) booleanUpdateFunctionXText).getLeft(),out,bwOut);
+			IUpdateFunction visitedRight = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.XorBooleanExpr) booleanUpdateFunctionXText).getRight(),out,bwOut);
+			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.XOR);
 		}
 		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.ImpliesBooleanExpr){
 			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.ImpliesBooleanExpr) booleanUpdateFunctionXText).getLeft(),out,bwOut);

@@ -87,7 +87,7 @@ public class ExecutorUnitOfWork implements IUnitOfWork<Boolean, XtextResource> {
 				msg = "Please, fix the error.";
 			}
 			msgVisualizer.openSimpleDialog(msg, DialogType.Error);
-			return Boolean.FALSE;
+			return false;
 		}else if(state.getErrors().size()>0){
 			IMessageDialogShower msgVisualizer = new MessageDialogShower(PlatformUI.getWorkbench().getActiveWorkbenchWindow().getShell());
 			String msg = "Please, fix the "+state.getErrors().size()+" errors.";
@@ -95,7 +95,7 @@ public class ExecutorUnitOfWork implements IUnitOfWork<Boolean, XtextResource> {
 				msg = "Please, fix the error.";
 			}
 			msgVisualizer.openSimpleDialog(msg, DialogType.Error);
-			return Boolean.FALSE;
+			return false;
 		}else{
 			List<ModelDefinition> modelDefinitions = new ArrayList<ModelDefinition>();
 			TreeIterator<EObject> contents = state.getAllContents();
@@ -138,7 +138,7 @@ public class ExecutorUnitOfWork implements IUnitOfWork<Boolean, XtextResource> {
 				myExecutor.readAndExecuteMultiThreaded(modelDef,canSynchEditor,project);
 			}
 			 */
-			return Boolean.TRUE;
+			return true;//true;
 		}
 	}
 }

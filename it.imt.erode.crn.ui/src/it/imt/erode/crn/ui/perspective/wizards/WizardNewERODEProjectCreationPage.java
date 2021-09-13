@@ -28,7 +28,6 @@ public class WizardNewERODEProjectCreationPage extends WizardNewProjectCreationP
 
 
 		initializeDialogUnits(parent);
-
 		PlatformUI.getWorkbench().getHelpSystem().setHelp(composite,IIDEHelpContextIds.NEW_PROJECT_WIZARD_PAGE);
 
 		composite.setLayout(new GridLayout());

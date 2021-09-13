@@ -15,6 +15,11 @@ public class MinusMonomial extends Monomial {
 	}
 	
 	@Override
+	public boolean needsI() {
+		return monomial.needsI();
+	}
+	
+	@Override
 	public String toString() {
 		return " -"+monomial.toString()+"";
 	}

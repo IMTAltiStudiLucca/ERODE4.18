@@ -85,6 +85,7 @@ public class SBMLImporter extends AbstractImporter {
 		if(file.isFile()) {
 			String modelName = file.getName().replace("_url.xml", "");
 			modelName = modelName.replace(".xml", "");
+			modelName = modelName.replace(".sbml", "");
 			SBMLDocument doc = new SBMLReader().readSBML(getFileName());
 			SBML2CRN converter = new SBML2CRN(doc.getModel(),forceMassAction);			
 			

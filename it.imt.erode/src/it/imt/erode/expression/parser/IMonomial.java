@@ -26,4 +26,8 @@ public interface IMonomial {
 	//String toStringPrefixingSpeciesName(String prefix);
 
 	
+	boolean isParameter();
+
+	boolean needsI();
+	
 }

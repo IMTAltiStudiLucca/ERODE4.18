@@ -10,12 +10,12 @@ import it.imt.erode.crn.interfaces.ICRNReaction;
 import it.imt.erode.crn.interfaces.IComposite;
 import it.imt.erode.crn.interfaces.ISpecies;
 
-public class ProductMonomial extends Monomial {
+public class DivisionMonomial extends Monomial {
 
 	private IMonomial left;
 	private IMonomial right;
 	
-	public ProductMonomial(IMonomial left, IMonomial right) {
+	public DivisionMonomial(IMonomial left, IMonomial right) {
 		this.left=left;
 		this.right=right;
 	}
@@ -27,7 +27,7 @@ public class ProductMonomial extends Monomial {
 	
 	@Override
 	public String toString() {
-		return "("+left+" * "+right+")";
+		return "("+left+" / "+right+")";
 	}
 
 	@Override
@@ -110,19 +110,21 @@ public class ProductMonomial extends Monomial {
 		}
 		String rightExpr = right.getOrComputeCoefficientExpression(parametersToConsider);
 		if(rightExpr.equals("0")  || rightExpr.equals("0.0")){
-			return "0";
+			throw new UnsupportedOperationException("Division by 0");
+			//return "0";
 		}
 		
 		String ret;
 				
-		if(leftExpr.equals("1")){
-			ret = rightExpr;
-		}
-		else if(rightExpr.equals("1")){
+//		if(leftExpr.equals("1")){
+//			ret = "1/("rightExpr+")";
+//		}
+//		else 
+		if(rightExpr.equals("1")){
 			ret = leftExpr;
 		} 
 		else{
-			ret = "( "+leftExpr+") * ("+rightExpr+")";
+			ret = "( "+leftExpr+") / ("+rightExpr+")";
 		}
 		return ret;
 	}
@@ -137,7 +139,7 @@ public class ProductMonomial extends Monomial {
 	public BigDecimal getOrComputeCoefficientOfParameter() {
 		BigDecimal bd = getCoefficientParam();
 		if(bd==null){
-			setCoefficientParam(left.getOrComputeCoefficientOfParameter().multiply(right.getOrComputeCoefficientOfParameter()));
+			setCoefficientParam(left.getOrComputeCoefficientOfParameter().divide(right.getOrComputeCoefficientOfParameter()));
 		}
 		return getCoefficientParam();
 	}

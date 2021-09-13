@@ -52,7 +52,11 @@ public class GUIBooleanNetworkImporter {
 		this.infoImporting = new InfoBooleanNetworkImporting(0, name,0);
 	}
 	
-	public InfoBooleanNetworkImporting importBooleanNetwork(boolean printInfo, boolean printBooleanNetwork,boolean print, String modelName, ArrayList<ArrayList<String>> initialConcentrations, LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions, ArrayList<ArrayList<String>> initialPartition, MessageConsoleStream consoleOut) throws IOException{
+	public InfoBooleanNetworkImporting importBooleanNetwork(boolean printInfo, boolean printBooleanNetwork,boolean print, 
+			String modelName, 
+			ArrayList<ArrayList<String>> initialConcentrations, 
+			LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions, 
+			ArrayList<ArrayList<String>> initialPartition, MessageConsoleStream consoleOut) throws IOException{
 		if(print){
 			//CRNReducerCommandLine.println(out,"\nImporting the model "+ modelName +" from the editor");
 			CRNReducerCommandLine.println(out,bwOut,"\nReading "+ modelName +"...");
@@ -213,7 +217,8 @@ public class GUIBooleanNetworkImporter {
 		
 	}
 	
-	public static void printToBNERODEFIle(IBooleanNetwork bn,IPartition partition, String name, Collection<String> preambleCommentLines, boolean verbose, MessageConsoleStream out,BufferedWriter bwOut, boolean originalNames){
+	public static void printToBNERODEFIle(IBooleanNetwork bn,IPartition partition, String name, Collection<String> preambleCommentLines, 
+			boolean verbose, MessageConsoleStream out,BufferedWriter bwOut, boolean originalNames){
 		String fileName = name;
 		
 		fileName=AbstractImporter.overwriteExtensionIfEnabled(fileName,".ode");

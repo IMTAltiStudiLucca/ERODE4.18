@@ -186,6 +186,9 @@ public class ChemicalReactionNetworkLabelProvider extends DefaultEObjectLabelPro
 		    } else {
 		      StringBuilder blockString = new StringBuilder();
 		      EList<SpeciesOrNode> _allSpecies = block.getAllSpecies();
+		      blockString.append(_allSpecies.size());
+		      blockString.append(" species");
+		      /*
 		      for (final SpeciesOrNode species : _allSpecies) {
 		        {
 		          blockString.append(" ");
@@ -198,6 +201,7 @@ public class ChemicalReactionNetworkLabelProvider extends DefaultEObjectLabelPro
 		          }
 		        }
 		      }
+		      */
 		      return blockString.toString();
 		    }
 		    return _xifexpression;

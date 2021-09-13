@@ -1,4 +1,4 @@
-package it.imt.erode.partitionrefinement.algorithms;
+package it.imt.erode.partitionrefinement.algorithms.corn;
 
 import java.io.BufferedWriter;
 import java.math.BigDecimal;
@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 //import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -31,53 +32,34 @@ import it.imt.erode.crn.label.NAryLabelBuilder;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
+import it.imt.erode.partitionrefinement.algorithms.CRNBisimulationsNAry;
+import it.imt.erode.partitionrefinement.splittersbstandcounters.ISpeciesCounterHandler;
 import it.imt.erode.partitionrefinement.splittersbstandcounters.SpeciesSplayBST;
 import it.imt.erode.utopic.MatlabODEPontryaginExporter;
 
 public class CORN_LumpabilityForControlRN {
 
 	//private static final BigDecimal DELTA_ABSOLUTE = BigDecimal.valueOf(0.1);
-	//private static final BigDecimal DELTA_PERCENTAGE = BigDecimal.valueOf(10);
+	private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 	private static final BigDecimal TWO = BigDecimal.valueOf(2);
 	private static final BigDecimal ZERO = BigDecimal.ZERO;
 	//private static final MathContext MC = new MathContext(CRNBisimulationsNAry.getSCALE(), RoundingMode.HALF_DOWN);
 
-	private static int cmpWithTol(BigDecimal key1, BigDecimal key2){
+	private HashMap<ICRNReaction, BigDecimal> m,M;
+	
 
-		int cmp = key1.compareTo(key2);
-		if(cmp==0){
-			return cmp;
-		}
-		else{
-			BigDecimal diff = key1.subtract(key2);
-			diff=diff.abs();
-			if(diff.compareTo(CRNBisimulationsNAry.TOLERANCE)<0){
-				//System.out.println("equal up-to-tolerance: "+key1 +" "+key2);
-				cmp=0;
-			}    
-			return cmp;
-		}
+	public static boolean isNumeric(String strNum) {
+	    if (strNum == null) {
+	        return false;
+	    }
+	    try {
+	        Double.parseDouble(strNum);
+	    } catch (NumberFormatException nfe) {
+	        return false;
+	    }
+	    return true;
 	}
-
-	private static BigDecimal divideWithScale(BigDecimal divisor, BigDecimal dividend){
-		if(cmpWithTol(divisor, ZERO)==0 && cmpWithTol(dividend, ZERO)!=0) {
-			return ZERO;
-		}
-		else {
-			return divisor.divide(dividend, CRNBisimulationsNAry.getSCALE(),CRNBisimulationsNAry.RM);
-		}
-	}
-//	private static BigDecimal multiplyWithScale(BigDecimal first, BigDecimal second){
-//		if(cmpWithTol(first, ZERO)==0 || cmpWithTol(second, ZERO)==0) {
-//			return ZERO;
-//		}
-//		else {
-//			return first.multiply(second, MC);
-//		}
-//	}
-
-
-
+	
 	/**
 	 * 
 	 * @param crn
@@ -87,12 +69,23 @@ public class CORN_LumpabilityForControlRN {
 	 * @param terminator 
 	 * @param absolutePertCoRN 
 	 * @param percentagePertCoRN 
+	 * @param hotToComputeMm 
+	 * @param absoluteClosureCoRN 
+	 * @param upperBoundFactorCoRN 
+	 * @param lowerBoundFactorCoRN 
+	 * @param certainConstants true if the constants rates should be considered certain. False otherwise
 	 * @return
 	 */
 	public IPartitionAndBoolean computeCoarsest(ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator,
-			IMessageDialogShower msgDialogShower, double percentagePertCoRN, double absolutePertCoRN){
+			IMessageDialogShower msgDialogShower, 
+			double percentagePertCoRN, double absolutePertCoRN, 
+			double percentageClosureCoRN, double absoluteClosureCoRN, 
+			double lowerBoundFactorCoRN, double upperBoundFactorCoRN, HowToComputeMm hotToComputeMm,
+			boolean certainConstants,LinkedHashMap<String, String> extraColumnsForCSV
+			){
 		Reduction red=Reduction.CoRN;
-
+		BigDecimal absolutePert=BigDecimal.valueOf(absolutePertCoRN/2);
+		
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,red.toString()+" Reducing: "+crn.getName());
 		}
@@ -127,17 +120,118 @@ public class CORN_LumpabilityForControlRN {
 			}
 			CRNReducerCommandLine.println(out,bwOut,"Before "+red.toString()+" partitioning we have "+ obtainedPartition.size() + blocks +" and "+crn.getSpeciesSize()+ " species.");
 		}
-
+		
+		//ICRN crnToConsider=crn;
+		m=new HashMap<>(crn.getReactions().size());
+		M=new HashMap<>(crn.getReactions().size());
+		HashMap<ICRNReaction, BigDecimal> mMcenter=new HashMap<>(crn.getReactions().size());
 		long begin = System.currentTimeMillis();
+		if(hotToComputeMm.equals(HowToComputeMm.ABSEPSCLOSURE)||hotToComputeMm.equals(HowToComputeMm.PERCEPSCLOSURE)) {
+			CRNReducerCommandLine.print(out,bwOut,"\n\tComputing m and M closing reaction kinetics up to ");
+			if(hotToComputeMm.equals(HowToComputeMm.ABSEPSCLOSURE)) {
+				CRNReducerCommandLine.print(out,bwOut,absoluteClosureCoRN+"...");
+			}
+			else {
+				CRNReducerCommandLine.print(out,bwOut,percentageClosureCoRN+"%...");
+			}
+			
+//			try {
+//				crnToConsider=CRN.copyCRN(crn, out, bwOut,true,true,false);
+//			} catch (IOException e) {
+//				CRNReducerCommandLine.println(out,bwOut,"Problems in homogeneizing parameters. I terminate");
+//				return new IPartitionAndBoolean(obtainedPartition, false);
+//			}
+			ArrayList<ArrayList<ICRNReaction>> reactionsWithEpsEquivalentRates = performClosureAndComputemM(crn, percentageClosureCoRN,
+					absoluteClosureCoRN, hotToComputeMm, m, M,mMcenter);
+			
+			long end = System.currentTimeMillis();
+			CRNReducerCommandLine.println(out,bwOut," completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".");
+			CRNReducerCommandLine.print(out,bwOut,"\t  The kinetics of the "+crn.getReactions().size()+" reactions have been grouped in "+reactionsWithEpsEquivalentRates.size()+" blocks.");
+		}
+		else { 
+
+			if(hotToComputeMm.equals(HowToComputeMm.ABSPERT)){
+				CRNReducerCommandLine.print(out,bwOut,"\n\tComputing m and M with intervals of size "+absolutePertCoRN+" around each uncertain reaction kinetics.");
+			}else if(hotToComputeMm.equals(HowToComputeMm.PERCPERT)){
+				CRNReducerCommandLine.print(out,bwOut,"\n\tComputing m and M with intervals of size "+percentagePertCoRN+"% around each uncertain reaction kinetics.");
+			} else if(hotToComputeMm.equals(HowToComputeMm.LowerUpperBoundRatios)){
+				CRNReducerCommandLine.print(out,bwOut,"\n\tComputing m and M with intervals ["+lowerBoundFactorCoRN+"*k,"+upperBoundFactorCoRN+"*k] for each reaction kinetics k.");
+			}
+
+			BigDecimal lowerBoundFactorCoRNBD=BigDecimal.valueOf(lowerBoundFactorCoRN);
+			BigDecimal upperBoundFactorCoRNBD=BigDecimal.valueOf(upperBoundFactorCoRN);
+			
+			for(ICRNReaction r:crn.getReactions()) {
+				BigDecimal Mr=ZERO;
+				BigDecimal mr=ZERO;
+				if(certainConstants && isNumeric(r.getRateExpression())) {
+					Mr = r.getRate();
+					mr = r.getRate();
+				}
+				else {
+					if(hotToComputeMm.equals(HowToComputeMm.PERCPERT)) {
+						//perturb by percentage DELTA
+						//BigDecimal oneTenth=divideWithScale(r.getRate(), DELTA_PERCENTAGE);//here I add/remove 10%
+						double perc=(percentagePertCoRN/2)/100.0;
+
+
+						BigDecimal percentageRate=r.getRate().multiply(BigDecimal.valueOf(perc));//divideWithScale(r.getRate(), BigDecimal.valueOf(percentagePertCoRN));
+						percentageRate=percentageRate.abs();//rates can be negative...
+						Mr=r.getRate().add(percentageRate);
+						mr=r.getRate().subtract(percentageRate);
+					}
+					else if(hotToComputeMm.equals(HowToComputeMm.ABSPERT)) {
+						//perturb by absolute value DELTA
+						//BigDecimal absolutePert=BigDecimal.valueOf(absolutePertCoRN/2);
+						Mr=r.getRate().add(absolutePert);
+						mr=r.getRate().subtract(absolutePert);
+					}
+					else if(hotToComputeMm.equals(HowToComputeMm.LowerUpperBoundRatios)) {
+						Mr=r.getRate().multiply(upperBoundFactorCoRNBD);
+						mr=r.getRate().multiply(lowerBoundFactorCoRNBD);
+					}
+				}
+				m.put(r, mr);
+				M.put(r, Mr);
+				if(mr.compareTo(Mr)==0) {
+					mMcenter.put(r, mr);
+				}
+				else {
+					mMcenter.put(r, (mr.add(Mr)).divide(TWO));
+				}
+			}
+			long end = System.currentTimeMillis();
+			CRNReducerCommandLine.print(out,bwOut," completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".");
+		}
+		
+		CRNReducerCommandLine.print(out,bwOut,"\n\tComputing FE on the centers of the bounds...");
+		long beginfe=System.currentTimeMillis();
+		HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM=new HashMap<>();
+		CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,null,mMcenter);
+		long endfe=System.currentTimeMillis();
+		CRNReducerCommandLine.print(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s) with "+obtainedPartition.size()+" blocks.");
+		
+		begin = System.currentTimeMillis();
 
 		boolean extraTab=false;
 		boolean print=true;
-		obtainedPartition=refine(red,crn,obtainedPartition,terminator,out,bwOut,extraTab,print,percentagePertCoRN, absolutePertCoRN);
+		obtainedPartition=refine(red,crn,obtainedPartition,terminator,out,bwOut,extraTab,print
+				/*,
+				percentagePertCoRN, 
+				absolutePertCoRN,
+				m,M,
+				lowerBoundFactorCoRN,upperBoundFactorCoRN,
+				hotToComputeMm*/);
 
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,"The final partition:");
 			CRNReducerCommandLine.println(out,bwOut,obtainedPartition);
 		}
+		
+		if(extraColumnsForCSV!=null) {
+			driverNodes_dn(out, bwOut, extraColumnsForCSV, obtainedPartition);
+		}
+		
 
 		long end = System.currentTimeMillis();
 		if(verbose){
@@ -147,9 +241,78 @@ public class CORN_LumpabilityForControlRN {
 		return new IPartitionAndBoolean(obtainedPartition,true);
 	}
 
-	protected IPartition refine(Reduction red, ICRN crn, IPartition partition, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, boolean extraTab, boolean print, double percentagePertCoRN, double absolutePertCoRN) {
-		return refine(red, crn, partition, terminator, out, bwOut, extraTab,print,percentagePertCoRN, absolutePertCoRN,null,null);
+	public static void driverNodes_dn(MessageConsoleStream out, BufferedWriter bwOut,
+			LinkedHashMap<String, String> extraColumnsForCSV, IPartition obtainedPartition) {
+		int blocks_with_drivers=0;
+		int driver_nodes=0;
+		IBlock current =obtainedPartition.getFirstBlock();
+		while(current!=null) {
+			if(current.getSpecies().iterator().next().getName().endsWith("_dn")) {
+				blocks_with_drivers++;
+				driver_nodes+=current.getSpecies().size();
+			}
+			current=current.getNext();
+		}
+		CRNReducerCommandLine.print(out,bwOut,"\n\tThe "+driver_nodes+" driver nodes have been partitioned in "+blocks_with_drivers+" blocks (assuming that the initial partition separated driver/non-driver nodes).");
+		extraColumnsForCSV.put("driver_nodes", String.valueOf(driver_nodes));
+		extraColumnsForCSV.put("blocks_driver_nodes", String.valueOf(blocks_with_drivers));
 	}
+
+	private ArrayList<ArrayList<ICRNReaction>> performClosureAndComputemM(ICRN crn, double percentageClosureCoRN,
+			double absoluteClosureCoRN, HowToComputeMm hotToComputeMm, HashMap<ICRNReaction, BigDecimal> m,
+			HashMap<ICRNReaction, BigDecimal> M, HashMap<ICRNReaction, BigDecimal> mMcenter) {
+		ArrayList<ICRNReaction> reactions=new ArrayList<>(crn.getReactions());
+		Collections.sort(reactions, new MAReactionComparator_OnlyParams());
+		
+		ArrayList<ArrayList<ICRNReaction>> reactionsWithEpsEquivalentRates=new ArrayList<>();
+		ArrayList<ICRNReaction> currentBlock=new ArrayList<>();
+		currentBlock.add(reactions.get(0));
+		reactionsWithEpsEquivalentRates.add(currentBlock);
+		BigDecimal eps=new BigDecimal(absoluteClosureCoRN);
+		BigDecimal ratioPerc=new BigDecimal(percentageClosureCoRN).divide(HUNDRED);
+		BigDecimal prev=reactions.get(0).getRate();
+		
+		for(int i=1;i<reactions.size();i++) {
+			ICRNReaction r=reactions.get(i);
+			BigDecimal rate=r.getRate();
+			BigDecimal limit;
+			if(hotToComputeMm.equals(HowToComputeMm.ABSEPSCLOSURE)) {
+				limit=prev.add(eps);
+			}
+			else {
+				BigDecimal toAdd=prev.multiply(ratioPerc);
+				toAdd=toAdd.abs();//rates can be negativer...
+				limit=prev.add(toAdd);
+			}
+			
+			if(limit.compareTo(rate)>=0) {
+				//The last considered rate is eps-close to the current
+				//do nothing
+			}
+			else {
+				//The last considered rate is too far away.
+				currentBlock=new ArrayList<>();
+				reactionsWithEpsEquivalentRates.add(currentBlock);
+			}
+			currentBlock.add(r);
+			prev=r.getRate();
+		}
+		
+		for(ArrayList<ICRNReaction> block : reactionsWithEpsEquivalentRates) {
+			BigDecimal mb=block.get(0).getRate();
+			BigDecimal Mb=block.get(block.size()-1).getRate();
+			for(ICRNReaction r:block) {
+				m.put(r, mb);
+				M.put(r, Mb);
+				mMcenter.put(r, (mb.add(Mb)).divide(TWO));
+			}
+		}
+		return reactionsWithEpsEquivalentRates;
+	}
+
+//	protected IPartition refine(Reduction red, ICRN crn, IPartition partition, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, boolean extraTab, boolean print, double percentagePertCoRN, double absolutePertCoRN) {
+//		return refine(red, crn, partition, terminator, out, bwOut, extraTab,print,percentagePertCoRN, absolutePertCoRN,null,null);
+//	}
 
 	//		protected static IPartition refine(Reduction red, ICRN crn, IPartition partition, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
 	//				boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
@@ -167,12 +330,17 @@ public class CORN_LumpabilityForControlRN {
 	 * @param terminator 
 	 * @param bwOut 
 	 * @param out 
+	 * @param upperBoundFactorCoRN 
+	 * @param lowerBoundFactorCoRN 
+	 * @param computeMm 
 	 */
 	private IPartition refine(Reduction red, ICRN crn, IPartition partition, Terminator terminator, 
 			MessageConsoleStream out, BufferedWriter bwOut, 
-			boolean extraTab, boolean print, 
+			boolean extraTab, boolean print
+			/*, 
 			double percentagePertCoRN, double absolutePertCoRN,
-			BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider
+			HashMap<ICRNReaction, BigDecimal> m,HashMap<ICRNReaction, BigDecimal> M, double lowerBoundFactorCoRN, double upperBoundFactorCoRN, 
+			HowToComputeMm computeMm*/
 			//ArrayListOfReactions[] reactionsToConsiderForEachSpecies, HashMap<IComposite, BigDecimal> multisetCoefficients_DELETE
 			) {
 		String pref = "";
@@ -188,7 +356,7 @@ public class CORN_LumpabilityForControlRN {
 
 
 		if(print) {
-			CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\tScanning the reactions once to pre-compute informations necessary to the partitioning ... ");
+			CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\tScanning the reactions once to pre-compute informations for the partitioning ... ");
 		}
 		long begin = System.currentTimeMillis();		
 
@@ -213,7 +381,14 @@ public class CORN_LumpabilityForControlRN {
 		HashMap<ISpecies, HashSet<IComposite>> speciesToReagentsContainingIt=new HashMap<>(crn.getSpeciesSize());
 		LinkedHashMap<ICRNReaction, BigDecimal> reactionToVrFirstMult=new LinkedHashMap<>(crn.getReactions().size());
 		LinkedHashMap<ICRNReaction, BigDecimal> reactionToCentreFirstMult=new LinkedHashMap<>(crn.getReactions().size());
-		scanReactionsForPrecomputation(crn, factorials, multisetCoefficients, reagentsToReactions,speciesToReagentsContainingIt, reactionToVrFirstMult, reactionToCentreFirstMult,percentagePertCoRN,absolutePertCoRN);
+		scanReactionsForPrecomputation(crn, factorials, multisetCoefficients, reagentsToReactions,
+				speciesToReagentsContainingIt, reactionToVrFirstMult, reactionToCentreFirstMult
+				/*,
+				percentagePertCoRN,
+				absolutePertCoRN,
+				M,m,
+				lowerBoundFactorCoRN,upperBoundFactorCoRN,
+				computeMm*/);
 
 
 		long end = System.currentTimeMillis();
@@ -221,6 +396,7 @@ public class CORN_LumpabilityForControlRN {
 			CRNReducerCommandLine.print(out,bwOut,"completed in "+ String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0))+" (s)");
 		}
 
+		begin =System.currentTimeMillis();
 		Integer iteration=1;
 		if(print) {
 			CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\tPerforming the actual "+red+" partition refinement ... ");
@@ -248,8 +424,10 @@ public class CORN_LumpabilityForControlRN {
 			partition=refinedPartition;
 		}while(partition.size()!=prevSize);
 
+		end =System.currentTimeMillis();
 		if(print) {
-			CRNReducerCommandLine.print(out,bwOut,"\n"+pref+"\t"+iteration+" iterations of the while true performed");
+			CRNReducerCommandLine.print(out,bwOut,iteration+" iterations of the while true performed ... ");
+			CRNReducerCommandLine.print(out,bwOut,"completed in "+ String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0))+" (s)");
 		}
 		return partition;
 	}
@@ -259,7 +437,16 @@ public class CORN_LumpabilityForControlRN {
 			HashMap<IComposite, ArrayList<ICRNReaction>> reagentsToReactions,
 			HashMap<ISpecies, HashSet<IComposite>> speciesToReagentsContainingIt,
 			LinkedHashMap<ICRNReaction, BigDecimal> reactionToVrFirstMult,
-			LinkedHashMap<ICRNReaction, BigDecimal> reactionToCentreFirstMult, double percentagePertCoRN, double absolutePertCoRN) {
+			LinkedHashMap<ICRNReaction, BigDecimal> reactionToCentreFirstMult
+			/*, 
+			double percentagePertCoRN, double absolutePertCoRN, HashMap<ICRNReaction, BigDecimal> M, HashMap<ICRNReaction, BigDecimal> m, double lowerBoundFactorCoRN, double upperBoundFactorCoRN, HowToComputeMm computeMm
+			*/) {
+		
+		/*
+		BigDecimal lowerBoundFactorCoRNBD=BigDecimal.valueOf(lowerBoundFactorCoRN);
+		BigDecimal upperBoundFactorCoRNBD=BigDecimal.valueOf(upperBoundFactorCoRN);
+		*/
+		
 		for(ICRNReaction r : crn.getReactions()) {
 			CRNBisimulationsNAry.extractMultisetCoefficients(multisetCoefficients, factorials, r);
 			IComposite reagents=r.getReagents();
@@ -280,11 +467,15 @@ public class CORN_LumpabilityForControlRN {
 				prevReag.add(reagents);
 			}
 
-			computeVRandCentreFR_FirstMultiplicand(r, multisetCoefficients,reactionToVrFirstMult,reactionToCentreFirstMult,percentagePertCoRN,absolutePertCoRN);
+			computeVRandCentreFR_FirstMultiplicand(r, multisetCoefficients,reactionToVrFirstMult,reactionToCentreFirstMult
+					/*,
+					percentagePertCoRN,absolutePertCoRN,M,m,lowerBoundFactorCoRNBD,upperBoundFactorCoRNBD, computeMm
+					*/);
 			//reactionToVrFirstMult.put(r, computeVRFirstMultiplicand(r, multisetCoefficients));
 			//reactionToCentreFirstMult.put(r, computeContreFRFirstMultiplicand(r, multisetCoefficients));
 
 		}
+		
 	}
 
 	private static void splitBlock(IBlock block, IPartition partition,IPartition newPartition,
@@ -320,16 +511,16 @@ public class CORN_LumpabilityForControlRN {
 
 		HashSet<IComposite> reagsWithSi=speciesToReagentsContainingIt.get(Si);
 		HashSet<IComposite> reagsWithSj=speciesToReagentsContainingIt.get(Sj);
-		if( (Si.getName().equals("S14")&&Sj.getName().equals("S12"))||
-			(Si.getName().equals("S12")&&Sj.getName().equals("S14"))) {
-			System.out.println("Ciao");
-		}
+//		if( (Si.getName().equals("S14")&&Sj.getName().equals("S12"))||
+//			(Si.getName().equals("S12")&&Sj.getName().equals("S14"))) {
+//			System.out.println("Ciao");
+//		}
 
 		if(nullOrEmpty(reagsWithSi)&&nullOrEmpty(reagsWithSj)) {
 			//Neither of them appear as reagents 
 			return true;
 		}
-		else if((!nullOrEmpty(reagsWithSi)) || (!nullOrEmpty(reagsWithSj))) {
+		else if(nullOrEmpty(reagsWithSi) || nullOrEmpty(reagsWithSj)) {
 			//System.out.println("Precsely one among "+Si+" or "+Sj.getName()+" does not appear as reagents. I do not return false because the one with reactions might get fr=0");
 			//One might think that I should return false because only one of them does not appear as reagents.
 			//However, it might be that the reactions give fr=0.
@@ -365,7 +556,7 @@ public class CORN_LumpabilityForControlRN {
 			for(IComposite reagents:reagsWithSi) {
 				if(reagents.isUnary()) {
 					if(consideredLabels.contains(EmptySetLabel.EMPTYSETLABEL)) {
-						//do nothing
+						//do nothing: I already considered rho=empty
 					}
 					else {
 						consideredLabels.add(EmptySetLabel.EMPTYSETLABEL);
@@ -449,6 +640,49 @@ public class CORN_LumpabilityForControlRN {
 		}
 		return true;
 	}
+	
+	/*
+	private static boolean areEqual_Centers_GeneratorselementwiseAbs(IPartition partition,
+			HashMap<IComposite, ArrayList<ICRNReaction>> reagentsToReactions,
+			LinkedHashMap<ICRNReaction, BigDecimal> reactionToVrFirstMult,
+			LinkedHashMap<ICRNReaction, BigDecimal> reactionToCentreFirstMult, IComposite rho, IComposite rhop) {
+
+		ArrayList<ICRNReaction> Rrho = reagentsToReactions.get(rho);
+		ArrayList<ICRNReaction> Rrhop = reagentsToReactions.get(rhop);
+		
+		
+		//I start comparing the centers (it takes less time than the generators
+		//The generatars are equal. I now compare the centers.
+		ArrayList<BigDecimal> c =computeCentreOfFR(rho , Rrho , reactionToCentreFirstMult, partition);
+		ArrayList<BigDecimal> cp=computeCentreOfFR(rhop, Rrhop, reactionToCentreFirstMult, partition);
+		boolean equalCenters=equalVectorsUpToElementwiseAbs(c,cp,false);
+		if(!equalCenters) {
+			//The centers are different. I can already return false	
+			return false;
+		}
+		else {
+			//The centers are equal. I have to compare the generators
+			LinkedHashSet<ArrayList<BigDecimal>> generators_fr_rho = new LinkedHashSet<>(0);
+			if(Rrho!=null && Rrho.size()>0) {
+				generators_fr_rho = computeGeneratorsOfFR(rho ,Rrho , reactionToVrFirstMult, partition);
+			}
+			else {
+				Rrho = new ArrayList<>(0);
+			}
+			
+			LinkedHashSet<ArrayList<BigDecimal>> generators_fr_rhop = new LinkedHashSet<>(0);
+			if(Rrhop!=null && Rrhop.size()>0) {
+				generators_fr_rhop = computeGeneratorsOfFR(rhop,Rrhop, reactionToVrFirstMult, partition);
+			}
+			else {
+				Rrhop = new ArrayList<>(0);
+			}
+
+			boolean equalGenerators=areFRGeneratorsEqualUpToElementwiseAbs(generators_fr_rho,generators_fr_rhop);
+			return equalGenerators;
+		}
+	}
+	*/
 
 	private static boolean areFRGeneratorsEqualUpToElementwiseAbs(
 			LinkedHashSet<ArrayList<BigDecimal>> generators_fr_1,
@@ -662,38 +896,55 @@ public class CORN_LumpabilityForControlRN {
 	}
 
 	private void computeVRandCentreFR_FirstMultiplicand(ICRNReaction r,HashMap<IComposite, BigDecimal> multisetCoefficients, 
-			LinkedHashMap<ICRNReaction,BigDecimal> reactionToVrFirstMult, LinkedHashMap<ICRNReaction,BigDecimal> reactionToCentreFirstMult, double percentagePertCoRN, double absolutePertCoRN){
+			LinkedHashMap<ICRNReaction,BigDecimal> reactionToVrFirstMult, LinkedHashMap<ICRNReaction,BigDecimal> reactionToCentreFirstMult
+			/*,
+			double percentagePertCoRN, double absolutePertCoRN, 
+			HashMap<ICRNReaction, BigDecimal> M, HashMap<ICRNReaction, BigDecimal> m,
+			BigDecimal lowerBoundFactorCoRN, BigDecimal upperBoundFactorCoRN, HowToComputeMm computeMm
+			*/){
 
 		BigDecimal rhofact=BigDecimal.ONE;
 		if(!r.isUnary()) {
-			multisetCoefficients.get(r.getReagents());
+			rhofact=multisetCoefficients.get(r.getReagents());
 		}
-		BigDecimal twoRhoFact=TWO.multiply(rhofact);
+		BigDecimal twoRhoFact=TWO.multiply(rhofact);	
 
-		boolean percentage=false;
-		if(percentagePertCoRN>=0) {
-			percentage=true;
-		}
+//		boolean percentage=false;
+//		if(percentagePertCoRN>=0) {
+//			percentage=true;
+//		}
 		
 		
-		BigDecimal Mr;
-		BigDecimal mr;
-		if(percentage) {
+		BigDecimal Mr=M.get(r);
+		BigDecimal mr=m.get(r);
+		/*
+		if(computeMm.equals(HowToComputeMm.PERCPERT)) {
 			//perturb by percentage DELTA
 			//BigDecimal oneTenth=divideWithScale(r.getRate(), DELTA_PERCENTAGE);//here I add/remove 10%
-			double perc=percentagePertCoRN/100.0;
+			double perc=(percentagePertCoRN/2)/100.0;
 			
 			
 			BigDecimal percentageRate=r.getRate().multiply(BigDecimal.valueOf(perc));//divideWithScale(r.getRate(), BigDecimal.valueOf(percentagePertCoRN));
+			percentageRate=percentageRate.abs();//rates can be negative...
 			Mr=r.getRate().add(percentageRate);
 			mr=r.getRate().subtract(percentageRate);
 		}
-		else {
+		else if(computeMm.equals(HowToComputeMm.ABSPERT)) {
 			//perturb by absolute value DELTA
-			BigDecimal absolutePert=BigDecimal.valueOf(absolutePertCoRN);
+			BigDecimal absolutePert=BigDecimal.valueOf(absolutePertCoRN/2);
 			Mr=r.getRate().add(absolutePert);
 			mr=r.getRate().subtract(absolutePert);
 		}
+		else if(computeMm.equals(HowToComputeMm.LowerUpperBoundRatios)) {
+			Mr=r.getRate().multiply(upperBoundFactorCoRN);
+			mr=r.getRate().multiply(lowerBoundFactorCoRN);
+		}
+		else {
+			//we have m and M.
+			Mr=M.get(r);
+			mr=m.get(r);
+		}
+		*/
 
 		BigDecimal firstMultiplierVR= divideWithScale(Mr.subtract(mr), twoRhoFact);
 		reactionToVrFirstMult.put(r, firstMultiplierVR);
@@ -732,5 +983,39 @@ public class CORN_LumpabilityForControlRN {
 		}
 		return rH;
 	}
+	
+	private static int cmpWithTol(BigDecimal key1, BigDecimal key2){
+
+		int cmp = key1.compareTo(key2);
+		if(cmp==0){
+			return cmp;
+		}
+		else{
+			BigDecimal diff = key1.subtract(key2);
+			diff=diff.abs();
+			if(diff.compareTo(CRNBisimulationsNAry.getTolerance())<0){
+				//System.out.println("equal up-to-tolerance: "+key1 +" "+key2);
+				cmp=0;
+			}    
+			return cmp;
+		}
+	}
+
+	private static BigDecimal divideWithScale(BigDecimal divisor, BigDecimal dividend){
+		if(cmpWithTol(divisor, ZERO)==0 && cmpWithTol(dividend, ZERO)!=0) {
+			return ZERO;
+		}
+		else {
+			return divisor.divide(dividend, CRNBisimulationsNAry.getSCALE(),CRNBisimulationsNAry.RM);
+		}
+	}
+//	private static BigDecimal multiplyWithScale(BigDecimal first, BigDecimal second){
+//		if(cmpWithTol(first, ZERO)==0 || cmpWithTol(second, ZERO)==0) {
+//			return ZERO;
+//		}
+//		else {
+//			return first.multiply(second, MC);
+//		}
+//	}
 
 }

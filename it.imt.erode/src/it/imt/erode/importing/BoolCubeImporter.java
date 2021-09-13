@@ -7,14 +7,21 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map.Entry;
 
 import javax.xml.stream.XMLStreamException;
 
 import org.eclipse.ui.console.MessageConsoleStream;
 import org.sbml.jsbml.ASTNode;
 import org.sbml.jsbml.ASTNode.Type;
+import org.sbml.jsbml.ListOf;
+import org.sbml.jsbml.LocalParameter;
 import org.sbml.jsbml.Model;
+import org.sbml.jsbml.Reaction;
 import org.sbml.jsbml.SBMLDocument;
 import org.sbml.jsbml.SBMLReader;
 import org.sbml.jsbml.SpeciesReference;
@@ -23,11 +30,13 @@ import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.IMessageDialogShower;
 import it.imt.erode.crn.implementations.CRN;
 import it.imt.erode.crn.implementations.Species;
+import it.imt.erode.crn.interfaces.ICRN;
 import it.imt.erode.crn.interfaces.ICRNReaction;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.expression.parser.IMonomial;
 import it.imt.erode.expression.parser.MinusMonomial;
 import it.imt.erode.expression.parser.NumberMonomial;
+import it.imt.erode.expression.parser.ParameterMonomial;
 import it.imt.erode.expression.parser.ProductMonomial;
 import it.imt.erode.expression.parser.SpeciesMonomial;
 import it.imt.erode.partition.implementations.Block;
@@ -67,7 +76,23 @@ public class BoolCubeImporter extends AbstractImporter{
 		
 		HashMap<String,ISpecies> namesToSpecies = loadSpecies(model);
 		
-		loadReactions(model,namesToSpecies,namesToSpecies.get(Species.I_SPECIESNAME));
+		loadParameters(model);
+		
+		ISpecies I = new Species(Species.I_SPECIESNAME, getCRN().getSpeciesSize(), BigDecimal.ONE, "1",false);
+		
+		boolean needsToAddI= loadReactions(model,namesToSpecies,I);
+		if(needsToAddI) {
+			getCRN().addSpecies(I);
+			namesToSpecies.put(Species.I_SPECIESNAME, I);
+		}
+		
+		HashSet<ISpecies> possibleOutputs=computePossibleOutputs(getCRN());
+		
+		ArrayList<HashSet<ISpecies>> blocks = new ArrayList<HashSet<ISpecies>>(1);
+		blocks.add(possibleOutputs);
+		//blocks.add(others);
+		getCRN().setUserDefinedPartition(blocks);
+		
 		IBlock uniqueBlock = new Block();
 		setInitialPartition(new Partition(uniqueBlock,getCRN().getSpecies().size()));
 		for (ISpecies species : getCRN().getSpecies()) {
@@ -86,8 +111,124 @@ public class BoolCubeImporter extends AbstractImporter{
 		getInfoImporting().setReadSpecies(getCRN().getSpecies().size());
 		return getInfoImporting();
 	}
+	
+	private static boolean hasODEStructure(ICRNReaction r) {
+			return  r.getReagents().getTotalMultiplicity()==1 && 
+					r.getProducts().getTotalMultiplicity()==2 && 
+					r.getProducts().getFirstReagent().equals(r.getProducts().getSecondReagent()) &&
+					r.getProducts().getFirstReagent().equals(r.getReagents().getFirstReagent());	
+	}
 
-	private void loadReactions(Model model, HashMap<String, ISpecies> namesToSpecies, ISpecies I) {
+	public static HashSet<ISpecies> computePossibleOutputs(ICRN crn) {
+		HashSet<ISpecies> possibleOutputs =new LinkedHashSet<ISpecies>(crn.getSpecies());
+		BigDecimal MinusOne= new BigDecimal(-1);
+		//HashSet<ISpecies> others=new LinkedHashSet<ISpecies>();
+		//HashMap<ISpecies, ArrayList<ICRNReaction>> spReact=new LinkedHashMap<>(getCRN().getSpecies().size());
+		for(ICRNReaction r: crn.getReactions()) {
+			if(r.hasArbitraryKinetics()) {
+				throw new UnsupportedOperationException("Possible outputs can be computed only for mass-action reactions");
+			}
+			//System.out.println(r);
+			//Outputs can appear as reageants only in their decay reaction: s -> 2*s, -1
+			if(hasODEStructure(r)) {
+				//It is odelike. If rate is not -1, it can't be an output
+				if(r.getRate().compareTo(MinusOne)!=0) {
+					possibleOutputs.remove(r.getReagents().getFirstReagent());
+				}
+			}
+			else {
+				//the reagents can't be outputs
+				for(int s=0;s<r.getReagents().getNumberOfDifferentSpecies();s++) {
+					possibleOutputs.remove(r.getReagents().getAllSpecies(s));
+				}
+			}
+
+			//			if(r.isODELike()) {
+			//				throw new UnsupportedOperationException("reaction not supported: "+r);
+			//			}
+			//			else {
+			//				ISpecies sp= r.getReagents().getFirstReagent();
+			//				ArrayList<ICRNReaction> prev = spReact.get(sp);
+			//				if(prev==null) {
+			//					prev=new ArrayList<>();
+			//					spReact.put(sp, prev);
+			//				}
+			//				prev.add(r);
+			//			}
+		}
+		return possibleOutputs;
+
+		//		for(Entry<ISpecies, ArrayList<ICRNReaction>> entry : spReact.entrySet()) {
+		//			ISpecies sp = entry.getKey();
+		//			ArrayList<ICRNReaction> reacts = entry.getValue();
+		//			if(reacts.size()!=1) {
+		//					possibleOutputs.remove(sp);
+		//					//others.add(sp);
+		//			}
+		//			else if(reacts.size()==1) {
+		//				if(reacts.get(0).getRate().compareTo(MinusOne)!=0) {
+		//					possibleOutputs.remove(sp);
+		//					//others.add(sp);
+		//				}
+		//			}
+		//		}
+		//		for(ISpecies sp : getCRN().getSpecies()) {
+		//			if(!spReact.containsKey(sp)) {
+		//				possibleOutputs.remove(sp);
+		//				//others.add(sp);
+		//			}
+		//		}
+
+		/*
+		IPartition initial = new Partition(getCRN().getSpeciesSize());
+		IBlock outputsBlock = new Block();
+		//IBlock otherBlock = new Block();
+		if(possibleOutputs.size()>0) {
+			initial.add(outputsBlock);
+			for(ISpecies sp : possibleOutputs) {
+				outputsBlock.addSpecies(sp);
+			}
+		}
+//		if(others.size()>0) {
+//			initial.add(otherBlock);
+//			for(ISpecies sp : others) {
+//				otherBlock.addSpecies(sp);
+//			}
+//		}
+		setInitialPartition(initial);
+		 */
+	}
+
+	private void loadParameters(Model model) {
+		//int count=0;
+		LinkedHashMap<String, Double> paramsToValue=new LinkedHashMap<>();
+		for (Reaction reaction : model.getListOfReactions()) {
+			if (reaction.isSetKineticLaw()) {
+				ListOf<LocalParameter> params = reaction.getKineticLaw().getListOfLocalParameters();
+				for(LocalParameter p : params) {
+					Double prev=paramsToValue.get(p.getName());
+					if(prev==null) {
+						paramsToValue.put(p.getName(), p.getValue());
+					}
+					else {
+						if(prev!=p.getValue()) {
+							throw new UnsupportedOperationException("Parameter "+p.getName()+" got at least two different values: "+prev+" and "+p.getValue());
+						}
+					}
+					//System.out.println(p.getName()+"="+p.getValue());
+				}
+				//count += reaction.getKineticLaw().getLocalParameterCount();
+			}
+		}
+		
+		for(Entry<String, Double> entry:paramsToValue.entrySet()) {
+			getCRN().addParameter(entry.getKey(), String.valueOf(entry.getValue()),true);
+		}
+		
+	}
+
+	private boolean loadReactions(Model model, HashMap<String, ISpecies> namesToSpecies, ISpecies I) {
+		boolean needsToAddI=false;
 		int reactionsNumber = model.getNumReactions();
 		List<ICRNReaction> allReactions = new ArrayList<ICRNReaction>(reactionsNumber);//each sbml reaction will lead to at least a crn reaction (?)
 		for(int r=0;r<reactionsNumber;r++){
@@ -96,21 +237,24 @@ public class BoolCubeImporter extends AbstractImporter{
 			String name = product.getSpecies();
 			ISpecies speciesOfODE = namesToSpecies.get(name);
 			
-			if(name.equals("PLCg_a")){
-				System.out.println("ciao");
-			}
+//			if(name.equals("PLCg_a")){
+//				System.out.println("ciao");
+//			}
 
 			ASTNode rateLaw = sbmlReaction.getKineticLaw().getMath();
 			
 			//Discard the division by param(i)
-			if(rateLaw.isOperator() && rateLaw.getType().equals(Type.DIVIDE)){
-				rateLaw=rateLaw.getLeftChild();
-			}
+//			if(rateLaw.isOperator() && rateLaw.getType().equals(Type.DIVIDE)){
+//				rateLaw=rateLaw.getLeftChild();
+//			}
 
 			ArrayList<IMonomial> monomials=parseOdefyODE(rateLaw,namesToSpecies);
 			for (IMonomial monomial : monomials) {
 				ICRNReaction reaction = monomial.toReaction(speciesOfODE,I).getReaction();
 				if(reaction.getRate().compareTo(BigDecimal.ZERO)!=0){
+					if(monomial.needsI()) {
+						needsToAddI=true;
+					}
 					allReactions.add(reaction);
 					/*
 					getCRN().addReaction(reaction);
@@ -126,6 +270,7 @@ public class BoolCubeImporter extends AbstractImporter{
 		
 		CRN.collapseAndCombineAndAddReactions(getCRN(), allReactions, out,bwOut);
 		getInfoImporting().setReadCRNReactions(getCRN().getReactions().size());
+		return needsToAddI;
 	}
 	
 	private ArrayList<IMonomial> parseOdefyODE(ASTNode node, HashMap<String, ISpecies> namesToSpecies) {
@@ -134,13 +279,32 @@ public class BoolCubeImporter extends AbstractImporter{
 			Type type = node.getType();
 			ArrayList<IMonomial> monomialsLeft = parseOdefyODE(node.getLeftChild(),namesToSpecies);
 			ArrayList<IMonomial> monomialsRight = parseOdefyODE(node.getRightChild(),namesToSpecies);
-			if(type.equals(Type.TIMES)){
+ 			if(type.equals(Type.TIMES)){
 				//combine the two
 				ArrayList<IMonomial> products = new ArrayList<>(monomialsLeft.size()*monomialsRight.size());
 				for (IMonomial left : monomialsLeft) {
 					for (IMonomial right : monomialsRight) {
 						products.add(new ProductMonomial(left, right));
 					}
+				}
+				return products;
+			}
+			else if(type.equals(Type.DIVIDE)) {
+				//I only support divisions by a parameter
+				if(monomialsRight.size()!=1) {
+					throw new UnsupportedOperationException("We can divide only by a parameter");
+				}
+				else if(!monomialsRight.get(0).isParameter()) {
+					throw new UnsupportedOperationException("We can divide only by a parameter");
+				}
+				//combine the two
+				ArrayList<IMonomial> products = new ArrayList<>(monomialsLeft.size());
+				String paramName=monomialsRight.get(0).toString();
+				double paramValue= getCRN().getMath().evaluate(paramName);
+				double oneVoerParam=1.0/paramValue;
+				NumberMonomial oneOverdivisor= new NumberMonomial(BigDecimal.valueOf(oneVoerParam), "1/"+paramName);
+				for (IMonomial left : monomialsLeft) {
+					products.add(new ProductMonomial(left, oneOverdivisor));
 				}
 				return products;
 			}
@@ -165,7 +329,17 @@ public class BoolCubeImporter extends AbstractImporter{
 		}
 		else if(node.isVariable()){
 			ArrayList<IMonomial> ret = new ArrayList<IMonomial>(1);
-			ret.add(new SpeciesMonomial(namesToSpecies.get(node.getName())));
+			ISpecies species=namesToSpecies.get(node.getName());
+			if(species!=null) {
+				ret.add(new SpeciesMonomial(species));
+			}
+			else {
+				//It must be a parameter
+				String name=node.getName();
+				double val=getCRN().getMath().evaluate(name);
+				ret.add(new ParameterMonomial(val, name));
+			}
+			
 			return ret; 
 		}
 		else if(node.isNumber()){
@@ -198,10 +372,10 @@ public class BoolCubeImporter extends AbstractImporter{
 			nameToSpecies.put(name, species);
 		}
 		
-		ISpecies I = new Species(Species.I_SPECIESNAME, id, BigDecimal.ONE, "1",false);
-		getCRN().addSpecies(I);
-		id++;
-		nameToSpecies.put(Species.I_SPECIESNAME, I);
+//		ISpecies I = new Species(Species.I_SPECIESNAME, id, BigDecimal.ONE, "1",false);
+//		getCRN().addSpecies(I);
+//		id++;
+//		nameToSpecies.put(Species.I_SPECIESNAME, I);
 		
 		getInfoImporting().setReadSpecies(getCRN().getSpecies().size());
 		return nameToSpecies;

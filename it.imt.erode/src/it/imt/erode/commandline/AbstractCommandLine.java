@@ -14,7 +14,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.StringTokenizer;
 
 import org.eclipse.ui.console.MessageConsoleStream;
@@ -422,7 +424,7 @@ public abstract class AbstractCommandLine implements ICommandLine {
 		
 	}
 
-	private List<String> csvReductionLabels() {
+	private List<String> createCsvReductionLabels() {
 		List<String> csvLabels = new ArrayList<String>();
 		csvLabels.add("ModelName");
 		csvLabels.add("Reduction");
@@ -440,9 +442,9 @@ public abstract class AbstractCommandLine implements ICommandLine {
 	}
 	
 	protected void writeReductionInfoInCSVFile(MessageConsoleStream out, BufferedWriter bwOut, String csvFile,
-			InfoCRNReduction infoReduction) {
+			InfoCRNReduction infoReduction, LinkedHashMap<String, String> extraColumnsForCSV) {
 		if(csvFile!=null) {
-			List<String> csvLabels = csvReductionLabels();
+			List<String> csvLabels = createCsvReductionLabels();
 			
 			List<String> csvValues = new ArrayList<String>();
 			
@@ -463,6 +465,12 @@ public abstract class AbstractCommandLine implements ICommandLine {
 			csvValues.add(String.valueOf(infoReduction.getParametersSize()));
 													
 			
+			if(extraColumnsForCSV!=null) {
+				for(Entry<String, String> entry: extraColumnsForCSV.entrySet()) {
+					csvLabels.add(entry.getKey());
+					csvValues.add(entry.getValue());
+				}
+			}
 			
 			
 			DataOutputHandlerAbstract.writeOneLineCSV(csvFile, "csv", csvLabels, csvValues, out, bwOut);
@@ -471,7 +479,7 @@ public abstract class AbstractCommandLine implements ICommandLine {
 
 	protected void writeReductionNotSucceededInfoInCSVFile(MessageConsoleStream out, BufferedWriter bwOut, String csvFile, ICRN crn, String reduction,int initPartitionSize) {
 		if(csvFile!=null) {
-			List<String> csvLabels = csvReductionLabels();
+			List<String> csvLabels = createCsvReductionLabels();
 			List<String> csvValues = new ArrayList<String>();
 			
 			csvValues.add(crn.getName());

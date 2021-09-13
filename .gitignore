@@ -44,3 +44,8 @@ it.imt.erode.crn.tests.ui/src-gen/*
 it.imt.erode/hTreeCircuit21.ode
 it.imt.erode/hTreeCircuit22.ode
 it.imt.erode/hTreeCircuit23.ode
+testbd/.classpath
+testbd/.project
+testbd/.settings/org.eclipse.jdt.core.prefs
+testbd/src/testbd/MainTest.java
+testbd/src/testbd/MyBigDecimal.java

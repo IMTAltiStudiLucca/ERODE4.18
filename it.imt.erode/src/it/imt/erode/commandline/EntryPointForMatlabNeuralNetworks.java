@@ -16,7 +16,7 @@ import it.imt.erode.importing.UnsupportedFormatException;
 public class EntryPointForMatlabNeuralNetworks extends EntryPointForMatlabAbstract {
 
 	private HashMap<String, ISpecies> speciesNameToSpecies;
-	private SimulationSolutions solutions;
+	//private SimulationSolutions solutions;
 	public EntryPointForMatlabNeuralNetworks(boolean printPartitions, boolean printCRNs){
 		super(printPartitions, printCRNs);
 		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
@@ -189,17 +189,17 @@ public class EntryPointForMatlabNeuralNetworks extends EntryPointForMatlabAbstra
 		}			
 	}
 	
-	public double[][] simulateODE(double timeHorizon) throws IOException {
-
-		solutions=null;
-		String command = "simulateODE({tEnd=>"+timeHorizon+",visualizePlot=>NO,steps=>10})";
-		
-		solutions = erode.handleSimulateODECommand(command, out, bwOut,false);
-		
-		//System.out.println("Simulation done");
-		
-		//plotsAll[species][step]
-		return solutions.getPlotsViews();
-	}
+//	public double[][] simulateODE(double timeHorizon) throws IOException {
+//
+//		solutions=null;
+//		String command = "simulateODE({tEnd=>"+timeHorizon+",visualizePlot=>NO,steps=>10})";
+//		
+//		solutions = erode.handleSimulateODECommand(command, out, bwOut,false);
+//		
+//		//System.out.println("Simulation done");
+//		
+//		//plotsAll[species][step]
+//		return solutions.getPlotsViews();
+//	}
 	
 }

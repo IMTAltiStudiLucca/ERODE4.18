@@ -1,3 +1,8 @@
+Add commands programmatically
+	MyParserUtil
+		Add here commands that you want to add automatically when  loading a model addcommands commandstoadd
+		generateCommands(
+
 Sundials does not work on my laptop at santanna (windows64, java 32)
 	-The fact is that I downloaded erode-java-32 in my Windows 64 bits. Probably I distributed sundials 32 there, while I should have sundials 64
 //TODO: SyntacticMarkovianBisimilarityNary

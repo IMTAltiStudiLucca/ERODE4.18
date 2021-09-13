@@ -128,8 +128,12 @@ public abstract class DataOutputHandlerAbstract implements IDataOutputHandler {
 	public void writeCSV(String csvFile/*,MessageConsoleStream out,IMessageDialogShower msgDialogShower*/) {
 
 		try {
-			FileOutputStream fos = new FileOutputStream(csvFile+".cdat");
-			CRNReducerCommandLine.print(out,bwOut,"Writing the csvFile "+csvFile+".cdat ... ");
+			if(!csvFile.endsWith(".cdat")) {
+				csvFile=csvFile+".cdat";
+			}
+			
+			FileOutputStream fos = new FileOutputStream(csvFile);
+			CRNReducerCommandLine.print(out,bwOut,"Writing the csvFile "+csvFile+" ... ");
 
 			PrintStream Output = new PrintStream(fos);
 			StringBuilder caption = new StringBuilder();

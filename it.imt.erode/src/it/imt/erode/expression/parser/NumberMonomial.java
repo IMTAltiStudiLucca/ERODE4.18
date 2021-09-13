@@ -77,6 +77,11 @@ public class NumberMonomial extends Monomial {
 		return getCoefficientParam();
 	}
 
+	@Override
+	public boolean needsI() {
+		return true;
+	}
+
 
 
 }

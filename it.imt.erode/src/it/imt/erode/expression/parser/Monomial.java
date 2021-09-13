@@ -74,5 +74,11 @@ public abstract class Monomial implements IMonomial {
 	protected void setCoefficientParam(BigDecimal coefficientParam) {
 		this.coefficientParam = coefficientParam;
 	}
+	
+	@Override
+	public boolean isParameter() {
+		return false;
+	}
+	
 
 }

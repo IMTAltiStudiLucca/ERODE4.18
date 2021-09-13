@@ -19,6 +19,11 @@ public class SpeciesMonomial extends Monomial {
 	}
 	
 	@Override
+	public boolean needsI() {
+		return false;
+	}
+	
+	@Override
 	public String toString() {
 		return species.getName();
 	}

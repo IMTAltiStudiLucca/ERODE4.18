@@ -53,6 +53,8 @@ public class ChemicalReactionNetworkProposalProvider extends AbstractChemicalRea
 	    acceptor.accept(this.createCompletionProposal("USER", "Set user defined initial partition", null, context));
 	    acceptor.accept(this.createCompletionProposal("IC", "According to the initial concentrations", null, context));
 	    acceptor.accept(this.createCompletionProposal("USER_and_IC", "Set user defined initial partition, further refined by the initial conditions", null, context));
+	    acceptor.accept(this.createCompletionProposal("Outputs", "One block with all 'outputs' (variables that do not affect other ones). Only for MA", null, context));
+	    acceptor.accept(this.createCompletionProposal("Outputs_singleton", "One block per 'output' (variables that do not affect other ones). Only for MA", null, context));
 	    return;
 	  }
 	  
@@ -394,7 +396,7 @@ public class ChemicalReactionNetworkProposalProvider extends AbstractChemicalRea
 	      keyword.getValue().equals("computeDifferentialHull") || keyword.getValue().equals("exportCRN") || 
 	      keyword.getValue().equals("smtTimeCSVFile") || keyword.getValue().equals("addSelfLoops") || keyword.getValue().equals("oneLabelAtAtTime") || 
 	      //keyword.getValue().equals("fileWhereToStorePartition") || 
-	      keyword.getValue().equals("IC") || keyword.getValue().equals("USER") || keyword.getValue().equals("NO") ||  keyword.getValue().equals("USER_and_IC") || 
+	      keyword.getValue().equals("IC") || keyword.getValue().equals("USER") || keyword.getValue().equals("NO") ||  keyword.getValue().equals("USER_and_IC") || keyword.getValue().equals("Outputs") || keyword.getValue().equals("Outputs_singleton") ||
 	      keyword.getValue().equals("reductionAlgorithm") || keyword.getValue().equals("exportFlyFast") || 
 	      keyword.getValue().equals("importChemKin") || keyword.getValue().equals("importLinearSystemAsCCSVMatrix") || 
 	      keyword.getValue().equals("reduceEpsNBB") || keyword.getValue().equals("reduceEpsNFB") || 

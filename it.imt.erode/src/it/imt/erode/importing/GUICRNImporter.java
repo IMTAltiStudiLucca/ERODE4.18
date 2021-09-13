@@ -352,7 +352,9 @@ public class GUICRNImporter  extends AbstractImporter {
 	    return number;
 	 }
 	
-	public static void printToERODEFIle(ICRN crn,IPartition partition, String name, boolean assignPopulationOfRepresentative, boolean groupAccordingToCurrentPartition, Collection<String> preambleCommentLines, boolean verbose, String icComment,MessageConsoleStream out,BufferedWriter bwOut, ODEorNET type, boolean rnEncoding,boolean originalNames){
+	public static void printToERODEFIle(ICRN crn,IPartition partition, String name, boolean assignPopulationOfRepresentative, 
+			boolean groupAccordingToCurrentPartition, Collection<String> preambleCommentLines, boolean verbose, 
+			String icComment,MessageConsoleStream out,BufferedWriter bwOut, ODEorNET type, boolean rnEncoding,boolean originalNames){
 		String fileName = name;
 		
 		fileName=overwriteExtensionIfEnabled(fileName,".ode");
@@ -919,7 +921,8 @@ public class GUICRNImporter  extends AbstractImporter {
 	
 	
 	
-	private static void writeXtextCRN(BufferedWriter bw,ICRN crn, ODEorNET type, boolean printView,MessageConsoleStream out,BufferedWriter bwOut,boolean rnEncoding,boolean originalNames) throws IOException {		
+	private static void writeXtextCRN(BufferedWriter bw,ICRN crn, ODEorNET type, boolean printView,MessageConsoleStream out,
+			BufferedWriter bwOut,boolean rnEncoding,boolean originalNames) throws IOException {		
 		if(crn!=null){
 			//Begin compute RN encoding
 			boolean computeRNEncoding=rnEncoding && !crn.isMassAction() && !type.equals(ODEorNET.ODE);
@@ -1347,24 +1350,40 @@ public class GUICRNImporter  extends AbstractImporter {
 				//I might add support for something like(x*y)^(3) -> (x*y)*(x*y)*(x*y)  
 			}
 			else if(type.equals(Type.DIVIDE)){
-				//We support only the case in which we have parameter1/parameter2 or the case expr/1
+				//We support only the case in which we have 
+					//(expr1+expr2...)/number
+					//(expr1+expr2...)/parameter
 				boolean supported=false;
-				if(monomialsLeft.size()==1 &&monomialsRight.size()==1) {
-					IMonomial numerator = monomialsLeft.get(0);
+				if(monomialsRight.size()==1 && (monomialsRight.get(0) instanceof NumberMonomial || monomialsRight.get(0) instanceof ParameterMonomial)) {
 					IMonomial denominator = monomialsRight.get(0);
-					BigDecimal bdn = numerator.getOrComputeCoefficient();
 					BigDecimal bdd = denominator.getOrComputeCoefficient();
-					IMonomial divisionResult = new NumberMonomial(bdn.divide(bdd,CRNBisimulationsNAry.getSCALE(),CRNBisimulationsNAry.RM), "("+numerator.getOrComputeCoefficientExpression()+")/("+denominator.getOrComputeCoefficientExpression()+")");
-					ArrayList<IMonomial> ret = new ArrayList<IMonomial>(1);
-					ret.add(divisionResult);
-					supported=true;
+					IMonomial divisionResult = new NumberMonomial(BigDecimal.ONE.divide(bdd,CRNBisimulationsNAry.getSCALE(),CRNBisimulationsNAry.RM), "1"+"/("+denominator.getOrComputeCoefficientExpression()+")");
+					ArrayList<IMonomial> ret = new ArrayList<IMonomial>(monomialsLeft.size());
+					for(IMonomial numerator : monomialsLeft) {
+						ProductMonomial numeratorTimesOneOverDenum = new ProductMonomial(numerator, divisionResult);
+						ret.add(numeratorTimesOneOverDenum);
+					}
 					return ret;
 				}
-				else if(monomialsRight.size()==1 && monomialsRight.get(0) instanceof NumberMonomial) {
-					if(((NumberMonomial)(monomialsRight.get(0))).getOrComputeCoefficient().compareTo(BigDecimal.ONE)==0) {
-						return monomialsLeft;
-					}
-				}
+//				if(monomialsLeft.size()==1 &&monomialsRight.size()==1) {
+//					IMonomial numerator = monomialsLeft.get(0);
+//					IMonomial denominator = monomialsRight.get(0);
+//					if(denominator instanceof NumberMonomial) {
+//						BigDecimal bdn = numerator.getOrComputeCoefficient();
+//						BigDecimal bdd = denominator.getOrComputeCoefficient();
+//						IMonomial divisionResult = new NumberMonomial(bdn.divide(bdd,CRNBisimulationsNAry.getSCALE(),CRNBisimulationsNAry.RM), "("+numerator.getOrComputeCoefficientExpression()+")/("+denominator.getOrComputeCoefficientExpression()+")");
+//						ArrayList<IMonomial> ret = new ArrayList<IMonomial>(1);
+//						ProductMonomial numeratorTimesOneOverDenum = new ProductMonomial(numerator, divisionResult);
+//						ret.add(numeratorTimesOneOverDenum);
+//						supported=true;
+//						return ret;
+//					}
+//				}
+//				else if(monomialsRight.size()==1 && monomialsRight.get(0) instanceof NumberMonomial) {
+//					if(((NumberMonomial)(monomialsRight.get(0))).getOrComputeCoefficient().compareTo(BigDecimal.ONE)==0) {
+//						return monomialsLeft;
+//					}
+//				}
 				if(!supported) {
 					throw new UnsupportedReactionNetworkEncodingException("The DIVIDE operator is currently not supported: "+node.toString());
 				}

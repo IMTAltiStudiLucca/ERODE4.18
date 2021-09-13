@@ -1467,24 +1467,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 		ICRN crnToConsider=crn;
 		try {
 			if(maxPercPerturb>0) {
-				crnToConsider = CRN.copyCRN(crn, out, bwOut);
-				Date d = new Date();
-				RandomEngine randomGenerator = new MersenneTwister(d);
-				for(ICRNReaction reaction : crnToConsider.getReactions()) {
-					boolean plus = RandomBNG.nextBoolean(randomGenerator, 0.5);
-					int percentage =RandomBNG.nextInt(randomGenerator, maxPercPerturb);//nextDouble(randomGenerator, maxPercPerturb);
-					//int percentage=(int) Math.round(dirtyPercentage);
-					double factor=percentage/100.0;
-					
-					BigDecimal actualPert = BigDecimal.valueOf(factor).multiply(reaction.getRate());
-					if(plus) {
-						reaction.setRate(reaction.getRate().add(actualPert), reaction.getRateExpression()+"+"+actualPert.toPlainString());
-					}
-					else {
-						reaction.setRate(reaction.getRate().subtract(actualPert), reaction.getRateExpression()+"-"+actualPert.toPlainString());
-					}
-					
-				}
+				crnToConsider = RandomBNG.createRndPerturbedCopy(crn, out, bwOut, maxPercPerturb);
 			}
 		} catch (IOException e1) {
 			throw new UnsupportedFormatException("IOException while copying the CRN: "+e1.getMessage());

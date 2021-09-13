@@ -27,6 +27,16 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 		this.op = op;  
 	}
 	
+	public IUpdateFunction getFirst() {
+		return first;
+	}
+	public IUpdateFunction getSecond() {
+		return second;
+	}
+	public BooleanConnector getOperator() {
+		return op;
+	}
+	
 	@Override
 	public String toString() {
 		return "("+first.toString()+getSymbol(op)+second.toString()+")";
@@ -40,6 +50,12 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 			return " -> ";
 		case OR:
 			return " | ";//" \\/ ";
+		case XOR:
+			return " XOR ";
+		case EQ:
+			return " = ";
+		case NEQ:
+			return " != ";
 		default:
 			throw new UnsupportedOperationException(op.toString());
 		}
@@ -55,6 +71,12 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 			return ctx.mkImplies(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue));
 		case OR:
 			return ctx.mkOr(new BoolExpr[] {first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue)});
+		case XOR:
+			return ctx.mkXor(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue));
+		case EQ:
+			return ctx.mkEq(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue));
+		case NEQ:
+			return ctx.mkNot(ctx.mkEq(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue)));						
 		default:
 			throw new UnsupportedOperationException(op.toString());
 		}

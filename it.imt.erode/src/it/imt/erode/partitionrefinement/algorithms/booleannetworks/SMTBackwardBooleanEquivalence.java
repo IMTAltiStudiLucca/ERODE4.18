@@ -266,7 +266,7 @@ public class SMTBackwardBooleanEquivalence {
 			
 			ISpecies reducedSpecies;
 			
-			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, BigDecimal.ZERO,"0",blockRepresentative.getNameAlphanumeric(),false);
+			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, blockRepresentative.getInitialConcentration(),blockRepresentative.getInitialConcentrationExpr(),blockRepresentative.getNameAlphanumeric(),false);
 			reducedBN.addSpecies(reducedSpecies);
 			
 			reducedSpecies.addCommentLines(currentBlock.computeBlockComment());

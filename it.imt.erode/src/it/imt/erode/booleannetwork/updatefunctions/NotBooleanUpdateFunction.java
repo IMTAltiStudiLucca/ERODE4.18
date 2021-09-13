@@ -22,6 +22,10 @@ public class NotBooleanUpdateFunction implements IUpdateFunction {
 		this.innerUpdateFunction = first;
 	}
 	
+	public IUpdateFunction getInnerUpdateFunction() {
+		return innerUpdateFunction;
+	}
+	
 	@Override
 	public String toString() {
 		return "(!"+innerUpdateFunction.toString()+")";

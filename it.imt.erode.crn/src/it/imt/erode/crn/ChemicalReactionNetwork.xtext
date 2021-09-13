@@ -70,6 +70,7 @@ ModelDefinition :
 
 ImportFolder:
 	importSBMLFolder
+	//|importBoolCubeSBMLFolder
 ;
 
 BooleanImportFolder:
@@ -647,13 +648,27 @@ reduceFE : {reduceFE}
 ;
 
 reduceCoRNFE : {reduceCoRNFE}
-	'reduceCoRNFE' '(' cornParams=CoRNParams ',' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+	'reduceCoRNFE' '(' cornParams=CoRNParams (',' optionalParametersFormatted=FormattedOptionalParametersReductions)? ')'
 ;
 
 CoRNParams:
-	'perturbation'
-	(('absolute' '=' absolute = POSITIVEINTORREAL)|
-	 ('percentage' '=' percentage = POSITIVEINTORREAL)) 
+	(
+		(
+			('intervalWidth'
+				(('absolute' '=' absolutePert = POSITIVEINTORREAL)|
+			 	 ('percentage' '=' percentagePert = POSITIVEINTORREAL))
+			 )|
+			('intervalBoundsFactors'
+				(('lower' '=' lowerFactor = POSITIVEINTORREAL)
+			 	 ('upper' '=' upperFactor = POSITIVEINTORREAL))
+			 )
+		 ) ',' 'certain' 'constants' '=' certainConstants=BooleanValue
+	 )
+	 |
+	('closure'
+		(('absolute' '=' absoluteClos = POSITIVEINTORREAL)|
+	 	 ('percentage' '=' percentageClos = POSITIVEINTORREAL))
+	 )  
 ;
 
 reduceBB : {reduceBB}
@@ -775,7 +790,7 @@ ReductionAlgorithm:
 	'prePartition' '=' prep = BooleanValue
 ;*/
 Prep:
-	'prePartition' '=' prep = ("NO"|"USER"|"IC"|"USER_and_IC")
+	'prePartition' '=' prep = ("NO"|"USER"|"IC"|"USER_and_IC"|"Outputs"|"Outputs_singleton")
 ;
 
 /*PrepForward:
@@ -865,6 +880,7 @@ ParametersExport:
 Export:
 	write |
 	exportMACRN |
+	exportRndPerturbedRN |
 	exportMARN |
 	exportStoichiometry |
 	exportBNG |
@@ -1238,6 +1254,13 @@ SMTQuestion:
 'FDE' | 'BDE'	
 ;
 
+exportRndPerturbedRN:
+	'exportRndPerturbedRN' '(' params = ParametersExport ','
+	'maxPercPerturb' 'from' '=' fromMaxPerturb=(ZERO|NAT) 
+					 'to'   '=' toMaxPerturb=(ZERO|NAT)
+					 'step' '=' stepMaxPerturb=(ZERO|NAT) 
+	 ')'
+;
 exportMACRN:
 	'exportMACRN' '(' params = ParametersExport 
 	 ')'
@@ -1378,7 +1401,15 @@ OptionalParametersSimulateODEs:
 	//TEnd //(',tEnd=>' tEnd = REAL)?
 	| ComputeJacobian
 	| SolverLibrary
+	| SimulationCampaign
 ;
+
+SimulationCampaign:
+	'campaign' 
+		'n' '=' n = NAT 
+		'for' 'percentage' 
+				( ('perturbed_ic' '=' ic=NAT)|
+				  ('perturbed_params' '=' params=NAT));
 
 SolverLibrary:
 	'library' '=' library = ('APACHE'|'SUNDIALS') 
@@ -1764,9 +1795,12 @@ terminal SIGN :
 	'-' | '+' 
 ;
 terminal NAT returns ecore::EInt: (('1'..'9') (INT?));//terminal NAT returns ecore::EInt: (('1'..'9') ('0'..'9')*);
+//NAT returns ecore::EInt: INT; //(('1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9') (INT?));
 terminal ZERO returns ecore::EInt: '0';
 //terminal ONE returns ecore::EInt: '1';
-BooleanValue returns ecore::EBoolean: "true" | "false";
+BooleanValue returns ecore::EBoolean: "true" | "false"/* |'0'|'1'*/;
+//BooleanValueBN: "true" | "false" | '1' | ZERO ; 
+//BooleanValueBN returns ecore::EBoolean: "true" | "false" | ZERO | "1";
 //terminal REAL returns ecore::EDouble: '-'? (('0'..'9')* '.' ('0' .. '9')+);
 //terminal REAL returns ecore::EDouble: '-'? (INT '.' (INT)+);
 //terminal REAL returns ecore::EDouble: '-'? (INT '.' INT);
@@ -1782,7 +1816,7 @@ NodeDeclarations : {NodeDeclarations}
 
 //A Boolean species and its (optional) initial truth value 
 Node:
-	name = ID (('=' ic = BooleanValue)?) (('(' originalName = STRING ')')?)
+	name = ID (('=' ic = (True|False)/*BooleanValue*/)?) (('(' originalName = STRING ')')?)
 ;
 
 NodeDefinitions: {NodeDefinitions}
@@ -1800,14 +1834,29 @@ BooleanUpdateFunction returns BoolExpr:
 	ImpliesBooleanExpr	
 ;
 
- ImpliesBooleanExpr returns BoolExpr: 
-	OrBooleanExpr ({ImpliesBooleanExpr.left=current}  ('implies'|'->') right=OrBooleanExpr)* 
+ImpliesBooleanExpr returns BoolExpr: 
+	XorBooleanExpr ({ImpliesBooleanExpr.left=current}  ('implies'|'->') right=XorBooleanExpr)* 
 ;
+XorBooleanExpr returns BoolExpr: 
+	OrBooleanExpr ({XorBooleanExpr.left=current}  ('XOR') right=OrBooleanExpr)* 
+;
+//ImpliesBooleanExpr returns BoolExpr: 
+//	OrBooleanExpr ({ImpliesBooleanExpr.left=current}  ('implies'|'->') right=OrBooleanExpr)* 
+//;
 OrBooleanExpr returns BoolExpr: 
 	AndBooleanExpr ({OrBooleanExpr.left=current} ('or'|'|') right=AndBooleanExpr)* 
 ;
+//AndBooleanExpr returns BoolExpr: 
+//	PrimaryOrNotPrimaryBooleanExpr ({AndBooleanExpr.left=current} ('and'|'&') right=PrimaryOrNotPrimaryBooleanExpr)* 
+//;
 AndBooleanExpr returns BoolExpr: 
-	PrimaryOrNotPrimaryBooleanExpr ({AndBooleanExpr.left=current} ('and'|'&') right=PrimaryOrNotPrimaryBooleanExpr)* 
+	NEqBooleanExpr ({AndBooleanExpr.left=current} ('and'|'&') right=NEqBooleanExpr)* 
+;
+NEqBooleanExpr returns BoolExpr: 
+	EqBooleanExpr ({NEqBooleanExpr.left=current} ('!=') right=EqBooleanExpr)* 
+;
+EqBooleanExpr returns BoolExpr: 
+	PrimaryOrNotPrimaryBooleanExpr ({EqBooleanExpr.left=current} ('=') right=PrimaryOrNotPrimaryBooleanExpr)* 
 ;
 
 /*
@@ -1840,17 +1889,18 @@ PrimaryBooleanExpr returns BoolExpr:
  | '(' ImpliesBooleanExpr ')' 
  ;
 
-PrimaryBoolean: 
-	False | True
-	| ReferenceToNode
+PrimaryBoolean: //{PrimaryBoolean}//{BooleanValueBN}//
+	//BooleanValueBN
+	False | True 
+	|  ReferenceToNode
 ;
 
 True: {True} //; returns STRING:{STRING}
-	"true" //| ONE
+	"true" //| {True} '1'
 	//ONE
 ;
 False: {False} //; returns STRING:{STRING}
-	"false" //| ZERO
+	"false" //| {False} '0'
 	//"false" | ZERO
 	//ZERO
 ;

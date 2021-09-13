@@ -38,7 +38,8 @@ public class DifferentialHull {
 		
 		boolean ignoreI=false;
 		
-		HashMap<String, EvaluatedParameter> paramNameToEvaluatedParameter = partitionParametersUpToDeltaClosure(crn,delta, hasDelta);
+		//ArrayList<ParametersBlock> parameterBlocks=new ArrayList<>();
+		HashMap<String, EvaluatedParameter> paramNameToEvaluatedParameter = partitionParametersUpToDeltaClosure(crn,delta, hasDelta/*,parameterBlocks*/);
 		
 		IBlock uniqueBlock = new Block();
 		IPartition partition = new Partition(uniqueBlock, crn.getSpecies().size()*2);
@@ -179,7 +180,7 @@ public class DifferentialHull {
 		return new CRNandPartition(hullCRN, partition);
 	}
 
-	private static HashMap<String, EvaluatedParameter> partitionParametersUpToDeltaClosure(ICRN crn, double delta,boolean hasDelta) {
+	private static HashMap<String, EvaluatedParameter> partitionParametersUpToDeltaClosure(ICRN crn, double delta,boolean hasDelta/*,ArrayList<ParametersBlock> parameterBlocks*/) {
 		
 		HashMap<String, EvaluatedParameter> paramNameToEvaluatedParameter = new HashMap<String, EvaluatedParameter>();
 		List<EvaluatedParameter> evaluatedParameters = new ArrayList<EvaluatedParameter>(0);
@@ -195,13 +196,15 @@ public class DifferentialHull {
 			}
 			
 			Collections.sort(evaluatedParameters, new EvaluatedParametersComparator());
-			
+			 
 			ParametersBlock currentBlock = new ParametersBlock();
+			//parameterBlocks.add(currentBlock);
 			double lastVal=evaluatedParameters.get(0).getValue();
 			for (EvaluatedParameter evaluatedParameter : evaluatedParameters) {
 				double currentVal = evaluatedParameter.getValue();
 				if(lastVal+delta< currentVal){
 					currentBlock = new ParametersBlock();
+					//parameterBlocks.add(currentBlock);
 				}
 				currentBlock.addParameter(evaluatedParameter);
 				lastVal=currentVal;
@@ -226,7 +229,13 @@ public class DifferentialHull {
 		else{
 			ASTNode rateLaw = ASTNode.parseFormula(rateExpression);
 			replaceParameterWithMinOrMaxOfItsBlock(rateLaw, paramNameToEvaluatedParameter, takeMax);
-			return rateLaw.toFormula();
+			String ret=rateLaw.toFormula();
+			if(rateLaw.isNumber()) {
+				return ret;
+			}
+			else {
+				return "("+ret+")"; 
+			}
 		}
 	}
 	

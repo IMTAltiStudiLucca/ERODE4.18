@@ -969,14 +969,23 @@ public class CRN implements ICRN {
 	}
 	
 	public static ICRN copyCRN(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
-		return copyCRN(crn, out, bwOut, true,true);
+		return copyCRN(crn, out, bwOut, true,true,true);
 	}
-	public static ICRN copyCRN(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut, boolean copyParameters, boolean copyReactions) throws IOException {
+	public static ICRN copyCRN(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut, 
+			boolean copyParameters, boolean copyReactions) throws IOException {
+		return copyCRN(crn, out, bwOut, copyParameters,copyReactions,true);
+	}
+	public static ICRN copyCRN(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut, 
+			boolean copyParameters, boolean copyReactions,boolean copySpecies) throws IOException {
 		ICRN crnNew = new CRN(crn.getName(),crn.getMath(),out,bwOut);
 		if(copyParameters) {
 			copyParameters(crn, crnNew);
 		}
-		ISpecies[] idToNewSpecies = copySpecies(crn, crnNew);
+		
+		ISpecies[] idToNewSpecies =null;
+		if(copySpecies) {
+			idToNewSpecies = copySpecies(crn, crnNew);
+		}
 		if(copyReactions) {
 			copyReactions(crn, crnNew, idToNewSpecies);
 		}
@@ -1169,6 +1178,15 @@ public class CRN implements ICRN {
 	}
 	*/
 	
+	private static ISpecies getCorrespSpecies(ISpecies[] idToNewSpecies,ISpecies old) {
+		if(idToNewSpecies==null) {
+			return old;
+		}
+		else {
+			return idToNewSpecies[old.getID()];
+		}
+		
+	}
 	public static void copyReactions(ICRN crn, ICRN crnNew, ISpecies[] idToNewSpecies) throws IOException {
 		copyReactions(crn, crnNew, idToNewSpecies,null);
 	}
@@ -1178,7 +1196,7 @@ public class CRN implements ICRN {
 			IComposite oldReagents =reaction.getReagents();
 			HashMap<ISpecies, Integer> reagentsHM = new HashMap<>(oldReagents.getNumberOfDifferentSpecies());
 			for(int i=0;i<oldReagents.getNumberOfDifferentSpecies();i++) {
-				ISpecies newSpecies = idToNewSpecies[oldReagents.getAllSpecies(i).getID()];
+				ISpecies newSpecies = getCorrespSpecies(idToNewSpecies,oldReagents.getAllSpecies(i));
 				reagentsHM.put(newSpecies, oldReagents.getMultiplicities(i));
 			}
 			//IComposite newReagents = crnNew.addReagentsIfNew(new Composite(reagentsHM));
@@ -1189,7 +1207,7 @@ public class CRN implements ICRN {
 			IComposite oldProducts =reaction.getProducts();
 			HashMap<ISpecies, Integer> productsHM = new HashMap<>(oldProducts.getNumberOfDifferentSpecies());
 			for(int i=0;i<oldProducts.getNumberOfDifferentSpecies();i++) {
-				ISpecies newSpecies = idToNewSpecies[oldProducts.getAllSpecies(i).getID()];
+				ISpecies newSpecies = getCorrespSpecies(idToNewSpecies,oldProducts.getAllSpecies(i));
 				productsHM.put(newSpecies, oldProducts.getMultiplicities(i));
 			}
 			//IComposite newProducts = crnNew.addProductIfNew(new Composite(productsHM));

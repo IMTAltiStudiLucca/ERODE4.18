@@ -58,6 +58,7 @@ import it.imt.erode.expression.evaluator.MathEval;
 import it.imt.erode.importing.AbstractImporter;
 import it.imt.erode.importing.BNetImporter;
 import it.imt.erode.importing.BioNetGenImporter;
+import it.imt.erode.importing.BoolCubeImporter;
 import it.imt.erode.importing.C2E2Exporter;
 import it.imt.erode.importing.CRNImporter;
 import it.imt.erode.importing.ExportSingleUseOfParams;
@@ -75,6 +76,7 @@ import it.imt.erode.importing.StoichiometricMatrixExporter;
 import it.imt.erode.importing.SupportedFormats;
 import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.importing.z3Importer;
+import it.imt.erode.importing.automaticallygeneratedmodels.RandomBNG;
 import it.imt.erode.importing.csv.CompactCSVMatrixImporter;
 import it.imt.erode.importing.sbml.FluxBalanceAnalysisModel;
 import it.imt.erode.importing.sbml.NegativeStoichiometryException;
@@ -93,7 +95,6 @@ import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
-import it.imt.erode.partitionrefinement.algorithms.CORN_LumpabilityForControlRN;
 import it.imt.erode.partitionrefinement.algorithms.CRNBisimulations;
 import it.imt.erode.partitionrefinement.algorithms.CRNBisimulationsNAry;
 import it.imt.erode.partitionrefinement.algorithms.ControlEquivalences;
@@ -106,6 +107,8 @@ import it.imt.erode.partitionrefinement.algorithms.SMTExactFluidBisimilarity;
 import it.imt.erode.partitionrefinement.algorithms.SMTOrdinaryFluidBisimilarityBinary;
 import it.imt.erode.partitionrefinement.algorithms.SyntacticMarkovianBisimilarityOLD;
 import it.imt.erode.partitionrefinement.algorithms.UCTMCLumping;
+import it.imt.erode.partitionrefinement.algorithms.corn.CORN_LumpabilityForControlRN;
+import it.imt.erode.partitionrefinement.algorithms.corn.HowToComputeMm;
 //import it.imt.erode.partitionrefinement.algorithms.SyntacticMarkovianBisimilarityAllLabels;
 import it.imt.erode.partitionrefinement.algorithms.SyntacticMarkovianBisimilarityBinary;
 import it.imt.erode.partitionrefinement.algorithms.SyntacticMarkovianBisimilarityNary;
@@ -575,7 +578,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		}
 	}
 
-	private void handleCreateDifferentialHullCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws UnsupportedFormatException, IOException {
+	protected void handleCreateDifferentialHullCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws UnsupportedFormatException, IOException {
 		//hullify(fileO1ut="",delta=0.1,strict=true,format="ODE/NET")
 		ODEorNET crnGUIFormat = ODEorNET.ODE;
 		SupportedFormats format = SupportedFormats.CRNGUI;
@@ -610,7 +613,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			}
 			else if(parameter.startsWith("delta=>")){
 				if(parameter.length()<="delta=>".length()){
-					CRNReducerCommandLine.println(out,bwOut,"Please, specify the alpha component of the confidence interval. ");
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the delta to use (the step) when looking for similar parameters to collapse. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 					return;
 				}
@@ -779,6 +782,9 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				else if(command.startsWith("exportCRN(")){
 					handleWriteCommand(command,out,bwOut);
 				}
+				else if(command.startsWith("exportRndPerturbedRN(")){
+					handleExportRndPerturbedRN(command,out,bwOut);
+				}
 				/*else if(command.startsWith("importBNG(")){
 				crn=null;
 				partition=null;
@@ -910,10 +916,11 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 
 
 
-	protected SimulationSolutions handleSimulateODECommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
-		return handleSimulateODECommand(command, out, bwOut,true);
+	protected void /*SimulationSolutions*/ handleSimulateODECommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
+		//return 
+		handleSimulateODECommand(command, out, bwOut,true);
 	}
-	protected SimulationSolutions handleSimulateODECommand(String command, MessageConsoleStream out, BufferedWriter bwOut,boolean print) throws IOException {
+	protected /*SimulationSolutions*/ void handleSimulateODECommand(String command, MessageConsoleStream out, BufferedWriter bwOut,boolean print) throws IOException {
 		//simulateODE({tEnd=>200,steps=>200,visualizePlot=>true});
 		double tEnd=0.0;//100.0;
 		int steps=100;//0
@@ -930,8 +937,13 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		boolean computeJacobian=false;
 		double defIC=0;
 		
-		boolean stepsSpecifified=false;
-		boolean stepSizeSpecifified=false;
+		boolean campaign=false,campaign_p=false,campaign_i=false;
+		int campaign_n=1;
+		int campaign_ic=0;
+		int campaign_params=0;
+		
+		boolean stepsSpecified=false;
+		boolean stepSizeSpecified=false;
 		boolean tEndSpecifified=false;
 		
 		boolean apache=true;
@@ -950,14 +962,14 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		String parameters[] = CRNReducerCommandLine.getParameters(command);
 		if(parameters==null){
 			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
-			return null;
+			return;
 		}
 		for(int p=0;p<parameters.length;p++){
 			if(parameters[p].startsWith("fileIn=>")){
 				boolean loadingSuccessful = invokeLoad(parameters[p],out,bwOut);
 				if(!loadingSuccessful){
 					CRNReducerCommandLine.println(out,bwOut,"The loading of the file failed. I skip this command: "+command);
-					return null;
+					return;
 				}
 			}
 			else if(parameters[p].equals("")){
@@ -967,7 +979,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="defaultIC=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the value to be used as default initial concentration. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				defIC = Double.valueOf(parameters[p].substring("defaultIC=>".length(), parameters[p].length()));
 			}
@@ -975,16 +987,16 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="steps=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the number of steps. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				steps = Integer.valueOf(parameters[p].substring("steps=>".length(), parameters[p].length()));
-				stepsSpecifified=true;
+				stepsSpecified=true;
 			}
 			else if(parameters[p].startsWith("tEnd=>")){
 				if(parameters[p].length()<="tEnd=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximum simulation time. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				tEnd = Double.valueOf(parameters[p].substring("tEnd=>".length(), parameters[p].length()));
 				tEndSpecifified=true;
@@ -993,10 +1005,10 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="stepSize=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the size of the steps. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				stepSize = Double.valueOf(parameters[p].substring("stepSize=>".length(), parameters[p].length()));
-				stepSizeSpecifified=true;
+				stepSizeSpecified=true;
 			}
 			/*else if(parameters[p].startsWith("imageFile=>")){
 				imageFile = parameters[p].substring(11, parameters[p].length());
@@ -1005,7 +1017,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="csvFile=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write the simulation data. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				csvFile = parameters[p].substring("csvFile=>".length(), parameters[p].length());
 			}
@@ -1013,7 +1025,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="minStep=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the minimal step. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				minStep = Double.valueOf(parameters[p].substring("minStep=>".length(), parameters[p].length()));
 			}
@@ -1021,7 +1033,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="maxStep=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximal step. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				maxStep = Double.valueOf(parameters[p].substring("maxStep=>".length(), parameters[p].length()));
 			}
@@ -1029,7 +1041,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="absTol=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the allowed absolute error. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				absTol = Double.valueOf(parameters[p].substring("absTol=>".length(), parameters[p].length()));
 			}
@@ -1037,10 +1049,42 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="relTol=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the allowed relative error. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				relTol = Double.valueOf(parameters[p].substring("relTol=>".length(), parameters[p].length()));
 			}
+			else if(parameters[p].startsWith("campaign_n=>")){
+				if(parameters[p].length()<="campaign_n=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the number of simulations to perform. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				campaign=true;
+				campaign_n = Integer.valueOf(parameters[p].substring("campaign_n=>".length(), parameters[p].length()));
+			}
+			else if(parameters[p].startsWith("campaign_IC=>")){
+				if(parameters[p].length()<="campaign_IC=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the percentage perturbation to apply on the initial conditions. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				campaign_ic = Integer.valueOf(parameters[p].substring("campaign_ic=>".length(), parameters[p].length()));
+				if(campaign_ic>0) {
+					campaign_i=true;
+				}
+			}
+			else if(parameters[p].startsWith("campaign_Params=>")){
+				if(parameters[p].length()<="campaign_Params=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the percentage perturbation to apply on the parameters. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				campaign_params= Integer.valueOf(parameters[p].substring("campaign_params=>".length(), parameters[p].length()));
+				if(campaign_params>0) {
+					campaign_p=true;
+				}
+			}
+			
 			/*else if(parameters[p].startsWith("covariances=>")){
 				if(parameters[p].length()<="covariances=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify if computed the covariances of the means of the concentrations. ");
@@ -1053,7 +1097,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="visualizePlot=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the plot has to be visualized (NO,VARS,VIEWS,VARS&VIEWS). ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				String param=parameters[p].substring("visualizePlot=>".length(), parameters[p].length());
 				if(param.equalsIgnoreCase("NO")){
@@ -1079,7 +1123,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="library=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the library to use: 'apache', or 'sundials'.");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				String param=parameters[p].substring("library=>".length(), parameters[p].length());
 				if(param.equalsIgnoreCase("apache")){
@@ -1093,7 +1137,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="computeJacobian=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the jacobian should be computed (and provided in the output). ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				String computeJacobianString = parameters[p].substring("computeJacobian=>".length(), parameters[p].length());
 				if(computeJacobianString.equalsIgnoreCase("true")){
@@ -1109,24 +1153,24 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(parameters[p].length()<="showLabels=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the plot labels have to be visualized. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 				showLabels = Boolean.valueOf(parameters[p].substring("showLabels=>".length(), parameters[p].length()));
 			}
 			else{
 				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
-				return null;
+				return;
 			}
 		}
 
 		//int p = ((tEndSpecifified)?1:0) + ((stepSizeSpecifified)?1:0) + ((stepsSpecifified)?1:0);
 		
 		//if(p!=2){
-		if(stepSizeSpecifified && stepsSpecifified){
+		if(stepSizeSpecified && stepsSpecified){
 			//CRNReducerCommandLine.println(out,bwOut,"Please, specify exactly two of the following parameters: tEnd, steps and stepSize.");
 			CRNReducerCommandLine.println(out,bwOut,"Please, specify either the number of steps or the step size.");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-			return null;
+			return;
 		}
 		/*if(tEnd==0.0){
 			CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximum simulated time. ");
@@ -1136,22 +1180,22 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		if(crn==null){
 			CRNReducerCommandLine.println(out,bwOut,"Before simulating a model, it is necessary to load it. "); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-			return null;
+			return;
 		}
 		if(crn.getSpecies().size()==0){
 			CRNReducerCommandLine.println(out,bwOut,"It is not possible to simulate a model with no species. ");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-			return null;
+			return;
 		}
 		if(crn.getReactions().size()==0){
 			CRNReducerCommandLine.println(out,bwOut,"It is not possible to simulate a model with no reactions. ");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-			return null;
+			return;
 		}
 		if(crn.algebraicSpecies() > 0){
 			CRNReducerCommandLine.println(out,bwOut,"Command simulateODE cannot be used on models with algebraic constraints. Use simulateDAE.");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-			return null;
+			return;
 		}
 		
 		/*
@@ -1162,12 +1206,12 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		}
 		*/
 		//By default, we use the default number of steps
-		if(!stepSizeSpecifified){
+		if(!stepSizeSpecified){
 			//default step size
-			stepsSpecifified=true;
+			stepsSpecified=true;
 		}
 
-		if(stepsSpecifified && tEndSpecifified){
+		if(stepsSpecified && tEndSpecifified){
 			if(steps>1){
 				stepSize = (tEnd / (double)(steps-1));
 			}
@@ -1175,7 +1219,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				stepSize = (tEnd / (double)steps);
 			}
 		}
-		else if(stepsSpecifified && stepSizeSpecifified){
+		else if(stepsSpecified && stepSizeSpecified){
 			tEnd = stepSize*steps;
 		}
 		else{
@@ -1191,20 +1235,52 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				if(!librariesSundialsCVODEPresent){
 					CRNReducerCommandLine.println(out,bwOut,"It is not possible to simulate using JSundials because the library is not present. ");
 					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
-					return null;
+					return;
 				}
 			}
 		}
 		
-		
-		return simulateODE(tEnd, stepSize, steps, imageFile, csvFile, visualizeVars, visualizeViews, minStep,maxStep,absTol,relTol,covariances, showLabels,out,bwOut,command,computeJacobian,defIC,print,apache);
+		if(campaign) {
+			String ext="";
+			if(csvFile!=null) {
+				int lastDot=csvFile.lastIndexOf('.');
+				if(lastDot>=0) {
+					ext=csvFile.substring(lastDot);
+					csvFile=AbstractImporter.overwriteExtensionIfEnabled(csvFile, "", true);
+				}
+			}
+			String csvFilen=null;
+			if(campaign_p) {
+				for(int sim=0;sim<campaign_n;sim++) {
+					ICRN crnRndPert=RandomBNG.createRndPerturbedCopy(crn, out, bwOut, campaign_params);
+					if(csvFile!=null) {
+						csvFilen=csvFile+"_"+sim+ext;
+					}
+					simulateODE(crnRndPert,tEnd, stepSize, steps, imageFile, csvFilen, visualizeVars, visualizeViews, minStep,maxStep,absTol,relTol,covariances, showLabels,out,bwOut,command,computeJacobian,defIC,print,apache);
+				}
+			}
+			else if(campaign_i) {
+				for(int sim=0;sim<campaign_n;sim++) {
+					ICRN crnRndPert = CRN.copyCRN(crn, out, bwOut, false, true, true);
+					RandomBNG.randomlyPerturbIC(crnRndPert,out, bwOut, campaign_ic);
+					if(csvFile!=null) {
+						csvFilen=csvFile+"_"+sim+ext;
+					}
+					simulateODE(crnRndPert,tEnd, stepSize, steps, imageFile, csvFilen, visualizeVars, visualizeViews, minStep,maxStep,absTol,relTol,covariances, showLabels,out,bwOut,command,computeJacobian,defIC,print,apache);
+				}
+			} 
+		}
+		else {
+			//return 
+			simulateODE(crn,tEnd, stepSize, steps, imageFile, csvFile, visualizeVars, visualizeViews, minStep,maxStep,absTol,relTol,covariances, showLabels,out,bwOut,command,computeJacobian,defIC,print,apache);
+		}
 	}
 	
-	private SimulationSolutions simulateODE(double tEnd, double interval, int nSteps, String imagesName, String csvFile, boolean visualizeVars, boolean visualizeViews, double minStep, double maxStep, double absTol, double relTol, boolean covariances, boolean showLabels, MessageConsoleStream out, BufferedWriter bwOut, String command, boolean computeJacobian,double defIC,boolean print,boolean apache) throws IOException {
+	private /*SimulationSolutions*/ void simulateODE(ICRN crnToConsider,double tEnd, double interval, int nSteps, String imagesName, String csvFile, boolean visualizeVars, boolean visualizeViews, double minStep, double maxStep, double absTol, double relTol, boolean covariances, boolean showLabels, MessageConsoleStream out, BufferedWriter bwOut, String command, boolean computeJacobian,double defIC,boolean print,boolean apache) throws IOException {
 		if(print){
-			if(crn.getName()!=null){
+			if(crnToConsider.getName()!=null){
 				//CRNReducerCommandLine.print(out,bwOut,"Simulating the ODEs of the model with name "+crn.getName()+" ... ");
-				CRNReducerCommandLine.print(out,bwOut,"Solving ODEs of "+crn.getName()+"... ");
+				CRNReducerCommandLine.print(out,bwOut,"Solving ODEs of "+crnToConsider.getName()+"... ");
 			}
 			else{
 				//CRNReducerCommandLine.print(out,bwOut,"Simulating the ODEs of the current model ... ");
@@ -1213,7 +1289,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		}
 		
 		long begin = System.currentTimeMillis();
-		ODESolver solver = new ODESolver(crn, 0.0, tEnd, interval, nSteps, minStep, maxStep, absTol, relTol,terminator,covariances,defIC,(apache)?SOLVERLIBRARY.APACHE:SOLVERLIBRARY.CVODE);
+		ODESolver solver = new ODESolver(crnToConsider, 0.0, tEnd, interval, nSteps, minStep, maxStep, absTol, relTol,terminator,covariances,defIC,(apache)?SOLVERLIBRARY.APACHE:SOLVERLIBRARY.CVODE);
 		boolean failed=false;
 		try{
 			solver.solve();
@@ -1245,7 +1321,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			//dog = new DataOutputHandler("ODE solutions",solver.getSolution(), true, solver.getX(), crn, true,covariances);
 			double[] xVector = solver.getX();
 			xVector[xVector.length-1]=tEnd;
-			dog.setData(crn.getName()+" - "+"ODE solutions",solver.getSolution(), true, xVector, crn, true,covariances,computeJacobian,command);
+			dog.setData(crnToConsider.getName()+" - "+"ODE solutions",solver.getSolution(), true, xVector, crnToConsider, true,covariances,computeJacobian,command);
 			
 			dog.setShowLabels(showLabels);
 			if(visualizeVars||visualizeViews){
@@ -1260,7 +1336,8 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				dog.writeCSV(csvFile);
 			}
 		}
-		return dog.getSimulationSolutions();
+		//return 
+		dog.getSimulationSolutions();
 	}
 	
 	
@@ -2917,7 +2994,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 						partitionInfoFileName, groupedFileName, sameICFileName, csvSMTTimeFileName, typeOfGroupedFile, 
 						computeOnlyPartition, csvFile, print, sumReductionAlgorithm, writeReducedCRN, writeGroupedCRN, 
 						writeSameICCRN, crn, null, originalCRNShort, obtainedPartition, new CRNandPartition(crn, obtainedPartition), 
-						icWarning, reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, beginBegin, smtTime, end);
+						icWarning, reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, beginBegin, smtTime, end,null);
 			} catch (UnsupportedFormatException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -2998,6 +3075,115 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			}
 		}
 		return allPairs;
+	}
+	
+	private void handleExportRndPerturbedRN(String command, MessageConsoleStream out, BufferedWriter bwOut) throws UnsupportedFormatException {
+		//exportPerturbedCRN({file=>outputfileName.ode,from=>from,to=>to,step=>step})
+		
+		if(crn==null) {
+			CRNReducerCommandLine.println(out,bwOut,"No model loaded.");
+			return;
+		}
+		
+		ICRN crnToConsider=crn;
+		IPartition partitionToConsider=partition;
+		
+		if(!crnToConsider.isMassAction()){
+			CRNandPartition abc = MatlabODEPontryaginExporter.computeRNEncoding(crn, out, bwOut, partition,true);
+			crnToConsider=abc.getCRN();
+			partitionToConsider=abc.getPartition();
+			//CRNReducerCommandLine.println(out,bwOut,"This command should be invoked on mass-action reaction networks.");
+			//return;
+		}
+		
+		int from=0,to=30,step=5;
+	
+		ODEorNET crnGUIFormat = ODEorNET.RN;
+		
+		String fileName = null;
+		SupportedFormats format = null;
+		String parameters[] = CRNReducerCommandLine.getParameters(command);
+		boolean rnEncoding=false;
+		if(parameters==null){
+			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			return;
+		}
+		for (String parameter : parameters) {
+			if(parameter.equals("")){
+				continue;
+			}
+			else if(parameter.startsWith("fileOut=>")){
+				if(parameter.length()<="fileOut=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				fileName = parameter.substring("fileOut=>".length(), parameter.length());
+				format = (fromGUI)?SupportedFormats.CRNGUI:SupportedFormats.CRN;
+				/*writeCRN(fileName,crn,partition,format,"","",out,bwOut);
+				break;*/
+			}
+			else if(parameter.startsWith("from=>")){
+				if(parameter.length()<="from=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the minimum perturbation. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				from = Integer.valueOf(parameter.substring("from=>".length(), parameter.length()));
+			}
+			else if(parameter.startsWith("to=>")){
+				if(parameter.length()<="to=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the maximum perturbation. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				to = Integer.valueOf(parameter.substring("to=>".length(), parameter.length()));
+			}
+			else if(parameter.startsWith("step=>")){
+				if(parameter.length()<="step=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the step to increase the perturbation. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				step = Integer.valueOf(parameter.substring("step=>".length(), parameter.length()));
+			}
+			else{
+				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameter+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+				return;
+			}
+		}
+		
+		if(fileName ==null || fileName.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		
+		int dot=fileName.lastIndexOf('.');
+		int sep=fileName.lastIndexOf(File.separator);
+		String ext="";
+		if(dot!=-1) {
+			if(dot>sep) {
+				ext=fileName.substring(dot);
+				fileName=AbstractImporter.overwriteExtensionIfEnabled(fileName, "", true);
+			}
+		}
+		
+		for(int maxPerturb=from;maxPerturb<= to;maxPerturb+=step) {
+			String fileNamePert=fileName+"_"+maxPerturb+ext;
+			ICRN perturbedCRN;
+			try {
+				perturbedCRN=RandomBNG.createRndPerturbedCopy(crnToConsider, out, bwOut, maxPerturb);
+			} catch (IOException e) {
+				CRNReducerCommandLine.println(out,bwOut,"Problems in perturbing the CRN. I terminate.");
+				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+				e.printStackTrace();
+				return;
+			}
+			writeCRN(fileNamePert,perturbedCRN,partitionToConsider,format,null,"",null,out,bwOut,crnGUIFormat,rnEncoding,null,false,false);
+		}
+		
+		
 	}
 	
 	private void handleWriteCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws UnsupportedFormatException {
@@ -7524,7 +7710,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				String problem;
 				for(int i=0;i<allFiles.length;i++) {
 					String current = foldIn.getAbsolutePath()+File.separator+allFiles[i];
-					if(allFiles[i].toLowerCase().endsWith(".xml")) {
+					if(allFiles[i].toLowerCase().endsWith(".xml") || allFiles[i].toLowerCase().endsWith(".sbml")) {
 						boolean failed=false;
 						boolean fba=false;
 						boolean nonIntStoich=false;
@@ -7773,6 +7959,9 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		String prePartitionWRTVIEWS="false";
 		String computeOnlyPartition="false";
 		String prePartitionUserDefined="false";
+		String prePartitionOutputs="false";
+		String prePartitionOutputsSingleton="false";
+		String certainConstants="true";
 		String epsilonString = "0";
 		String deltaString = "0";
 		String modelWithBigM=null;//for UCTMCfe
@@ -7782,8 +7971,13 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		boolean 	halveRatesOfHomeoReactions = false;
 		String csvFile=null;
 		
+		HowToComputeMm hotToComputeMm=HowToComputeMm.PERCEPSCLOSURE;
 		double percentagePertCoRN=-1;
 		double absolutePertCoRN=-1;
+		double percentageClosureCoRN=-1;
+		double absoluteClosureCoRN=-1;
+		double lowerBoundFactorCoRN=-1;
+		double upperBoundFactorCoRN=-1;
 		
 		/*if(reduction.equalsIgnoreCase("EFL")||reduction.equalsIgnoreCase("BDE")||reduction.equalsIgnoreCase("BB")||reduction.equalsIgnoreCase("NBB")){
 			prePartitionWRTIC="true";
@@ -7866,6 +8060,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					return null;
 				}
 				percentagePertCoRN = Double.valueOf(parameters[p].substring("percentagePerturbation=>".length(), parameters[p].length()));
+				hotToComputeMm=HowToComputeMm.PERCPERT;
 			}
 			else if(parameters[p].startsWith("absolutePerturbation=>")){
 				if(parameters[p].length()<="absolutePerturbation=>".length()){
@@ -7874,7 +8069,53 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					return null;
 				}
 				absolutePertCoRN = Double.valueOf(parameters[p].substring("absolutePerturbation=>".length(), parameters[p].length()));
+				hotToComputeMm=HowToComputeMm.ABSPERT;
 			}
+			else if(parameters[p].startsWith("percentageClosure=>")){
+				if(parameters[p].length()<="percentageClosure=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the percentage value of epsilon to compute the closure or reaction dynamics for CoRN. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				percentageClosureCoRN = Double.valueOf(parameters[p].substring("percentageClosure=>".length(), parameters[p].length()));
+				hotToComputeMm=HowToComputeMm.PERCEPSCLOSURE;
+			}
+			else if(parameters[p].startsWith("absoluteClosure=>")){
+				if(parameters[p].length()<="absoluteClosure=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the absolute value of epsilon to compute the closure or reaction dynamics for CoRN. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				absoluteClosureCoRN = Double.valueOf(parameters[p].substring("absoluteClosure=>".length(), parameters[p].length()));
+				hotToComputeMm=HowToComputeMm.ABSEPSCLOSURE;
+			}
+			else if(parameters[p].startsWith("lowerFactor=>")){
+				if(parameters[p].length()<="lowerFactor=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the factor by which multiplying the rate to get the lower bounds for CoRN. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				lowerBoundFactorCoRN = Double.valueOf(parameters[p].substring("lowerFactor=>".length(), parameters[p].length()));
+				hotToComputeMm=HowToComputeMm.LowerUpperBoundRatios;
+			}
+			else if(parameters[p].startsWith("upperFactor=>")){
+				if(parameters[p].length()<="upperFactor=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the factor by which multiplying the rate to get the upper bounds for CoRN. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				upperBoundFactorCoRN = Double.valueOf(parameters[p].substring("upperFactor=>".length(), parameters[p].length()));
+				hotToComputeMm=HowToComputeMm.LowerUpperBoundRatios;
+			}
+			else if(parameters[p].startsWith("certainConstants=>")){
+				if(parameters[p].length()<="certainConstants=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify whether the constants should be considered certain (true) or uncertain (false). ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				certainConstants=parameters[p].substring("certainConstants=>".length(), parameters[p].length());
+			}
+			
 			else if(parameters[p].startsWith("delta=>")){
 				if(parameters[p].length()<="delta=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify the delta value. ");
@@ -7988,6 +8229,20 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					prePartitionWRTIC = "false";
 					prePartitionUserDefined = "true";
 				}
+				else if(prep.compareToIgnoreCase("Outputs")==0){
+					prePartitionWRTVIEWS = "false";
+					prePartitionWRTIC = "false";
+					prePartitionUserDefined = "false";
+					prePartitionOutputs = "true";
+					prePartitionOutputsSingleton = "false";
+				}
+				else if(prep.compareToIgnoreCase("Outputs_singleton")==0){
+					prePartitionWRTVIEWS = "false";
+					prePartitionWRTIC = "false";
+					prePartitionUserDefined = "false";
+					prePartitionOutputs = "false";
+					prePartitionOutputsSingleton = "true";
+				}
 				else if(prep.compareToIgnoreCase("USER_and_IC")==0){
 					prePartitionWRTVIEWS = "false";
 					prePartitionWRTIC = "true";
@@ -8087,7 +8342,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					}
 					initial = initialPartitionAfterSplittingAlgebraic;
 				}
-
+				
 				//Split blocks of user partition separating algebraic and non-algebraic variables
 				if(prePartitionUserDefined!=null && prePartitionUserDefined.equalsIgnoreCase("true")){
 					ArrayList<HashSet<ISpecies>> userDefinedPartitionAfterSplittingAlgebraic = new ArrayList<>(userDefinedPartition.size());
@@ -8179,6 +8434,40 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Prepartitioning failed: only views which only sum species (e.g., \"s1 + s2\") are supported.",true,DialogType.Error);
 					//CRNReducerCommandLine.println(out,bwOut," FAILED: the views do not allow it.");
 				}
+			}
+		}
+		else if(prePartitionOutputs!=null && prePartitionOutputs.equalsIgnoreCase("true")) {
+			if(print){
+				CRNReducerCommandLine.print(out,bwOut,"Prepartinioning with one block for all outputs...");
+			}
+			long begin = System.currentTimeMillis();
+			HashSet<ISpecies> possibleOutputs = BoolCubeImporter.computePossibleOutputs(crnToConsider);
+			ArrayList<HashSet<ISpecies>> possibleOutputsPartition = new ArrayList<>(1);
+			possibleOutputsPartition.add(possibleOutputs);
+			initial = CRNBisimulationsNAry.prepartitionUserDefined(crnToConsider.getSpecies(), possibleOutputsPartition, false, out, bwOut, terminator);
+			long end = System.currentTimeMillis();
+			if(print){
+				//CRNReducerCommandLine.println(out,bwOut," completed. The "+crn.getSpecies().size()+" species have been prepartitioned in "+initial.size()+" blocks. Time necessary: "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)");
+				CRNReducerCommandLine.println(out,bwOut," completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".\n\tThe "+crnToConsider.getSpecies().size()+" "+((crnToConsider.getMdelDefKind().equals(ODEorNET.ODE))?"variables":"species")+" have been prepartitioned in "+ blockOrBlocks(initial.size()));
+			}
+		}
+		else if(prePartitionOutputsSingleton!=null && prePartitionOutputsSingleton.equalsIgnoreCase("true")) {
+			if(print){
+				CRNReducerCommandLine.print(out,bwOut,"Prepartinioning with one per output...");
+			}
+			long begin = System.currentTimeMillis();
+			HashSet<ISpecies> possibleOutputs = BoolCubeImporter.computePossibleOutputs(crnToConsider);
+			ArrayList<HashSet<ISpecies>> possibleOutputsPartition = new ArrayList<>(possibleOutputs.size());
+			for(ISpecies output : possibleOutputs) {
+				HashSet<ISpecies> current = new LinkedHashSet<ISpecies>(1);
+				current.add(output);
+				possibleOutputsPartition.add(current);
+			}
+			initial = CRNBisimulationsNAry.prepartitionUserDefined(crnToConsider.getSpecies(), possibleOutputsPartition, false, out, bwOut, terminator);
+			long end = System.currentTimeMillis();
+			if(print){
+				//CRNReducerCommandLine.println(out,bwOut," completed. The "+crn.getSpecies().size()+" species have been prepartitioned in "+initial.size()+" blocks. Time necessary: "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)");
+				CRNReducerCommandLine.println(out,bwOut," completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".\n\tThe "+crnToConsider.getSpecies().size()+" "+((crnToConsider.getMdelDefKind().equals(ODEorNET.ODE))?"variables":"species")+" have been prepartitioned in "+ blockOrBlocks(initial.size()));
 			}
 		}
 		else {
@@ -8277,6 +8566,8 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		
 		IPartition obtainedPartitionOfParams = null;
 		
+		LinkedHashMap<String, String> extraColumnsForCSV=new LinkedHashMap<>(3);
+		
 		//Compute the partition
 		long begin = System.currentTimeMillis();
 		boolean succeeded=true;
@@ -8294,9 +8585,10 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				//labels = crn.computeUnaryBinaryLabels();
 				obtainedPartitionAndBool = CRNBisimulations.computeCoarsest(Reduction.FB,crnToConsider, initial, verbose,out,bwOut,print,terminator);
 			}
-			//N-ary FB which characterizes OFL. JCAM/PNAS
+			//N-ary FB which characterizes OFL. PNAS
 			else if(reduction.equalsIgnoreCase("FE")){
-				obtainedPartitionAndBool = CRNBisimulationsNAry.computeCoarsest(Reduction.FE,crnToConsider, initial, verbose,out,bwOut,terminator,messageDialogShower); 
+				obtainedPartitionAndBool = CRNBisimulationsNAry.computeCoarsest(Reduction.FE,crnToConsider, initial, verbose,out,bwOut,terminator,messageDialogShower);
+				//CORN_LumpabilityForControlRN.driverNodes_dn(out, bwOut, extraColumnsForCSV, obtainedPartitionAndBool.getPartition());
 			}
 			else if(reduction.equalsIgnoreCase("UCTMCFE")){
 				
@@ -8362,7 +8654,9 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			{
 				//Control FE for Uncertain MAR-RN
 				CORN_LumpabilityForControlRN CoRN = new CORN_LumpabilityForControlRN();
-				obtainedPartitionAndBool =CoRN.computeCoarsest(crnToConsider, initial, verbose, out, bwOut, terminator, messageDialogShower,percentagePertCoRN,absolutePertCoRN);
+				obtainedPartitionAndBool =CoRN.computeCoarsest(crnToConsider, initial, verbose, out, bwOut, terminator, messageDialogShower,
+						percentagePertCoRN,absolutePertCoRN,percentageClosureCoRN,absoluteClosureCoRN,lowerBoundFactorCoRN,upperBoundFactorCoRN,
+						hotToComputeMm,certainConstants.equalsIgnoreCase("true"),extraColumnsForCSV);
 			}
 			//2-to-2 Bisimulation for Exact CTMC lumpability
 			else //if(reduction.equalsIgnoreCase("EMSB"))
@@ -8519,7 +8813,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					partitionInfoFileName, groupedFileName, sameICFileName, csvSMTTimeFileName, typeOfGroupedFile,
 					computeOnlyPartition, csvFile, print, sumReductionAlgorithm, writeReducedCRN, writeGroupedCRN,
 					writeSameICCRN, crnToConsider, initial, originalCRNShort, obtainedPartition, cp, icWarning,
-					reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, begin, smtTime, end);
+					reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, begin, smtTime, end,extraColumnsForCSV);
 		}
 		else {
 			//MessageConsoleStream out, BufferedWriter bwOut, String csvFile, ICRN crn, String reduction, long timeInMS,int initPartitionSize
@@ -8542,7 +8836,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			boolean writeGroupedCRN, boolean writeSameICCRN, ICRN crnToConsider, IPartition initial,
 			String originalCRNShort, IPartition obtainedPartition, CRNandPartition cp, String icWarning,
 			String reductionName, String reducedModelName, List<Double> smtChecksTime,
-			IPartition obtainedPartitionOfParams, long begin, String smtTime, long end)
+			IPartition obtainedPartitionOfParams, long begin, String smtTime, long end, LinkedHashMap<String, String> extraColumnsForCSV)
 			throws UnsupportedFormatException, IOException {
 		String reducedCRNShort;
 		/*
@@ -8740,7 +9034,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			}
 		}
 		
-		writeReductionInfoInCSVFile(out, bwOut, csvFile, infoReduction);
+		writeReductionInfoInCSVFile(out, bwOut, csvFile, infoReduction,extraColumnsForCSV);
 	}
 	
 	
@@ -8778,7 +9072,10 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		writeCRN(fileName, crnToWrite, partitionToWrite, format, groupAccordingToCurrentPartition, assignSameICToBlocks, preambleCommentLines, icComment, furtherParameters, out, bwOut, crnGUIFormat,rnEncoding, paramsToCurry, messageDialogShower, false,originalNames);
 	}
 	
-	private static void writeCRN(String fileName, ICRN crnToWrite, IPartition partitionToWrite, SupportedFormats format,boolean groupAccordingToCurrentPartition, boolean assignSameICToBlocks, Collection<String> preambleCommentLines, String icComment, List<String> furtherParameters, MessageConsoleStream out, BufferedWriter bwOut, ODEorNET crnGUIFormat,boolean rnEncoding, LinkedHashSet<String> paramsToCurry, IMessageDialogShower messageDialogShower, boolean deterministicCorrection, boolean originalNames) throws UnsupportedFormatException{
+	private static void writeCRN(String fileName, ICRN crnToWrite, IPartition partitionToWrite, SupportedFormats format,
+			boolean groupAccordingToCurrentPartition, boolean assignSameICToBlocks, Collection<String> preambleCommentLines,
+			String icComment, List<String> furtherParameters, MessageConsoleStream out, BufferedWriter bwOut, ODEorNET crnGUIFormat,
+			boolean rnEncoding, LinkedHashSet<String> paramsToCurry, IMessageDialogShower messageDialogShower, boolean deterministicCorrection, boolean originalNames) throws UnsupportedFormatException{
 		//fileName = fileName.rec place('-', '_').replace(" ", "");
 		if(crnToWrite==null){
 			//CRNReducerCommandLine.println(out,bwOut,"Before writing a model in a file it is necessary to load it. "); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");

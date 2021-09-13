@@ -80,6 +80,8 @@ function epsForMaxError(erodeMatlabScript,csvFile,max_allowed_slopes,tEnd)
             fprintf('Computed epsCLump at (%s): nRows=%d, epslion=%d, error=%d, max_allowed_error=%d\n',datestr(now,'HH:MM:SS.FFF'),nRows,epsilon,err,max_allowed_error);
             if(epsilon == 0)
                 clump_nRows=nRows;
+                fprintf('The matrix by exact CLump')
+                M
             end
             
             current_eps=epsilon;
@@ -139,6 +141,8 @@ function epsForMaxError(erodeMatlabScript,csvFile,max_allowed_slopes,tEnd)
 		[et,perc_et,normM_xt]=solve_and_compute_error(chosen_M,driftName,[0 tEnd],x0,M0,chosen_epsilon,max_allowed_slope_percentage);
         
         fprintf('The error computation terminated at (%s) with et=%d, perc_et=%d\n',datestr(now,'HH:MM:SS.FFF'),et,perc_et)
+        fprintf('The chosen M\n')
+        chosen_M
         
         addCaption=0;
         if ~isfile(csvFile)

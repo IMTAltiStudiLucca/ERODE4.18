@@ -891,7 +891,7 @@ public class MatlabODEPontryaginExporter {
 		if(print) {
 			CRNReducerCommandLine.print(out, bwOut, " ( converting the ODEs in reaction network form ... ");
 		}
-		
+		String errorMessage="";
 		ISpecies I = new Species(Species.I_SPECIESNAME, null, crn.getSpecies().size(), BigDecimal.ONE, "1",false);
 		
 		ICRN polynomialCRN = new CRN(crn.getName(), crn.getSymbolicParameters(), crn.getConstraints(), crn.getParameters(), crn.getMath(), out, bwOut);
@@ -939,9 +939,11 @@ public class MatlabODEPontryaginExporter {
 				}
 				catch(UnsupportedReactionNetworkEncodingException e){
 					computeRNEncoding=false;
+					errorMessage=e.getMessage();
 					break;
 				} catch (IOException e) {
 					computeRNEncoding=false;
+					errorMessage=e.getMessage();
 					break;
 				}
 				
@@ -957,7 +959,7 @@ public class MatlabODEPontryaginExporter {
 			if(print) {
 				CRNReducerCommandLine.println(out,bwOut, "). ");
 			}
-			CRNReducerCommandLine.print(out,bwOut, "\tThe model cannot be encoded as a mass action reaction network.");
+			CRNReducerCommandLine.print(out,bwOut, "\tThe model cannot be encoded as a mass action reaction network:\n  "+errorMessage);
 			return null;
 		}
 		else{
