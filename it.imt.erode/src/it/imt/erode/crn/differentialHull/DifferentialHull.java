@@ -94,10 +94,23 @@ public class DifferentialHull {
 					StringBuilder driftOverline = speciesToOverlineDrift.get(species);
 					StringBuilder driftUnderline = speciesToUnderlineDrift.get(species);
 					mult = Math.abs(mult);
+					//BEGIN FIX! I was apply the abs only to the bigdecimal and not to the expression
+					String rateExpr=reaction.getRateExpression();
+					if(rate.compareTo(BigDecimal.ZERO)<0) {
+						if(rateExpr.startsWith("-") && (!rateExpr.contains("+")) && (!rateExpr.substring(1).contains("-")) ) {
+							rateExpr=rateExpr.substring(1);//"-("+rateExpr+")";
+						}
+						else {
+							rateExpr="-("+rateExpr+")";
+						}
+						
+					}
+					//END FIX!
 					rate = rate.abs();
 					
-					String firingRateOverline = computeRateExpression(reaction.getRateExpression(),positive,true,paramNameToEvaluatedParameter) +"*";
-					String firingRateUnderline = computeRateExpression(reaction.getRateExpression(),positive,false,paramNameToEvaluatedParameter)+"*";
+					
+					String firingRateOverline = computeRateExpression(rateExpr,positive,true,paramNameToEvaluatedParameter) +"*";
+					String firingRateUnderline = computeRateExpression(rateExpr,positive,false,paramNameToEvaluatedParameter)+"*";
 					
 					
 					if(positive){
