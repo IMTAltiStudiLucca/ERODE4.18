@@ -98,6 +98,8 @@ public class DifferentialHull {
 					
 					String firingRateOverline = computeRateExpression(reaction.getRateExpression(),positive,true,paramNameToEvaluatedParameter) +"*";
 					String firingRateUnderline = computeRateExpression(reaction.getRateExpression(),positive,false,paramNameToEvaluatedParameter)+"*";
+					
+					
 					if(positive){
 						firingRateOverline  += reaction.getReagents().getMassActionExpression(false,"o",ignoreI);
 						firingRateUnderline += reaction.getReagents().getMassActionExpression(false,"u",ignoreI);
@@ -156,6 +158,12 @@ public class DifferentialHull {
 			}
 			if(speciesToOverlineNegativeDrift.get(species)!=null){
 				oRate = oRate + "-("+speciesToOverlineNegativeDrift.get(species)+")";
+//				if(oRate.equals("")) {
+//				 oRate = oRate + "("+speciesToOverlineNegativeDrift.get(species)+")";
+//				}
+//				else {
+//				 oRate = oRate + "+("+speciesToOverlineNegativeDrift.get(species)+")";
+//				}
 			}
 			if(!oRate.equals("")){
 				ISpecies oSpecies =speciesToOverline.get(species);
@@ -169,6 +177,12 @@ public class DifferentialHull {
 			}
 			if(speciesToUnderlineNegativeDrift.get(species)!=null){
 				uRate = uRate + "-("+speciesToUnderlineNegativeDrift.get(species)+")";
+//				if(uRate.equals("")) {
+//					uRate = uRate + "("+speciesToUnderlineNegativeDrift.get(species)+")";
+//				}
+//				else {
+//					uRate = uRate + "+("+speciesToUnderlineNegativeDrift.get(species)+")";					
+//				}
 			}
 			if(!uRate.equals("")){
 				ISpecies uSpecies =speciesToUnderline.get(species);
