@@ -694,8 +694,8 @@ public class Composite implements IComposite
 					sb.append("1");
 				}
 				else{
-					sb.append(pref);
-					String name =withAlphaNumericNames?species.getNameAlphanumeric():species.getName(); 
+					//sb.append(pref);
+					String name =pref+(withAlphaNumericNames?species.getNameAlphanumeric():species.getName()); 
 					sb.append(name);
 					for(int m=1;m<multiplicity;m++){
 						sb.append("*"+name);
