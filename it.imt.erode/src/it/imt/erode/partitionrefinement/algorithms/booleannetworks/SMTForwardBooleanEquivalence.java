@@ -786,10 +786,15 @@ public class SMTForwardBooleanEquivalence {
 			ISpecies reducedSpecies;
 			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, ic,/*currentBlock.computeBlockConcentrationExpr()*/icExpr,blockRepresentative.isAlgebraic());
 			reducedBN.addSpecies(reducedSpecies);
-
+			
 			reducedSpecies.addCommentLines(currentBlock.computeBlockComment());
 			correspondenceBlock_ReducedSpecies.put(currentBlock, reducedSpecies);
-
+		}
+		
+		for( Entry<IBlock, ISpecies> entry : correspondenceBlock_ReducedSpecies.entrySet()) {
+			IBlock currentBlock=entry.getKey();
+			//ISpecies reducedSpecies=entry.getValue();
+			
 			IUpdateFunction sum =computeUpdateFunctionSumPreservingRepresentative(bn,currentBlock,op,partition, correspondenceBlock_ReducedSpecies, speciesNameToSpecies,aggregationFunction);
 			if(simplify) {
 				BoolExpr z3Sum = sum.toZ3(ctx, speciesNameToSpecies, speciesToODENames);
@@ -800,12 +805,48 @@ public class SMTForwardBooleanEquivalence {
 			else {
 				correspondenceBlock_sumOfUpdateFunctions.put(currentBlock, sum);
 			}
-
-			/*
-			currentBlock=currentBlock.getNext();
-			i++;
-			 */
 		}
+		
+//		for(int i=0;i<representativeSpecies.length;i++) {
+//			if(Terminator.hasToTerminate(terminator)){
+//				break;
+//			}
+//			ISpecies blockRepresentative = representativeSpecies[i];
+//			IBlock currentBlock = partition.getBlockOf(blockRepresentative);
+//			/*
+//			ISpecies blockRepresentative = currentBlock.getRepresentative(CRNReducerCommandLine.COMPUTEREPRESENTATIVEBYMINOUTSIDEPARTITIONREFINEMENT);
+//			 */
+//			String nameRep=blockRepresentative.getName();
+//			BigDecimal ic = currentBlock.getBlockConcentration();
+//			String icExpr="false";
+//			if(ic.compareTo(BigDecimal.ZERO)>0) {
+//				ic=BigDecimal.ONE;
+//				icExpr="true";
+//			}
+//
+//			ISpecies reducedSpecies;
+//			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, ic,/*currentBlock.computeBlockConcentrationExpr()*/icExpr,blockRepresentative.isAlgebraic());
+//			reducedBN.addSpecies(reducedSpecies);
+//
+//			reducedSpecies.addCommentLines(currentBlock.computeBlockComment());
+//			correspondenceBlock_ReducedSpecies.put(currentBlock, reducedSpecies);
+//
+//			IUpdateFunction sum =computeUpdateFunctionSumPreservingRepresentative(bn,currentBlock,op,partition, correspondenceBlock_ReducedSpecies, speciesNameToSpecies,aggregationFunction);
+//			if(simplify) {
+//				BoolExpr z3Sum = sum.toZ3(ctx, speciesNameToSpecies, speciesToODENames);
+//				BoolExpr z3SumSimpl=(BoolExpr)z3Sum.simplify();
+//				IUpdateFunction sumSimplified=compiler.toUpdateFunction(z3SumSimpl);
+//				correspondenceBlock_sumOfUpdateFunctions.put(currentBlock, sumSimplified);
+//			}
+//			else {
+//				correspondenceBlock_sumOfUpdateFunctions.put(currentBlock, sum);
+//			}
+//
+//			/*
+//			currentBlock=currentBlock.getNext();
+//			i++;
+//			 */
+//		}
 
 
 
