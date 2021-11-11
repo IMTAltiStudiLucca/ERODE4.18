@@ -7,11 +7,11 @@ import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
 import com.microsoft.z3.Z3Exception;
 
-import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.crn.symbolic.constraints.BooleanConnector;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
+import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
 
 public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 
@@ -62,21 +62,21 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 	}
 
 	@Override
-	public BoolExpr toZ3(Context ctx, IBooleanNetwork booleanNetwork, HashMap<String, ISpecies> nodeNameToNode,
+	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
 			HashMap<ISpecies, BoolExpr> nodeToTruthValue) throws Z3Exception {
 		switch (op) {
 		case AND:
-			return ctx.mkAnd(new BoolExpr[] {first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue)});
+			return ctx.mkAnd(new BoolExpr[] {first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
 		case IMPLIES:
-			return ctx.mkImplies(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue));
+			return ctx.mkImplies(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
 		case OR:
-			return ctx.mkOr(new BoolExpr[] {first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue)});
+			return ctx.mkOr(new BoolExpr[] {first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
 		case XOR:
-			return ctx.mkXor(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue));
+			return ctx.mkXor(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
 		case EQ:
-			return ctx.mkEq(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue));
+			return ctx.mkEq(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
 		case NEQ:
-			return ctx.mkNot(ctx.mkEq(first.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,booleanNetwork,nodeNameToNode,nodeToTruthValue)));						
+			return ctx.mkNot(ctx.mkEq(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)));						
 		default:
 			throw new UnsupportedOperationException(op.toString());
 		}
@@ -87,6 +87,15 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,HashMap<String, ISpecies> speciesNameToOriginalSpecies) {
 		IUpdateFunction firstCloned = first.cloneReplacingWithRepresentative(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies);
 		IUpdateFunction secondCloned = second.cloneReplacingWithRepresentative(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies);
+		return new BooleanUpdateFunctionExpr(firstCloned, secondCloned, op);
+	}
+
+	@Override
+	public IUpdateFunction cloneReplacingNorRepresentativeWithNeutral(IPartition partition,
+			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
+			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction) {
+		IUpdateFunction firstCloned = first.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
+		IUpdateFunction secondCloned = second.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
 		return new BooleanUpdateFunctionExpr(firstCloned, secondCloned, op);
 	}
 }

@@ -257,20 +257,20 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 	 * }
 	 * }
 	 */
-	@Check
-	public void checkDecName(final Species ps) {
-		String name = ps.getName().trim();
-		String lowerName = name.toLowerCase();
-		boolean _startsWith = lowerName.startsWith("dec");
-		if (_startsWith) {
-			if ((((((((((lowerName.startsWith("dec0") || lowerName.startsWith("dec1")) || lowerName.startsWith("dec2")) || lowerName.startsWith("dec3")) || 
-					lowerName.startsWith("dec4")) || lowerName.startsWith("dec5")) || lowerName.startsWith("dec6")) || lowerName.startsWith("dec7")) || 
-					lowerName.startsWith("dec8")) || lowerName.startsWith("dec9"))) {
-				this.warning("The use of \"Dec\" followed by a number as name of species is deprecated", 
-						ChemicalReactionNetworkPackage.eINSTANCE.getSpeciesOrNode_Name(), ChemicalReactionNetworkValidator.DEC_NAME);
-			}
-		}
-	}
+//	@Check
+//	public void checkDecName(final Species ps) {
+//		String name = ps.getName().trim();
+//		String lowerName = name.toLowerCase();
+//		boolean _startsWith = lowerName.startsWith("dec");
+//		if (_startsWith) {
+//			if ((((((((((lowerName.startsWith("dec0") || lowerName.startsWith("dec1")) || lowerName.startsWith("dec2")) || lowerName.startsWith("dec3")) || 
+//					lowerName.startsWith("dec4")) || lowerName.startsWith("dec5")) || lowerName.startsWith("dec6")) || lowerName.startsWith("dec7")) || 
+//					lowerName.startsWith("dec8")) || lowerName.startsWith("dec9"))) {
+//				this.warning("The use of \"Dec\" followed by a number as name of species is deprecated", 
+//						ChemicalReactionNetworkPackage.eINSTANCE.getSpeciesOrNode_Name(), ChemicalReactionNetworkValidator.DEC_NAME);
+//			}
+//		}
+//	}
 
 	@Check
 	public void checkDecoder(final decompress elem) {

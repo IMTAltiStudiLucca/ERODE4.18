@@ -42,8 +42,12 @@ import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
 
 public class SMTOrdinaryFluidBisimilarityBinary {
-
+	
+	private static final boolean IMPOSEpositivePopulationsAssertion=false;
+	
+	
 	private HashMap<String, String> cfg;
+	
 	private BoolExpr positivePopulationsAssertion;
 	private BoolExpr allConstraintAssertion;
 	private Context ctx;
@@ -355,14 +359,17 @@ public class SMTOrdinaryFluidBisimilarityBinary {
 					swappedSum =  (ArithExpr)swappedSum.substitute(redistributorApp, ctx.mkMul(new ArithExpr[]{oneMinusRedistributor,sumOfThetwo}));
 					swappedSum=(ArithExpr)swappedSum.simplify();
 					solver.reset();
-					solver.add(positivePopulationsAssertion);
+					if(IMPOSEpositivePopulationsAssertion) {
+						solver.add(positivePopulationsAssertion);
+					}
 					solver.add(allConstraintAssertion);
+					//TODO: test: what happens if I don't specify the value for the redistributor s?
 					solver.add(ctx.mkEq(redistributor, ctx.mkReal("0.5")));
 					solver.add(ctx.mkNot(ctx.mkEq(cumulativeODEsOfCSB, swappedSum)));
 					
 					totalInnerIteration++;
 					System.out.print(totalInnerIteration +" ");
-					if(totalInnerIteration%100==0) {
+					if(totalInnerIteration%50==0) {
 						System.out.println();
 					}
 					if(totalInnerIteration==MAXINNERITERATIONS) {
@@ -467,7 +474,8 @@ public class SMTOrdinaryFluidBisimilarityBinary {
 					}
 					
 					solver.reset();
-					solver.add(positivePopulationsAssertion);
+					if(IMPOSEpositivePopulationsAssertion)
+						solver.add(positivePopulationsAssertion);
 					solver.add(allConstraintAssertion);
 					solver.add(ctx.mkEq(redistributor, ctx.mkReal("0.5")));
 					solver.add(ctx.mkNot(ctx.mkAnd(conditionForEachSplitter)));
@@ -594,7 +602,8 @@ public class SMTOrdinaryFluidBisimilarityBinary {
 			s++;
 			speciesToODEsDef.put(species, zero);
 		}
-		positivePopulationsAssertion = ctx.mkAnd(positivePopulationAssertions);
+		if(IMPOSEpositivePopulationsAssertion)
+			positivePopulationsAssertion = ctx.mkAnd(positivePopulationAssertions);
 
 		symbParNameToSymbParZ3 = new HashMap<>(crn.getSymbolicParameters().size());
 		for(String symbPar : crn.getSymbolicParameters()){
@@ -610,7 +619,8 @@ public class SMTOrdinaryFluidBisimilarityBinary {
 		}
 		allConstraintAssertion = ctx.mkAnd(constraintAssertions);
 		
-		solver.add(positivePopulationAssertions);
+		if(IMPOSEpositivePopulationsAssertion)
+			solver.add(positivePopulationsAssertion);//solver.add(positivePopulationAssertions);
 		solver.add(allConstraintAssertion);
 		Status status = solver.check();
 		if(status==Status.UNKNOWN){
@@ -937,7 +947,7 @@ public class SMTOrdinaryFluidBisimilarityBinary {
 				addSpeciesInvolvedInTheReaction(reaction.getProducts().getAllSpecies(i), reaction.getReagents().getAllSpecies(0));
 			}
 		}
-		else{
+		else if(reaction.getReagents().getNumberOfDifferentSpecies()==2){
 			//Two distinct reagents
 			addSpeciesInvolvedInTheReaction(reaction.getReagents().getAllSpecies(0),reaction.getReagents().getAllSpecies(0));
 			addSpeciesInvolvedInTheReaction(reaction.getReagents().getAllSpecies(0),reaction.getReagents().getAllSpecies(1));
@@ -947,6 +957,30 @@ public class SMTOrdinaryFluidBisimilarityBinary {
 				addSpeciesInvolvedInTheReaction(reaction.getProducts().getAllSpecies(i), reaction.getReagents().getAllSpecies(0));
 				addSpeciesInvolvedInTheReaction(reaction.getProducts().getAllSpecies(i), reaction.getReagents().getAllSpecies(1));
 			}
+		}
+		else {
+			//TODO: check, added on 28/10/2021
+			//N-ary distinct reagents
+			IComposite reagents = reaction.getReagents();
+			for(int r=0;r<reagents.getNumberOfDifferentSpecies();r++) {
+				for(int r2=0;r2<reagents.getNumberOfDifferentSpecies();r2++) {
+					addSpeciesInvolvedInTheReaction(reaction.getReagents().getAllSpecies(r),reaction.getReagents().getAllSpecies(r2));
+				}
+			}
+//			addSpeciesInvolvedInTheReaction(reaction.getReagents().getAllSpecies(0),reaction.getReagents().getAllSpecies(0));
+//			addSpeciesInvolvedInTheReaction(reaction.getReagents().getAllSpecies(0),reaction.getReagents().getAllSpecies(1));
+//			addSpeciesInvolvedInTheReaction(reaction.getReagents().getAllSpecies(1),reaction.getReagents().getAllSpecies(0));
+//			addSpeciesInvolvedInTheReaction(reaction.getReagents().getAllSpecies(1),reaction.getReagents().getAllSpecies(1));
+			
+			for(int i=0;i<reaction.getProducts().getNumberOfDifferentSpecies();i++){
+				for(int r2=0;r2<reagents.getNumberOfDifferentSpecies();r2++) {
+					addSpeciesInvolvedInTheReaction(reaction.getProducts().getAllSpecies(i), reaction.getReagents().getAllSpecies(r2));
+				}
+			}
+//			for(int i=0;i<reaction.getProducts().getNumberOfDifferentSpecies();i++){
+//				addSpeciesInvolvedInTheReaction(reaction.getProducts().getAllSpecies(i), reaction.getReagents().getAllSpecies(0));
+//				addSpeciesInvolvedInTheReaction(reaction.getProducts().getAllSpecies(i), reaction.getReagents().getAllSpecies(1));
+//			}
 		}
 		
 	}

@@ -99,7 +99,7 @@ public class SMTBackwardBooleanEquivalence {
 
 		
 		if(verbose){
-			CRNReducerCommandLine.println(out,bwOut,"Boolean BDE Reducing: "+bn.getName()+" using Microsoft z3");
+			CRNReducerCommandLine.println(out,bwOut,"Boolean Backward Reducing: "+bn.getName()+" using Microsoft z3");
 		}
 
 		IPartition obtainedPartition = partition.copy();
@@ -399,7 +399,7 @@ public class SMTBackwardBooleanEquivalence {
 		for (Entry<String, IUpdateFunction> entry : bn.getUpdateFunctions().entrySet()) {
 			ISpecies species = speciesNameToSpecies.get(entry.getKey());
 			IUpdateFunction updateFunction = entry.getValue();
-			BoolExpr updateFunctionZ3 = updateFunction.toZ3(ctx, bn, speciesNameToSpecies, speciesToPopulation);
+			BoolExpr updateFunctionZ3 = updateFunction.toZ3(ctx, /*bn,*/ speciesNameToSpecies, speciesToPopulation);
 			updateFunctionZ3=(BoolExpr)updateFunctionZ3.simplify();
 			speciesToODEsDef.put(species, updateFunctionZ3);
 			allODEsDefArray[j]=ctx.mkEq(speciesToODENames.get(species), updateFunctionZ3);

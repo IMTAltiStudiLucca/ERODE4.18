@@ -2554,6 +2554,18 @@ public class MyParserUtil {
 		if(!hasToReduce){
 			sb.append("computeOnlyPartition=>true,");
 		}
+		
+		if(red instanceof reduceFBE) {
+			String aggrFunc=((reduceFBE) red).getAggregationFunction();
+			sb.append("aggregationFunction=>");
+			sb.append(aggrFunc);
+			sb.append(',');
+			
+			boolean simplify=((reduceFBE) red).isSimplify();
+			sb.append("simplify=>"+simplify);
+			sb.append(',');
+		}
+		
 		if(sb.charAt(sb.length()-1)==','){
 			sb.deleteCharAt(sb.length()-1);
 		}

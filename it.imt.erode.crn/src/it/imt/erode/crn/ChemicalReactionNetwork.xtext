@@ -1956,7 +1956,7 @@ reduceBBE : {reduceBBE}
 ;
 
 reduceFBE : {reduceFBE}
-	'reduceFBE' '(' optionalParametersFormatted=FormattedOptionalParametersBooleanReductions ')'
+	'reduceFBE' '(' 'aggregationFunction' '=' aggregationFunction=('OR'|'AND') ',' 'simplify' '=' simplify=BooleanValue (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
 ;
 
 FormattedOptionalParametersBooleanReductions: {FormattedOptionalParametersBooleanReductions}

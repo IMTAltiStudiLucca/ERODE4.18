@@ -22,7 +22,9 @@ import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.CRNBisimulationsNAry;
 import it.imt.erode.partitionrefinement.algorithms.ExactFluidBisimilarity;
+import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.SMTBackwardBooleanEquivalence;
+import it.imt.erode.partitionrefinement.algorithms.booleannetworks.SMTForwardBooleanEquivalence;
 import it.imt.erode.simulation.output.DataOutputHandlerAbstract;
 
 public class BooleanNetworkCommandLine extends AbstractCommandLine {
@@ -220,6 +222,8 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			return null;
 		}
 		String computeOnlyPartition="false";
+		String simplify="false";
+		
 		//String reduction=null;
 		String reducedFileName=null;
 		String partitionInfoFileName=null;
@@ -228,6 +232,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 		//String computeOnlyPartition="false";
 		String prePartitionUserDefined="false";
 		String csvFile=null;
+		String aggregationFunction=null;
 
 		boolean print=true;
 		//boolean newReductionAlgorithm=false;
@@ -277,6 +282,14 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 				}
 				computeOnlyPartition = parameters[p].substring("computeOnlyPartition=>".length(), parameters[p].length());
 			}
+			else if(parameters[p].startsWith("simplify=>")){
+				if(parameters[p].length()<="simplify=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify if the reduced update functins should be simplified. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				simplify = parameters[p].substring("simplify=>".length(), parameters[p].length());
+			}
 			else if(parameters[p].startsWith("prePartition=>")){
 				if(parameters[p].length()<="prePartition=>".length()){
 					CRNReducerCommandLine.println(out,bwOut,"Please, specify if you want to prepartion the species of the model according to their initial conditions or to the views. ");
@@ -313,6 +326,14 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 				}
 				csvFile = parameters[p].substring("csvFile=>".length(), parameters[p].length());
 			}
+			else if(parameters[p].startsWith("aggregationFunction=>")){
+				if(parameters[p].length()<="aggregationFunction=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the aggregation function to use. It can be either OR or AND. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+				aggregationFunction = parameters[p].substring("aggregationFunction=>".length(), parameters[p].length());
+			}
 			else{
 				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
 				return null;
@@ -329,6 +350,22 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			CRNReducerCommandLine.println(out,bwOut,"Please, specify the reduction technique. ");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 			return null;
+		}
+		FBEAggregationFunctions aggr=null;
+		if(reduction.equals("FBE")) {
+			if(aggregationFunction==null || aggregationFunction.length()==0) {
+				CRNReducerCommandLine.println(out,bwOut,"Please, specify an aggregation function. ");
+				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+				return null;
+			}
+			else {
+				aggr= FBEAggregationFunctions.valueOf(aggregationFunction);
+				if(aggr==null) {
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify an aggregation function. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return null;
+				}
+			}
 		}
 
 		//groupedFileName = crn.getName()+"grouped.net";
@@ -407,6 +444,8 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 
 		List<Double> smtChecksTime = null;
 
+		SMTForwardBooleanEquivalence smtFBE =null;
+		
 		//Compute the partition
 		long begin = System.currentTimeMillis();
 		boolean succeeded=true;
@@ -419,19 +458,20 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			smtChecksTime=smtBBE.getSMTChecksSecondsAtStep();
 			smtBBE=null;
 		}
-		else if(reduction.equalsIgnoreCase("FBE")){
+		else if(reduction.equalsIgnoreCase("fbe")){
 			obtainedPartition=initial;
-			/*
+			
 			//Previous implementation of OFL reduction of POPL where we were not using the binary characterization, but we were using a counterexample-based apporach similar to the EFL case. It is not guaranteed to give the coarsest reduction (but we didn't find any model for which this happens). 
 			//SMTOrdinaryFluidBisimilarity9 smtOFL = new SMTOrdinaryFluidBisimilarity9();
 			//obtainedPartition = smtOFL.computeOFLsmt(crn, initial, verbose);			
-			SMTOrdinaryFluidBisimilarityBinary smtOFLBinary = new SMTOrdinaryFluidBisimilarityBinary();
-			PartitionAndString ps = smtOFLBinary.computeOFLsmt(crn, initial, verbose,out,bwOut,print,terminator); 
+			smtFBE = new SMTForwardBooleanEquivalence(aggr/*FBEAggregationFunctions.OR*/,simplify.equalsIgnoreCase("true"));
+			PartitionAndString ps = smtFBE.computeOFLsmt(bn, initial, CRNReducerCommandLine.verbose, out, bwOut, print, terminator);
+			 
 			obtainedPartition = ps.getPartition();
 			smtTime=ps.getString();
-			smtChecksTime=smtOFLBinary.getSMTChecksSecondsAtStep();
-			smtOFLBinary=null;
-			 */
+			smtChecksTime=smtFBE.getSMTChecksSecondsAtStep();
+			//smtFBE=null;
+			 
 		}
 		else{
 			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"The reduction techinque "+reduction+ " does not exist.",DialogType.Error);
@@ -521,6 +561,10 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 				begin = System.currentTimeMillis();
 				if(reduction.equalsIgnoreCase("bbe")) {
 					bp = SMTBackwardBooleanEquivalence.computeReducedBBE(bn, reducedModelName, obtainedPartition, "//", out, bwOut, terminator);
+				}
+				else if(reduction.equalsIgnoreCase("fbe")) {
+					bp = smtFBE.computeReducedFBE(bn, reducedModelName, obtainedPartition, "//",  out, bwOut, terminator, aggr);
+					smtFBE=null;
 				}
 
 				end = System.currentTimeMillis();
