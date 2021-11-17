@@ -66,6 +66,20 @@ ModelDefinition :
 		)
 	'end' 'Boolean' ('Network'|'network')	
 )
+|
+(	
+	'begin' 'Multivalued' 'Boolean' ('Network'|'network') name = ID ('[' 'logger' '=' log=BooleanValue ']')?
+		(
+			(
+				elements += MVNodeDeclarations
+				(elements += InitPartition)?
+				elements += MVNodeDefinitions
+				(elements += BooleanCommand)*
+			)
+			|  elements+=BooleanImportFolder
+		)
+	'end' 'Multivalued' 'Boolean' ('Network'|'network')	
+)
 ;
 
 ImportFolder:
@@ -74,11 +88,14 @@ ImportFolder:
 ;
 
 BooleanImportFolder:
-	importBNetFolder
+	importBNetFolder|importSBMLQualFolder
 ;
 importBNetFolder:
 	'importBNetFolder' '(' params = ParametersImportFolder ')'
 	//'importSBMLFolder' '(' 'folderIn' '=' folderIn = STRING ',' 'folderOut' '=' folderOut = STRING (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
+;
+importSBMLQualFolder:
+	'importSBMLQualFolder' '(' params = ParametersImportFolder ')'
 ;
 
 /*ModelDefinition:	
@@ -1806,6 +1823,148 @@ BooleanValue returns ecore::EBoolean: "true" | "false"/* |'0'|'1'*/;
 //terminal REAL returns ecore::EDouble: '-'? (INT '.' INT);
 
 
+//BEGIN Multi-Valued REGULATORY NETWORK
+MVNodeDeclarations : {MVNodeDeclarations} 
+  ('begin' 'init') 
+  	(allMVNodes += MVNode)*
+  ('end' 'init')
+;
+//A MV species and its (optional) initial value 
+MVNode:
+	name = ID (('[' ('max'?) max=NAT']')?) (('=' ic = (ZERO|NAT))?)  (('(' originalName = STRING ')')?)
+;
+
+MVNodeDefinitions: {MVNodeDefinitions}
+  ('begin' 'update' 'functions')		
+	(mvNodeDefinitions += MVNodeDefinition)*
+  ('end' 'update' 'functions')
+;
+MVNodeDefinition:  	
+  name = [MVNode] ('='|':'|',') updateFunction = ArithExprReferenceToMVNodeOrValue//SumMVUpdateFunctions//MVUpdateFunctionsSum
+;
+
+ArithExprReferenceToMVNodeOrValue returns ExprReferenceToMVNodeOrValue:
+	SumReferenceToMVNodeOrValue
+;
+
+SumReferenceToMVNodeOrValue returns ExprReferenceToMVNodeOrValue:
+	MulReferenceToMVNodeOrValue ({SumReferenceToMVNodeOrValue.left=current}  ('+') right=MulReferenceToMVNodeOrValue)* 
+;
+MulReferenceToMVNodeOrValue returns ExprReferenceToMVNodeOrValue:
+	//ReferenceToMVNodeOrValue ({MulReferenceToMVNodeOrValue.left=current}  ('*') right=ReferenceToMVNodeOrValue)* 
+	PrimaryExprRefNodeOrValue ({MulReferenceToMVNodeOrValue.left=current}  ('*') right=PrimaryExprRefNodeOrValue)*
+;
+PrimaryExprRefNodeOrValue  returns ExprReferenceToMVNodeOrValue:
+	ReferenceToMVNodeOrValue 
+	| MVUpdateFunctionByCases
+	|'(' ArithExprReferenceToMVNodeOrValue ')'
+;
+
+//MVUpdateFunctionsSum returns MVExpr: 
+//	MVUpdateFunctionsMul ({MVUpdateFunctionsSum.left=current}  ('+') right=MVUpdateFunctionsMul)* 
+//;
+//MVUpdateFunctionsMul returns MVExpr: 
+//	MVUpdateFunctions ({MVUpdateFunctionsMul.left=current}  ('*') right=MVUpdateFunctions)* 
+//;
+
+//MVUpdateFunctionsSum:{MVUpdateFunctionsSum}
+//	caseFunction+=MVUpdateFunctions ('+' caseFunction+=MVUpdateFunctions)*	
+//;
+
+//SumMVUpdateFunctions:
+//	MulMVUpdateFunctions ({SumMVUpdateFunctions.left=current}  ('+') right=MulMVUpdateFunctions)*
+//;
+//
+//MulMVUpdateFunctions:
+//	PrimaryMVUpdateFunctionsExpr ({MulMVUpdateFunctions.left=current}  ('*') right=PrimaryMVUpdateFunctionsExpr)*
+//;
+//
+//PrimaryMVUpdateFunctionsExpr:
+//	ArithExprReferenceToMVNodeOrValue
+//;
+
+MVUpdateFunctionByCases returns ExprReferenceToMVNodeOrValue: {MVUpdateFunctions}
+	//((
+	casesMV+=caseMV (',' (casesMV+=caseMV))*
+	//)|(MVUpdateFunction))
+;
+caseMV:
+	val = (ZERO|NAT) 
+		( ('if' aCaseMV = MVUpdateFunction)
+		 |
+		  'otherwise'
+		)
+;
+
+MVUpdateFunction returns MVExpr:
+	ImpliesMVExpr	
+;
+
+ImpliesMVExpr returns MVExpr: 
+	XorMVExpr ({ImpliesMVExpr.left=current}  ('implies'|'->') right=XorMVExpr)* 
+;
+XorMVExpr returns MVExpr: 
+	OrMVExpr ({XorMVExpr.left=current}  ('XOR') right=OrMVExpr)* 
+;
+OrMVExpr returns MVExpr: 
+	AndMVExpr ({OrMVExpr.left=current} ('or'|'|') right=AndMVExpr)* 
+;
+AndMVExpr returns MVExpr: 
+	PrimaryOrNotPrimaryMVExpr ({AndMVExpr.left=current} ('and'|'&') right=PrimaryOrNotPrimaryMVExpr)* 
+;
+/* 
+AndMVExpr returns MVExpr: 
+	NEqMVExpr ({AndMVExpr.left=current} ('and'|'&') right=NEqMVExpr)* 
+;
+NEqMVExpr returns MVExpr: 
+	EqMVExpr ({NEqMVExpr.left=current} ('!=') right=EqMVExpr)* 
+;
+EqMVExpr returns MVExpr: 
+	PrimaryOrNotPrimaryMVExpr ({EqMVExpr.left=current} ('=') right=PrimaryOrNotPrimaryMVExpr)* 
+;
+*/
+PrimaryOrNotPrimaryMVExpr returns MVExpr:
+	PrimaryMVExpr | NotMVExpr 
+;
+NotMVExpr returns MVExpr:
+	('not'|'!') PrimaryMVExpr {NotMVExpr.left=current}
+;
+
+//PrimaryMVExpr returns MVExpr:
+// False | True |
+// 	(
+// 		'(' 
+// 			(PrimaryMVComparison |  ImpliesMVExpr) 
+// 		')'
+// 	) 
+// ;
+// PrimaryMVComparison :{PrimaryMVComparison}
+//	//left=ReferenceToMVNodeOrValue comp=Comp right=ReferenceToMVNodeOrValue
+//	/*'{'*/left=ArithExprReferenceToMVNodeOrValue comp=Comp right=ArithExprReferenceToMVNodeOrValue/*'}'*/
+//;
+PrimaryMVExpr returns MVExpr:
+ PrimaryMV   
+ | '(' ImpliesMVExpr ')' 
+ ;
+
+PrimaryMV://{PrimaryMV} 
+	False | True | 
+	//ReferenceToMVNode
+	PrimaryMVComparison 
+;
+
+PrimaryMVComparison :{PrimaryMVComparison}
+	//left=ReferenceToMVNodeOrValue comp=Comp right=ReferenceToMVNodeOrValue
+	'{'left=ArithExprReferenceToMVNodeOrValue comp=Comp right=ArithExprReferenceToMVNodeOrValue'}'
+;
+
+ReferenceToMVNode: {ReferenceToMVNode} 
+	reference=[MVNode]
+;
+ReferenceToMVNodeOrValue:
+	ReferenceToMVNode|	{Value} val=(ZERO|NAT)
+;
+//END Multi-Valued REGULATORY NETWORK
 
 //BEGIN REGULATORY NETWORK
 NodeDeclarations : {NodeDeclarations} 
@@ -1910,7 +2069,7 @@ ReferenceToNode: {ReferenceToNode}
 ;
 
 SpeciesOrNode:
-	Species|Node
+	Species|Node|MVNode
 ;
 
 BooleanCommand:
@@ -1921,7 +2080,8 @@ BooleanCommand:
 
 ExportBN:
 	writeBN |
-	exportBoolNet
+	exportBoolNet |
+	exportSBMLQual
 ;
 
 writeBN:
@@ -1936,6 +2096,12 @@ exportBoolNet:
 				(',' 'originalNames' '=' originalNames=BooleanValue)?
 	  ')'
 ;
+exportSBMLQual:
+	'exportSBMLQual' '(' params = ParametersExport
+	 			//(',' 'format' '=' format=ODEorNET)?
+			//	(',' 'originalNames' '=' originalNames=BooleanValue)?
+	  ')'
+;
 
 UpdateStatusBooleanCommand:
 	'this' '=' (reduction = BooleanReduction)
@@ -1944,7 +2110,9 @@ UpdateStatusBooleanCommand:
 BooleanReduction: 
 	//SMTBooleanReduction
 	reduceBBE | 
-	reduceFBE 	
+	reduceFBE |
+	//reduceBME |
+	reduceFME 	
 ;
 //SMTBooleanReduction:
 //	reduceBBE | 
@@ -1956,7 +2124,15 @@ reduceBBE : {reduceBBE}
 ;
 
 reduceFBE : {reduceFBE}
-	'reduceFBE' '(' 'aggregationFunction' '=' aggregationFunction=('OR'|'AND') ',' 'simplify' '=' simplify=BooleanValue (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
+	'reduceFBE' '(' 'aggregationFunction' '=' aggregationFunction=('OR'|'AND') (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
+;
+
+//reduceBME : {reduceBME}
+//	'reduceBME' '(' 'simplify' '=' simplify=BooleanValue (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
+//;
+
+reduceFME : {reduceFME}
+	'reduceFME' '(' 'aggregationFunction' '=' aggregationFunction=('PLUS'/* 'OR'|'AND'*/)  (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
 ;
 
 FormattedOptionalParametersBooleanReductions: {FormattedOptionalParametersBooleanReductions}
@@ -1968,7 +2144,11 @@ OptionalParametersBooleanReductions:
 	| FilePart   
 	| CSVFile
 	|FileRed
+	| Simplify
 	//| ReductionAlgorithm
 	//| SMTTimesCSVFile
+;
+Simplify:
+	'simplify' '=' simplify=BooleanValue
 ;
 //END REGULATORY NETWORK

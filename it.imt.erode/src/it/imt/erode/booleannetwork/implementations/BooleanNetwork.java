@@ -2,6 +2,7 @@ package it.imt.erode.booleannetwork.implementations;
 
 import java.io.BufferedWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,6 +20,7 @@ public class BooleanNetwork implements IBooleanNetwork {
 
 	private List<ISpecies> allSpecies;
 	private LinkedHashMap<String, IUpdateFunction> updateFunctions;
+	private LinkedHashMap<String, Integer> nameToMax;
 	private String name;
 	
 	private MessageConsoleStream out;
@@ -26,14 +28,24 @@ public class BooleanNetwork implements IBooleanNetwork {
 	private ArrayList<HashSet<ISpecies>> userDefinedInitialPartition=new ArrayList<>(0);
 	
 	private List<ICommand> commands;
+	private boolean multivalued=false;
 	
-	public BooleanNetwork(String name, MessageConsoleStream out,BufferedWriter bwOut) {
+	public BooleanNetwork(String name, MessageConsoleStream out,BufferedWriter bwOut, boolean multivalued) {
 		super();
 		this.out=out;
 		this.bwOut=bwOut;
 		this.name=name;
 		this.allSpecies = new ArrayList<>();
 		this.updateFunctions = new LinkedHashMap<>();
+		this.multivalued=multivalued;
+		nameToMax=new LinkedHashMap<>();
+	}
+//	public BooleanNetwork(String name, MessageConsoleStream out,BufferedWriter bwOut) {
+//		this(name,out,bwOut,false);
+//	}
+	
+	public boolean isMultiValued() {
+		return multivalued;
 	}
 	
 	@Override
@@ -135,6 +147,50 @@ public class BooleanNetwork implements IBooleanNetwork {
 	@Override
 	public LinkedHashMap<String, IUpdateFunction> getUpdateFunctions() {
 		return updateFunctions;
+	}
+
+	@Override
+	public void setMax(ISpecies newSp, Integer max) {
+		if(!multivalued) {
+			throw new UnsupportedOperationException("The method setMax should be used only of multivalued networks");
+		}
+		if(max==null||max==1) {
+			//If 1 do nothing, that's the default 
+		}
+		if(max<1) {
+			throw new UnsupportedOperationException("The max value of a multivalued species should be at least 1");
+		}
+		if(max>1) {
+			nameToMax.put(newSp.getName(), max);
+		}
+	}
+
+	@Override
+	public int cumulMax(Collection<ISpecies> species) {
+		int cumul=0;
+		for(ISpecies sp : species) {
+			Integer cur=nameToMax.get(sp.getName());
+			if(cur==null) {
+				cur=1;
+			}
+			cumul+=cur;
+		}
+		return cumul;
+	}
+	
+	@Override
+	public LinkedHashMap<String, Integer> getNameToMax(){
+		return nameToMax;
+	}
+	@Override
+	public int getNameToMax(String speciesName){
+		Integer ret = nameToMax.get(speciesName);
+		if(ret==null) {
+			return 1;
+		}
+		else {
+			return ret;
+		}
 	}
 
 }

@@ -1,7 +1,7 @@
 package it.imt.erode.crn.symbolic.constraints;
 
 public enum BasicConstraintComparator {
-LE,GE,
+LT,GT,
 LEQ,GEQ,
 EQ,NOTEQ
 }

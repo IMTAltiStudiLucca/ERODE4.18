@@ -4,6 +4,7 @@
 package it.imt.erode.crn.validation;
 
 import com.google.common.collect.Iterables;
+
 import it.imt.erode.crn.chemicalReactionNetwork.ALG;
 import it.imt.erode.crn.chemicalReactionNetwork.AbsTol;
 import it.imt.erode.crn.chemicalReactionNetwork.AlgSpecies;
@@ -21,12 +22,19 @@ import it.imt.erode.crn.chemicalReactionNetwork.ICList;
 import it.imt.erode.crn.chemicalReactionNetwork.Import;
 import it.imt.erode.crn.chemicalReactionNetwork.InitPartition;
 import it.imt.erode.crn.chemicalReactionNetwork.Limits;
+import it.imt.erode.crn.chemicalReactionNetwork.MVNode;
+import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDeclarations;
+import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinition;
+import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinitions;
+import it.imt.erode.crn.chemicalReactionNetwork.MVUpdateFunctions;
 import it.imt.erode.crn.chemicalReactionNetwork.MassActionRate;
 import it.imt.erode.crn.chemicalReactionNetwork.MassActionReduction;
 import it.imt.erode.crn.chemicalReactionNetwork.MaxStep;
 import it.imt.erode.crn.chemicalReactionNetwork.Method;
 import it.imt.erode.crn.chemicalReactionNetwork.MinStep;
 import it.imt.erode.crn.chemicalReactionNetwork.ModelDefinition;
+import it.imt.erode.crn.chemicalReactionNetwork.Node;
+import it.imt.erode.crn.chemicalReactionNetwork.NodeDeclarations;
 import it.imt.erode.crn.chemicalReactionNetwork.NodeDefinition;
 import it.imt.erode.crn.chemicalReactionNetwork.NodeDefinitions;
 import it.imt.erode.crn.chemicalReactionNetwork.ODE;
@@ -58,6 +66,7 @@ import it.imt.erode.crn.chemicalReactionNetwork.SymbolicParametersList;
 import it.imt.erode.crn.chemicalReactionNetwork.UpdateStatusCommand;
 import it.imt.erode.crn.chemicalReactionNetwork.ViewsList;
 import it.imt.erode.crn.chemicalReactionNetwork.VisualizePlot;
+import it.imt.erode.crn.chemicalReactionNetwork.caseMV;
 import it.imt.erode.crn.chemicalReactionNetwork.decompress;
 import it.imt.erode.crn.chemicalReactionNetwork.exportBNG;
 import it.imt.erode.crn.chemicalReactionNetwork.exportC2E2;
@@ -65,6 +74,8 @@ import it.imt.erode.crn.chemicalReactionNetwork.exportLBS;
 import it.imt.erode.crn.chemicalReactionNetwork.exportPontryaginPolygonMethod;
 import it.imt.erode.crn.chemicalReactionNetwork.importMRMC;
 import it.imt.erode.crn.chemicalReactionNetwork.reduceBDE;
+import it.imt.erode.crn.chemicalReactionNetwork.reduceFBE;
+import it.imt.erode.crn.chemicalReactionNetwork.reduceFME;
 import it.imt.erode.crn.chemicalReactionNetwork.reduceUncertainFE;
 import it.imt.erode.crn.chemicalReactionNetwork.simulateCTMC;
 import it.imt.erode.crn.chemicalReactionNetwork.simulateDAE;
@@ -257,20 +268,20 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 	 * }
 	 * }
 	 */
-//	@Check
-//	public void checkDecName(final Species ps) {
-//		String name = ps.getName().trim();
-//		String lowerName = name.toLowerCase();
-//		boolean _startsWith = lowerName.startsWith("dec");
-//		if (_startsWith) {
-//			if ((((((((((lowerName.startsWith("dec0") || lowerName.startsWith("dec1")) || lowerName.startsWith("dec2")) || lowerName.startsWith("dec3")) || 
-//					lowerName.startsWith("dec4")) || lowerName.startsWith("dec5")) || lowerName.startsWith("dec6")) || lowerName.startsWith("dec7")) || 
-//					lowerName.startsWith("dec8")) || lowerName.startsWith("dec9"))) {
-//				this.warning("The use of \"Dec\" followed by a number as name of species is deprecated", 
-//						ChemicalReactionNetworkPackage.eINSTANCE.getSpeciesOrNode_Name(), ChemicalReactionNetworkValidator.DEC_NAME);
-//			}
-//		}
-//	}
+	//	@Check
+	//	public void checkDecName(final Species ps) {
+	//		String name = ps.getName().trim();
+	//		String lowerName = name.toLowerCase();
+	//		boolean _startsWith = lowerName.startsWith("dec");
+	//		if (_startsWith) {
+	//			if ((((((((((lowerName.startsWith("dec0") || lowerName.startsWith("dec1")) || lowerName.startsWith("dec2")) || lowerName.startsWith("dec3")) || 
+	//					lowerName.startsWith("dec4")) || lowerName.startsWith("dec5")) || lowerName.startsWith("dec6")) || lowerName.startsWith("dec7")) || 
+	//					lowerName.startsWith("dec8")) || lowerName.startsWith("dec9"))) {
+	//				this.warning("The use of \"Dec\" followed by a number as name of species is deprecated", 
+	//						ChemicalReactionNetworkPackage.eINSTANCE.getSpeciesOrNode_Name(), ChemicalReactionNetworkValidator.DEC_NAME);
+	//			}
+	//		}
+	//	}
 
 	@Check
 	public void checkDecoder(final decompress elem) {
@@ -625,8 +636,12 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 		LinkedHashSet<String> undefinedSpecies = new LinkedHashSet<String>();
 		Import importCommand = ((Import) null);
 		LinkedHashSet<Species> speciesWithoutDynamics = new LinkedHashSet<Species>();
+		LinkedHashSet<Node> nodesWithoutDynamics = new LinkedHashSet<>();
+		LinkedHashSet<MVNode> mvNodesWithoutDynamics = new LinkedHashSet<>();
 		boolean importedModel = false;
 		boolean mrmc = false;
+		boolean isBN=false;
+		boolean isMV=false;
 		EList<EObject> _elements = model.getElements();
 		for (final EObject elem : _elements) {
 			{
@@ -650,15 +665,134 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 								nSymbPars = ((SymbolicParametersList)elem).getSymbolicParameters().size();
 							} else {
 								if ((elem instanceof NodeDefinitions)) {
+									isBN=true;
 									EList<NodeDefinition> _nodeDefinitions = ((NodeDefinitions)elem).getNodeDefinitions();
-									for (final NodeDefinition nodeDefinition : _nodeDefinitions) {
-										String _name = nodeDefinition.getName().getName();
-										boolean _tripleEquals = (_name == null);
-										if (_tripleEquals) {
-											this.addUndefinedNode(nodeDefinition, undefinedSpecies);
+									//									for (final NodeDefinition nodeDefinition : _nodeDefinitions) {
+									//										String _name = nodeDefinition.getName().getName();
+									//										boolean _tripleEquals = (_name == null);
+									//										if (_tripleEquals) {
+									//											this.addUndefinedNode(nodeDefinition, undefinedSpecies);
+									//										}
+									//									}
+
+									///
+									//ODEsList odes = ((ODEsList) elem);
+									EList<Node> _allSpecies_1 = (((NodeDeclarations[])Conversions.unwrapArray((Iterables.<NodeDeclarations>filter(model.getElements(), NodeDeclarations.class)), NodeDeclarations.class))[0]).getAllNodes();
+									LinkedHashSet<Node> _linkedHashSet_1 = new LinkedHashSet<>(_allSpecies_1);
+									nodesWithoutDynamics = _linkedHashSet_1;
+									int _size = _nodeDefinitions.size();
+									final LinkedHashSet<Node> nodesWithDynamics = new LinkedHashSet<>(_size);
+									ArrayList<NodeDefinition> dupUpdateFunc = new ArrayList<>();
+									for (final NodeDefinition updateFunc : _nodeDefinitions) {
+										{
+											nodesWithoutDynamics.remove(updateFunc.getName());
+											boolean _contains = nodesWithDynamics.contains(updateFunc.getName());
+											if (_contains) {
+												dupUpdateFunc.add(updateFunc);
+											} else {
+												nodesWithDynamics.add(updateFunc.getName());
+											}
+											String _name_1 = updateFunc.getName().getName();
+											boolean _tripleEquals_1 = (_name_1 == null);
+											if (_tripleEquals_1) {
+												this.addUndefinedNode(updateFunc, undefinedSpecies);
+											}
 										}
 									}
-								} else {
+									int _size_1 = dupUpdateFunc.size();
+									boolean _greaterThan = (_size_1 > 0);
+									if (_greaterThan) {
+										for (final NodeDefinition updFunc : dupUpdateFunc) {
+											{
+												String _name_1 = updFunc.getName().getName();
+												String msg = ("Duplicate Update Function for the species " + _name_1);
+												this.error(msg, updFunc, 
+														ChemicalReactionNetworkPackage.eINSTANCE.getNodeDefinition_Name()/*, ChemicalReactionNetworkValidator.DUPLICATE_ODE*/);
+											}
+										}
+									}
+								} 
+								//////
+								else if ((elem instanceof MVNodeDefinitions)) {
+									isMV=true;
+									EList<MVNodeDefinition> _nodeDefinitions = ((MVNodeDefinitions)elem).getMvNodeDefinitions();
+									EList<MVNode> _allSpecies_1 = (((MVNodeDeclarations[])Conversions.unwrapArray((Iterables.<MVNodeDeclarations>filter(model.getElements(), MVNodeDeclarations.class)), MVNodeDeclarations.class))[0]).getAllMVNodes();
+									LinkedHashSet<MVNode> _linkedHashSet_1 = new LinkedHashSet<>(_allSpecies_1);
+									mvNodesWithoutDynamics = _linkedHashSet_1;
+									int _size = _nodeDefinitions.size();
+									final LinkedHashSet<MVNode> mvNodesWithDynamics = new LinkedHashSet<>(_size);
+									ArrayList<MVNodeDefinition> dupUpdateFunc = new ArrayList<>();
+									for (final MVNodeDefinition updateFunc : _nodeDefinitions) {
+										{
+											mvNodesWithoutDynamics.remove(updateFunc.getName());
+											if (mvNodesWithDynamics.contains(updateFunc.getName())) {
+												dupUpdateFunc.add(updateFunc);
+											} else {
+												mvNodesWithDynamics.add(updateFunc.getName());
+											}
+											//String _name_1 = updateFunc.getName().getName();
+											//boolean _tripleEquals_1 = (_name_1 == null);
+											if (updateFunc.getName().getName()==null) {
+												this.addUndefinedMVNode(updateFunc, undefinedSpecies);
+											}
+											else {
+												//The node exists. If this is a simple case function, I check that the update function contains only correct values
+												MVNode sp = updateFunc.getName();
+												int max=Math.max(1,sp.getMax());
+												if(updateFunc.getUpdateFunction() instanceof MVUpdateFunctions) {
+													MVUpdateFunctions caseFunction=(MVUpdateFunctions)updateFunc.getUpdateFunction();
+												//for(MVUpdateFunctions updateFunc_addend : updateFunc.getUpdateFunction().getCaseFunction()) {
+													int otherwise=0;
+													HashSet<Integer> values=new HashSet<>(caseFunction.getCasesMV().size());
+													for(caseMV cur_case : caseFunction.getCasesMV()) {
+														int cur=cur_case.getVal();
+														if(cur>max) {
+															this.error("Wrong value "+cur+" for species "+sp.getName(), cur_case, //updateFunc, 
+																	ChemicalReactionNetworkPackage.eINSTANCE.getcaseMV_Val());
+															//ChemicalReactionNetworkPackage.eINSTANCE.getMVNodeDefinition_Name()/*, ChemicalReactionNetworkValidator.DUPLICATE_ODE*/);
+														}
+														else {
+															values.add(cur);
+														}
+														if(cur_case.getACaseMV()==null) {
+															otherwise++;
+														}
+													}
+													if(otherwise > 1 ||(otherwise == 0 && values.size()==max+1)) {
+														this.error("The'otherwise' case should be once (or implicitly by providing 1 case less). It is used "+otherwise+" times for "+sp.getName()+".", updateFunc, 
+																ChemicalReactionNetworkPackage.eINSTANCE.getMVNodeDefinition_Name()/*, ChemicalReactionNetworkValidator.DUPLICATE_ODE*/);
+													}
+													if(otherwise == 0 && values.size()<max) {
+														this.error("The otherwise case be omitted (given implicitly) only if all other cases are specified. Problem for "+sp.getName()+".", updateFunc, 
+																ChemicalReactionNetworkPackage.eINSTANCE.getMVNodeDefinition_Name()/*, ChemicalReactionNetworkValidator.DUPLICATE_ODE*/);
+													}
+													//													if(otherwise == 1 && values.size()<max+1) {
+													//														this.error("Missing cases for "+sp.getName()+" please consider all from 0 to "+max, updateFunc, 
+													//																ChemicalReactionNetworkPackage.eINSTANCE.getMVNodeDefinition_Name()/*, ChemicalReactionNetworkValidator.DUPLICATE_ODE*/);
+													//													}
+
+
+												}
+
+											}
+										}
+									}
+									int _size_1 = dupUpdateFunc.size();
+									boolean _greaterThan = (_size_1 > 0);
+									if (_greaterThan) {
+										for (final MVNodeDefinition updFunc : dupUpdateFunc) {
+											{
+												String _name_1 = updFunc.getName().getName();
+												String msg = ("Duplicate Update Function for the species " + _name_1);
+												this.error(msg, updFunc, 
+														ChemicalReactionNetworkPackage.eINSTANCE.getMVNodeDefinition_Name()/*, ChemicalReactionNetworkValidator.DUPLICATE_ODE*/);
+											}
+										}
+									}
+									//////
+								}
+
+								else {
 									if ((elem instanceof ReactionsList)) {
 										int _nReactionssList = nReactionssList;
 										nReactionssList = (_nReactionssList + 1);
@@ -828,6 +962,14 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 																		this.allowOnlyReduceBDE(((Reduction)elem), model, i);
 																	}
 																}
+																if(elem instanceof reduceFME && !isMV) {
+																	String msg_2 = "FME is supported only for multivalued networks";
+																	this.error(msg_2, model, ChemicalReactionNetworkPackage.eINSTANCE.getModelDefinition_Elements(), i);
+																}
+																else if((elem instanceof reduceFBE /*|| elem instanceof reduceBBE*/) && !isBN) {
+																	String msg_2 = "FBE are supported only for Boolean networks. Use FME for Multivalue Boolean networks";
+																	this.error(msg_2, model, ChemicalReactionNetworkPackage.eINSTANCE.getModelDefinition_Elements(), i);
+																} 
 															} else {
 																if ((elem instanceof UpdateStatusCommand)) {
 																	Reduction _reduction = ((UpdateStatusCommand)elem).getReduction();
@@ -841,7 +983,7 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 																		this.handleMSG(msg_4, model, i);
 																	} else {
 																		if ((nALGConstraints > 0)) {
-																		this.allowOnlyReduceBDE(_reduction, model, i);
+																			this.allowOnlyReduceBDE(_reduction, model, i);
 																		}
 																	}
 																} else {
@@ -952,7 +1094,25 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 						ChemicalReactionNetworkPackage.eINSTANCE.getModelDefinition_Name(), ChemicalReactionNetworkValidator.MISSING_DRIFTS);
 			}
 		}
+
+		if(nodesWithoutDynamics.size()>0) {
+			for(Node node : nodesWithoutDynamics) {
+				String _name_1 = node.getName();
+				String msg_3 = ("Missing update function of species " + _name_1);
+				this.error(msg_3, node, 
+						ChemicalReactionNetworkPackage.eINSTANCE.getSpeciesOrNode_Name()/*, ChemicalReactionNetworkValidator.MISSING_DRIFT*/);
+			}
+		}
+		if(mvNodesWithoutDynamics.size()>0) {
+			for(MVNode node : mvNodesWithoutDynamics) {
+				String _name_1 = node.getName();
+				String msg_3 = ("Missing update function of species " + _name_1);
+				this.error(msg_3, node, 
+						ChemicalReactionNetworkPackage.eINSTANCE.getSpeciesOrNode_Name()/*, ChemicalReactionNetworkValidator.MISSING_DRIFT*/);
+			}
+		}
 	}
+
 
 	protected void allowOnlyReduceBDE(final Reduction elem, final ModelDefinition model, final int i) {
 		if ((!(elem instanceof reduceBDE))) {
@@ -1002,6 +1162,28 @@ public class ChemicalReactionNetworkValidator extends AbstractChemicalReactionNe
 	 * }
 	 */
 	public boolean addUndefinedNode(final NodeDefinition nodeDef, final LinkedHashSet<String> undefinedSpecies) {
+		boolean _xblockexpression = false;
+		{
+			ICompositeNode importNode = NodeModelUtils.findActualNodeFor(nodeDef);
+			int offset = importNode.getOffset();
+			String text = importNode.getText();
+			int _totalOffset = importNode.getTotalOffset();
+			int _minus = (offset - _totalOffset);
+			text = text.substring(_minus);
+			int endPos = text.indexOf("=");
+			if ((endPos != (-1))) {
+				text = text.substring(0, endPos);
+			} else {
+				endPos = text.indexOf(":");
+				if ((endPos != (-1))) {
+					text = text.substring(0, endPos);
+				}
+			}
+			_xblockexpression = undefinedSpecies.add(text.trim());
+		}
+		return _xblockexpression;
+	}
+	public boolean addUndefinedMVNode(final MVNodeDefinition nodeDef, final LinkedHashSet<String> undefinedSpecies) {
 		boolean _xblockexpression = false;
 		{
 			ICompositeNode importNode = NodeModelUtils.findActualNodeFor(nodeDef);

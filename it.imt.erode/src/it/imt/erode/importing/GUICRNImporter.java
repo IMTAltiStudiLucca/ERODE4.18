@@ -1114,8 +1114,14 @@ public class GUICRNImporter  extends AbstractImporter {
 			bw.write("//UNDEFINED MODEL");
 		}
 	}
+	
 	public static void writeInitBlock(BufferedWriter bw, List<ISpecies> allSpecies, boolean originalNames, ISpecies I,
 			final boolean shouldAddI) throws IOException {
+		writeInitBlock(bw, allSpecies, originalNames, I, shouldAddI, null);
+	}
+	
+	public static void writeInitBlock(BufferedWriter bw, List<ISpecies> allSpecies, boolean originalNames, ISpecies I,
+			final boolean shouldAddI, LinkedHashMap<String, Integer> nameToMax) throws IOException {
 		bw.write(" begin init\n");
 		for (ISpecies species : allSpecies) {
 			if(!species.isAlgebraic()) {
@@ -1127,6 +1133,14 @@ public class GUICRNImporter  extends AbstractImporter {
 					bw.write(species.getName());
 				}
 				
+				if(nameToMax!=null) {
+					Integer max=nameToMax.get(species.getName());
+					if (max!=null && max!=1) {
+						bw.write(" [ ");
+						bw.write(""+max);
+						bw.write(" ] ");
+					}
+				}
 				
 				if(species.getInitialConcentration().compareTo(BigDecimal.ZERO)!=0){
 					bw.write(" = ");

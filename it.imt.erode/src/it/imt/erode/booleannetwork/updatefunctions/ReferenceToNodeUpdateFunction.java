@@ -3,8 +3,8 @@ package it.imt.erode.booleannetwork.updatefunctions;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 
-import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
+import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.crn.interfaces.ISpecies;
@@ -13,7 +13,7 @@ import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.SMTForwardBooleanEquivalence;
 
-public class ReferenceToNodeUpdateFunction implements IUpdateFunction {
+public class ReferenceToNodeUpdateFunction implements IUpdateFunction/*_ArithExprRefToNode_Value*/ {
 
 	private String name;
 	
@@ -28,8 +28,8 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction {
 	
 	
 	@Override
-	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, BoolExpr> nodeToTruthValue) throws Z3Exception {
+	public Expr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
+			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
 		//return ctx.mkTrue();
 		ISpecies referredNode = nodeNameToNode.get(name);
 		return nodeToTruthValue.get(referredNode);
@@ -59,6 +59,11 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction {
 		else {
 			return SMTForwardBooleanEquivalence.neutralElementUpdFunc(aggregationFunction);
 		}
+	}
+	
+	@Override
+	public boolean seemsInputSpecies(String sp) {
+		return sp.equals(name);
 	}
 		
 }

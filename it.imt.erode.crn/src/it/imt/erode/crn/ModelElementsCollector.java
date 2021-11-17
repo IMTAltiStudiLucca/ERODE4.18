@@ -11,6 +11,7 @@ import it.imt.erode.crn.chemicalReactionNetwork.BooleanImportFolder;
 import it.imt.erode.crn.chemicalReactionNetwork.Command;
 import it.imt.erode.crn.chemicalReactionNetwork.Import;
 import it.imt.erode.crn.chemicalReactionNetwork.ImportFolder;
+import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinition;
 import it.imt.erode.crn.chemicalReactionNetwork.NodeDefinition;
 
 public class ModelElementsCollector {
@@ -37,12 +38,13 @@ public class ModelElementsCollector {
 	private boolean synchEditor;
 	private EList<BoolExpr> constraintsListXTEXT;
 	private EList<NodeDefinition> booleanUpdateFunctionsXTEXT;
+	private EList<MVNodeDefinition> mvBooleanUpdateFunctionsXTEXT;
 	
 	public ModelElementsCollector(String modelName,ArrayList<String> symbolicParameters, EList<BoolExpr> constraintsListXTEXT, ArrayList<ArrayList<String>> parameters, 
 			ArrayList<LinkedHashMap<String,String>> reactions, ArrayList<LinkedHashMap<String,String>> algebraicConstraints,
 			ArrayList<ArrayList<String>> views, ArrayList<ArrayList<String>> initialConcentrations,ArrayList<ArrayList<String>> initialAlgConcentrations,ArrayList<ArrayList<String>> userPartition,
 			ArrayList<Command> commandsList, ArrayList<BooleanCommand> booleanCommandsList, String importString, Import importCommand, String importFolderString, ImportFolder importFolderCommand, BooleanImportFolder booleanImportFolderCommand, String importName,
-			ModelDefKind modelDefKind, EList<NodeDefinition> booleanUpdateFunctionsXTEXT, boolean synchEditor, String absolutePath) {
+			ModelDefKind modelDefKind, EList<NodeDefinition> booleanUpdateFunctionsXTEXT, EList<MVNodeDefinition> mvBooleanUpdateFunctionsXTEXT, boolean synchEditor, String absolutePath) {
 		super();
 		this.absolutePath=absolutePath;
 		this.modelName = modelName;
@@ -67,6 +69,7 @@ public class ModelElementsCollector {
 		this.synchEditor=synchEditor;
 		
 		this.booleanUpdateFunctionsXTEXT=booleanUpdateFunctionsXTEXT;
+		this.mvBooleanUpdateFunctionsXTEXT=mvBooleanUpdateFunctionsXTEXT;
 	}
 
 	public boolean isSyncEditor() {
@@ -158,9 +161,9 @@ public class ModelElementsCollector {
 	public EList<NodeDefinition> getBooleanUpdateFunctionsXTEXT() {
 		return booleanUpdateFunctionsXTEXT;
 	}
-
-	public void setBooleanUpdateFunctionsXTEXT(EList<NodeDefinition> booleanUpdateFunctionsXTEXT) {
-		this.booleanUpdateFunctionsXTEXT = booleanUpdateFunctionsXTEXT;
+	
+	public EList<MVNodeDefinition> getMVBooleanUpdateFunctionsXTEXT() {
+		return mvBooleanUpdateFunctionsXTEXT;
 	}
 	
 }

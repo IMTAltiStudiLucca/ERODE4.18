@@ -93,11 +93,17 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 				else if(command.startsWith("reduceFBE(")){//else if(command.startsWith("reduceOOBsmt(")){
 					handleReduceCommand(command,updateCRN,"FBE",out,bwOut);//handleReduceCommand(command,updateCRN,"oobsmt");
 				}
+				else if(command.startsWith("reduceFME(")){//else if(command.startsWith("reduceOOBsmt(")){
+					handleReduceCommand(command,updateCRN,"FME",out,bwOut);//handleReduceCommand(command,updateCRN,"oobsmt");
+				}
 				else if(command.startsWith("writeBN")) {
 					handleWriteCommand(command,out,bwOut);
 				}
 				else if(command.startsWith("exportBoolNet")) {
 					handleExportBoolNetCommand(command, out, bwOut);
+				}
+				else if(command.startsWith("exportSBMLQual")) {
+					handleExportSBMLQualCommand(command, out, bwOut);
 				}
 				/*else if(command.startsWith("setIC(")){
 					handleSetIC(command,out,bwOut);
@@ -166,7 +172,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			return;
 		}
 		
-		GUIBooleanNetworkImporter.printToBNERODEFIle(bn, partition, fileName, null, true, out, bwOut, originalNames);
+		GUIBooleanNetworkImporter.printToBNERODEFIle(bn, partition, fileName, null, true, out, bwOut, originalNames,null);
 	}
 	
 	private void handleExportBoolNetCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
@@ -213,6 +219,54 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 		}
 		
 		GUIBooleanNetworkImporter.printToBNBoolNetFIle(bn, partition, fileName, null, true, out, bwOut, originalNames);
+	}
+	
+	private void handleExportSBMLQualCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
+		String fileName = null;
+		String parameters[] = CRNReducerCommandLine.getParameters(command);
+		//boolean originalNames=false;
+		if(parameters==null){
+			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			return;
+		}
+		for (String parameter : parameters) {
+			if(parameter.equals("")){
+				continue;
+			}
+			else if(parameter.startsWith("fileOut=>")){
+				if(parameter.length()<="fileOut=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				fileName = parameter.substring("fileOut=>".length(), parameter.length());
+				//format = (fromGUI)?SupportedFormats.CRNGUI:SupportedFormats.CRN;
+			}
+//			else if(parameter.startsWith("originalNames=>")){
+//				if(parameter.length()<="originalNames=>".length()){
+//					CRNReducerCommandLine.println(out,bwOut,"Please, specify whether if orginal names should be used or not. ");
+//					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+//					return;
+//				}
+//				String orn = parameter.substring("originalNames=>".length(), parameter.length());
+//				if(orn.equalsIgnoreCase("true")) {
+//					originalNames=true;
+//				}
+//			}
+			else{
+				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameter+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+				return;
+			}
+		}
+		if(fileName ==null || fileName.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		
+		Collection<String> preambleCommentLines=null;
+		//GUIBooleanNetworkImporter.printToBNBoolNetFIle(bn, partition, fileName, null, true, out, bwOut, originalNames);
+		GUIBooleanNetworkImporter.printToSBMLQualFIle(bn, partition, fileName, preambleCommentLines, true, out, bwOut);
 	}
 
 	protected IPartitionAndBoolean handleReduceCommand(String command, boolean updateCRN, String reduction, MessageConsoleStream out, BufferedWriter bwOut) throws UnsupportedFormatException, Z3Exception, IOException {
@@ -352,7 +406,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			return null;
 		}
 		FBEAggregationFunctions aggr=null;
-		if(reduction.equals("FBE")) {
+		if(reduction.equals("FBE") ||reduction.equals("FME")) {
 			if(aggregationFunction==null || aggregationFunction.length()==0) {
 				CRNReducerCommandLine.println(out,bwOut,"Please, specify an aggregation function. ");
 				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
@@ -445,20 +499,36 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 		List<Double> smtChecksTime = null;
 
 		SMTForwardBooleanEquivalence smtFBE =null;
+		SMTBackwardBooleanEquivalence smtBBE=null;
 		
 		//Compute the partition
 		long begin = System.currentTimeMillis();
 		boolean succeeded=true;
 		String smtTime=null;
 		if(reduction.equalsIgnoreCase("BBE")){
-			SMTBackwardBooleanEquivalence smtBBE = new SMTBackwardBooleanEquivalence();
+			smtBBE = new SMTBackwardBooleanEquivalence(simplify.equalsIgnoreCase("true"));
 			PartitionAndString ps = smtBBE.computeBBEsmt(bn,initial,CRNReducerCommandLine.verbose,out,bwOut,print,terminator,messageDialogShower);
 			obtainedPartition = ps.getPartition();
 			smtTime = ps.getString();
 			smtChecksTime=smtBBE.getSMTChecksSecondsAtStep();
-			smtBBE=null;
+			//smtBBE=null;
 		}
 		else if(reduction.equalsIgnoreCase("fbe")){
+			obtainedPartition=initial;
+			
+			//Previous implementation of OFL reduction of POPL where we were not using the binary characterization, but we were using a counterexample-based apporach similar to the EFL case. It is not guaranteed to give the coarsest reduction (but we didn't find any model for which this happens). 
+			//SMTOrdinaryFluidBisimilarity9 smtOFL = new SMTOrdinaryFluidBisimilarity9();
+			//obtainedPartition = smtOFL.computeOFLsmt(crn, initial, verbose);			
+			smtFBE = new SMTForwardBooleanEquivalence(aggr/*FBEAggregationFunctions.OR*/,simplify.equalsIgnoreCase("true"));
+			PartitionAndString ps = smtFBE.computeOFLsmt(bn, initial, CRNReducerCommandLine.verbose, out, bwOut, print, terminator);
+			 
+			obtainedPartition = ps.getPartition();
+			smtTime=ps.getString();
+			smtChecksTime=smtFBE.getSMTChecksSecondsAtStep();
+			//smtFBE=null;
+			 
+		}
+		else if(reduction.equalsIgnoreCase("fme")){
 			obtainedPartition=initial;
 			
 			//Previous implementation of OFL reduction of POPL where we were not using the binary characterization, but we were using a counterexample-based apporach similar to the EFL case. It is not guaranteed to give the coarsest reduction (but we didn't find any model for which this happens). 
@@ -560,9 +630,10 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 				
 				begin = System.currentTimeMillis();
 				if(reduction.equalsIgnoreCase("bbe")) {
-					bp = SMTBackwardBooleanEquivalence.computeReducedBBE(bn, reducedModelName, obtainedPartition, "//", out, bwOut, terminator);
+					bp = smtBBE.computeReducedBBE(bn, reducedModelName, obtainedPartition, "//", out, bwOut, terminator);
+					smtBBE=null;
 				}
-				else if(reduction.equalsIgnoreCase("fbe")) {
+				else if(reduction.equalsIgnoreCase("fbe")||reduction.equalsIgnoreCase("fme")) {
 					bp = smtFBE.computeReducedFBE(bn, reducedModelName, obtainedPartition, "//",  out, bwOut, terminator, aggr);
 					smtFBE=null;
 				}
@@ -602,7 +673,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 					//SupportedFormats format = (fromGUI)?SupportedFormats.CRNGUI:SupportedFormats.CRN;
 					//String commentSymbol =(fromGUI)?"//":"#";
 					//CRNReducerCommandLine.print(out, bwOut, "Writing reduced file in "+reducedFileName+" ... ");
-					GUIBooleanNetworkImporter.printToBNERODEFIle(bp.getBN(), bp.getPartition(), reducedFileName, preambleCommentLines, verbose, out, bwOut, originalNames);
+					GUIBooleanNetworkImporter.printToBNERODEFIle(bp.getBN(), bp.getPartition(), reducedFileName, preambleCommentLines, verbose, out, bwOut, originalNames,null);
 					//CRNReducerCommandLine.print(out, bwOut, "completed.");
 					//printToERODEFIle(crn, obtainedPartition, name, assignPopulationOfRepresentative, groupAccordingToCurrentPartition, preambleCommentLines, verbose, icComment, out, bwOut, type, rnEncoding, originalNames);
 					//writeCRN(reducedFileName,bp.getBN(),bp.getPartition(),format,infoReduction.toComments(),icWarning,null,out,bwOut,false,null);
@@ -626,6 +697,8 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			}
 
 		}
+		smtBBE=null;
+		smtFBE=null;
 		return new IPartitionAndBoolean(obtainedPartition, succeeded);
 	}
 	

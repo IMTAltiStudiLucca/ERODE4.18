@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
+import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.crn.interfaces.ISpecies;
@@ -22,7 +23,7 @@ public class TrueUpdateFunction implements IUpdateFunction {
 	
 	@Override
 	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, BoolExpr> nodeToTruthValue) throws Z3Exception {
+			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
 		return ctx.mkTrue();
 	}
 	
@@ -38,6 +39,11 @@ public class TrueUpdateFunction implements IUpdateFunction {
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
 			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction) {
 		return new TrueUpdateFunction();
+	}
+	
+	@Override
+	public boolean seemsInputSpecies(String sp) {
+		return true;
 	}
 		
 }

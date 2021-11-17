@@ -473,6 +473,7 @@ public class MyParserUtil {
 		//boolean isBooleanNetwork= false;
 		//I decided to parse them later on, as done for the constraints.
 		EList<NodeDefinition> nodeDefinitions=null;
+		EList<MVNodeDefinition> mvNodeDefinitions=null;
 		
 		//I cannot parse them here, because I don't see the core tool. I just pass the constraints to the GUI.
 		EList<BoolExpr> constraintsList= null;
@@ -726,6 +727,39 @@ public class MyParserUtil {
 				}
 			}*/
 			
+			//MultiValued network
+			else if(element instanceof MVNodeDeclarations){
+				modelDefKind=ModelDefKind.BOOLEANMV;
+				
+				EList<MVNode> icList = ((MVNodeDeclarations)element).getAllMVNodes();
+				
+				initialConcentrations = new ArrayList<ArrayList<String>>(icList.size());
+				for (MVNode ic : icList) {
+					//name,value,originalName
+					ArrayList<String> initialConcentration = new ArrayList<>(3);
+					initialConcentrations.add(initialConcentration);
+					//Name,ic,max
+					initialConcentration.add(ic.getName());
+					initialConcentration.add(String.valueOf(ic.getIc()));
+					int max=ic.getMax();
+					if(ic.getMax()==0) {
+						max=1;
+					}
+					initialConcentration.add(String.valueOf(max));
+					//initialConcentration.add(String.valueOf(ic.isIc()));
+					if(ic.getOriginalName()!=null){
+						initialConcentration.add(ic.getOriginalName());
+					}
+				}
+			}
+			else if(element instanceof MVNodeDefinitions){
+				mvNodeDefinitions = ((MVNodeDefinitions)element).getMvNodeDefinitions();
+			}
+//			else if(element instanceof BooleanCommand){
+//				booleanCommandsList.add((BooleanCommand)element);
+//			}
+			
+			
 			//Boolean network
 			else if(element instanceof NodeDeclarations){
 				//isBooleanNetwork=true;
@@ -768,12 +802,13 @@ public class MyParserUtil {
 			else if(element instanceof BooleanCommand){
 				booleanCommandsList.add((BooleanCommand)element);
 			}
+			
 		}
 	
 		ModelElementsCollector mec = new ModelElementsCollector(modelName,symbolicParameters,constraintsList,parameters, reactions, algebraicConstraints,views, initialConcentrations, initialAlgConcentrations,
 				initialPartition, commandsList, booleanCommandsList, importString, 
 				importCommand, importFolderString, importFolderCommand,booleanImportFolderCommand,importName, modelDefKind,
-				nodeDefinitions,
+				nodeDefinitions,mvNodeDefinitions,
 				synchEditor,absolutePath);
 		return mec;
 	
@@ -1083,13 +1118,15 @@ public class MyParserUtil {
 	private static String parseBooleanImportFolder(BooleanImportFolder imp, String commandName, String absoluteParentPath) {
 		StringBuilder sb = new StringBuilder(commandName);
 		sb.append("({");
-		if(imp instanceof importBNetFolder) {
+		if(imp instanceof importBNetFolder|| imp instanceof importSBMLQualFolder) {
+			//imp.
+			ParametersImportFolder params = imp.getParams();
 			//BEGIN To be moved outside if when we will have more 'ImportFolder'
 			sb.append("folderIn=>");
-			sb.append(computeFileName(((importBNetFolder) imp).getParams().getFolderIn(), absoluteParentPath,false));
+			sb.append(computeFileName(params.getFolderIn(), absoluteParentPath,false));
 			sb.append(',');
 			sb.append("folderOut=>");
-			sb.append(computeFileName(((importBNetFolder) imp).getParams().getFolderOut(), absoluteParentPath,false));
+			sb.append(computeFileName(params.getFolderOut(), absoluteParentPath,false));
 			sb.append(',');
 			//END To be moved outside if when we will have more 'ImportFolder'
 		}
@@ -1257,15 +1294,20 @@ public class MyParserUtil {
 		sb.append(computeFileName(exp.getParams().getFileOut(), absoluteParentPath));
 		sb.append(',');
 		
-		boolean originalNames = exp.isOriginalNames();
-		if(originalNames) {
-			sb.append("originalNames=>true,");
-		}
 		
 		if(exp instanceof writeBN){
-			
+			boolean originalNames = ((writeBN)exp).isOriginalNames();
+			if(originalNames) {
+				sb.append("originalNames=>true,");
+			}
 		}
 		else if(exp instanceof exportBoolNet){
+			boolean originalNames = ((exportBoolNet)exp).isOriginalNames();
+			if(originalNames) {
+				sb.append("originalNames=>true,");
+			}
+		}
+		else if(exp instanceof exportSBMLQual) {
 			
 		}
 		
@@ -2546,6 +2588,10 @@ public class MyParserUtil {
 						String fileName = computeFileName(((CSVFile) par).getCsv(),absoluteParentPath);
 						p = fileName;
 					}
+					else if(par instanceof Simplify) {
+						sb.append("simplify=>");
+						p = ""+ ((Simplify) par).isSimplify();
+					}
 					sb.append(p);
 					sb.append(',');
 				}
@@ -2561,9 +2607,19 @@ public class MyParserUtil {
 			sb.append(aggrFunc);
 			sb.append(',');
 			
-			boolean simplify=((reduceFBE) red).isSimplify();
-			sb.append("simplify=>"+simplify);
+//			boolean simplify=((reduceFBE) red).isSimplify();
+//			sb.append("simplify=>"+simplify);
+//			sb.append(',');
+		}
+		else if(red instanceof reduceFME) {
+			String aggrFunc=((reduceFME) red).getAggregationFunction();
+			sb.append("aggregationFunction=>");
+			sb.append(aggrFunc);
 			sb.append(',');
+			
+//			boolean simplify=((reduceFME) red).isSimplify();
+//			sb.append("simplify=>"+simplify);
+//			sb.append(',');
 		}
 		
 		if(sb.charAt(sb.length()-1)==','){

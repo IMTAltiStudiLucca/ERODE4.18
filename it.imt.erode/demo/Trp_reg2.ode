@@ -1,0 +1,14 @@
+begin Multivalued Boolean network Trp_reg2
+ begin init
+  Trpext [ 2 ] 
+  Trp [ 2 ] 
+  TrpE
+  TrpR
+ end init
+begin update functions
+  Trpext = (1 if (Trpext = 1), 2 if (Trpext = 2), 0 otherwise)
+  Trp = (1 if (((Trpext = 0)&(TrpE = 1)) | (Trpext = 1)), 2 if (Trpext = 2), 0 otherwise)
+  TrpE = (1 if ((Trp = 0)&(TrpR = 0)), 0 otherwise)
+  TrpR = (1 if (Trp = 2), 0 otherwise)
+end update functions
+end Multivalued Boolean network 

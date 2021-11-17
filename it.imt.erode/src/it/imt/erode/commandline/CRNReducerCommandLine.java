@@ -22,6 +22,7 @@ import javax.xml.stream.XMLStreamException;
 
 import org.eclipse.ui.console.MessageConsoleStream;
 import org.jdom.JDOMException;
+import org.sbml.jsbml.SBMLDocument;
 import org.sbml.jsbml.text.parser.ParseException;
 
 import com.eteks.parser.CompilationException;
@@ -43,6 +44,7 @@ import it.imt.erode.auxiliarydatastructures.IPartitionsAndBoolean;
 import it.imt.erode.auxiliarydatastructures.PartitionAndString;
 import it.imt.erode.auxiliarydatastructures.PartitionAndStringAndBoolean;
 import it.imt.erode.auxiliarydatastructures.Reduction;
+import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.cage.CreateCAGEScript;
 import it.imt.erode.causalgraph.CausalGraphCreator;
 import it.imt.erode.crn.differentialHull.DifferentialHull;
@@ -77,6 +79,7 @@ import it.imt.erode.importing.SupportedFormats;
 import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.importing.z3Importer;
 import it.imt.erode.importing.automaticallygeneratedmodels.RandomBNG;
+import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
 import it.imt.erode.importing.csv.CompactCSVMatrixImporter;
 import it.imt.erode.importing.sbml.FluxBalanceAnalysisModel;
 import it.imt.erode.importing.sbml.NegativeStoichiometryException;
@@ -125,6 +128,8 @@ import it.imt.erode.smc.multivesta.FERNState;
 //import it.imt.erode.smc.multivesta.FERNState;
 import it.imt.erode.utopic.MatlabODEPontryaginExporter;
 import it.imt.erode.utopic.vnodelp.VNODELPExporter;
+import sbml.conversion.document.ISBMLConverter;
+import sbml.conversion.document.SBMLManager;
 //import umontreal.iro.lecuyer.stat.Tally;
 //import vesta.mc.InfoMultiQuery;
 import vesta.mc.InfoMultiQuery;
@@ -572,12 +577,17 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			partition=null;
 			handleImportBNetFolderCommand(command,out,bwOut);
 		}
+		else if(command.startsWith("importSBMLQualFolder(")){
+			crn=null;
+			partition=null;
+			handleImportSBMLQualFolderCommand(command,out,bwOut);
+		}
 		else{
 			CRNReducerCommandLine.println(out,bwOut,"Unknown command \""+command+"\". I skip it."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut, "Type --help for usage instructions.");
 			//usage();
 		}
 	}
-
+	
 	protected void handleCreateDifferentialHullCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) throws UnsupportedFormatException, IOException {
 		//hullify(fileO1ut="",delta=0.1,strict=true,format="ODE/NET")
 		ODEorNET crnGUIFormat = ODEorNET.ODE;
@@ -7641,6 +7651,116 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			return false;
 		} 
 		
+		return true;
+	}
+	
+	private boolean handleImportSBMLQualFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
+		String[] parameters = CRNReducerCommandLine.getParameters(command);
+		if(parameters==null){
+			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			return false;
+		}
+		String folderIn=null;
+		String folderOut=null;
+		for(int p=0;p<parameters.length;p++){
+			if(parameters[p].startsWith("folderIn=>")){
+				if(parameters[p].length()<="folderIn=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the folder from which to read. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return false;
+				}
+				folderIn = parameters[p].substring("folderIn=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("folderOut=>")){
+				if(parameters[p].length()<="folderOut=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the folder where to write the imported models. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return false;
+				}
+				folderOut = parameters[p].substring("folderOut=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].equals("")){
+				continue;
+			}
+			else{
+				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+				return false;
+			}
+		}
+		if(folderIn ==null || folderIn.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the file to be loaded. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return false;
+		}
+		try {
+			//new String[]{String.valueOf(forceMassAction)},
+			
+			File foldOut = new File(folderOut);
+			String foldoutPrefix = foldOut.getAbsolutePath()+File.separator;
+			
+			File foldIn = new File(folderIn);
+			if(foldIn.isDirectory()) {
+				String[] allFiles = foldIn.list();
+				CRNReducerCommandLine.println(out,bwOut,"Loading all SBML Qual files in folder:");
+				CRNReducerCommandLine.println(out,bwOut,"\t"+folderIn);
+				CRNReducerCommandLine.println(out,bwOut,"The folder contains "+allFiles.length+" files:");
+				for(int i=0;i<allFiles.length;i++) {
+					CRNReducerCommandLine.println(out,bwOut,"\t"+allFiles[i]);
+				}
+				CRNReducerCommandLine.println(out,bwOut,"");
+				for(int i=0;i<allFiles.length;i++) {
+					String current = foldIn.getAbsolutePath()+File.separator+allFiles[i];
+					if(allFiles[i].toLowerCase().endsWith(".sbml")) {
+						String fileOut = foldoutPrefix+AbstractImporter.overwriteExtensionIfEnabled(allFiles[i],".ode",true);
+						
+				        SBMLDocument sbmlDocument = (SBMLDocument) SBMLManager.read(current);
+				        ISBMLConverter sbmlConverter = SBMLManager.create(sbmlDocument);
+				        GUIBooleanNetworkImporter guiBooleanNetworkImporter = sbmlConverter.getGuiBnImporter();
+				        IBooleanNetwork bn = guiBooleanNetworkImporter.getBooleanNetwork();
+				        Collection<String> preambleComments=new ArrayList<String>(2);
+				        preambleComments.add("Automatically imported by "+TOOLNAME+" from");
+				        preambleComments.add(current);
+				        
+				        Collection<String> commands = new ArrayList<String>(2);
+				        
+				        commands.add("reduceBBE(fileWhereToStorePartition=\""+bn.getName()+"BBE.txt\",csvFile=\"reductionsMaximalBBE.csv\",reducedFile=\""+bn.getName()+"BBE.ode\")");
+				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+				        	commands.add("reduceBBE(fileWhereToStorePartition=\""+bn.getName()+"InputPreservingBBE.txt\",csvFile=\"reductionsIPBBE.csv\",reducedFile=\""+bn.getName()+"InputPreservingBBE.ode\",prePartition=USER)\n");
+				        }
+				        commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"FBE_OR.txt\",csvFile=\"reductionsMaximalFBE_OR.csv\",reducedFile=\""+bn.getName()+"FBE_OR.ode\")");
+				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+				        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"InputPreservingFBE_OR.txt\",csvFile=\"reductionsIPFBE_OR.csv\",reducedFile=\""+bn.getName()+"InputPreservingFBE_OR.ode\",prePartition=USER)\n");
+				        }
+				        commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"FBE_AND.txt\",csvFile=\"reductionsMaximalFBE_AND.csv\",reducedFile=\""+bn.getName()+"FBE_AND.ode\")");
+				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+				        	commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"InputPreservingFBE_AND.txt\",csvFile=\"reductionsIPFBE_AND.csv\",reducedFile=\""+bn.getName()+"InputPreservingFBE_AND.ode\",prePartition=USER)\n");
+				        }
+						GUIBooleanNetworkImporter.printToBNERODEFIle(bn,guiBooleanNetworkImporter.getInitialPartition(),
+				        		fileOut,preambleComments, true, null, null, false,commands);
+						
+						//BNetImporter bnet = new BNetImporter(current, out, bwOut, messageDialogShower);
+						//bnet.readAndExportBNet(true, fileOut);
+						CRNReducerCommandLine.println(out,bwOut,"");
+					}
+				}
+			}
+		} catch (IllegalArgumentException e) {
+			if(e.getMessage()!=null){
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of "+folderIn+" failed.\nError message:\n"+e.getMessage(),DialogType.Error);
+			}
+			else{
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of "+folderIn+" failed.",DialogType.Error);
+			}
+			return false;
+		} catch (IOException e) {
+			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled IO errors.\nError message:\n"+e.getMessage(),DialogType.Error);
+			//CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			return false;
+		} catch (XMLStreamException e) {
+			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled IO errors while reading the SBML file.\nError message:\n"+e.getMessage(),DialogType.Error);
+			e.printStackTrace();
+			return false;
+		} 
 		return true;
 	}
 	

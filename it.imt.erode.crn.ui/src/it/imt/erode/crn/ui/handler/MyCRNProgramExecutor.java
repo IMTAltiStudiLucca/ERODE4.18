@@ -31,16 +31,30 @@ import it.imt.erode.crn.ModelDefKind;
 import it.imt.erode.crn.ModelElementsCollector;
 import it.imt.erode.crn.MyParserUtil;
 import it.imt.erode.crn.chemicalReactionNetwork.BoolExpr;
+import it.imt.erode.crn.chemicalReactionNetwork.ExprReferenceToMVNodeOrValue;
+import it.imt.erode.crn.chemicalReactionNetwork.MVExpr;
+import it.imt.erode.crn.chemicalReactionNetwork.MVNode;
+import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinition;
+import it.imt.erode.crn.chemicalReactionNetwork.MVUpdateFunctions;
 import it.imt.erode.crn.chemicalReactionNetwork.ModelDefinition;
+import it.imt.erode.crn.chemicalReactionNetwork.MulReferenceToMVNodeOrValue;
 import it.imt.erode.crn.chemicalReactionNetwork.Node;
 import it.imt.erode.crn.chemicalReactionNetwork.NodeDefinition;
+import it.imt.erode.crn.chemicalReactionNetwork.SumReferenceToMVNodeOrValue;
 import it.imt.erode.crn.chemicalReactionNetwork.SymbolicParameter;
+import it.imt.erode.crn.chemicalReactionNetwork.caseMV;
+import it.imt.erode.booleannetwork.updatefunctions.ArithmeticConnector;
+import it.imt.erode.booleannetwork.updatefunctions.BinaryExprIUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.BooleanUpdateFunctionExpr;
 import it.imt.erode.booleannetwork.updatefunctions.FalseUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.MVComparison;
+import it.imt.erode.booleannetwork.updatefunctions.MVUpdateFunctionByCases;
 import it.imt.erode.booleannetwork.updatefunctions.NotBooleanUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.Otherwise;
 import it.imt.erode.booleannetwork.updatefunctions.ReferenceToNodeUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.TrueUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.ValUpdateFunction;
 import it.imt.erode.crn.symbolic.constraints.BasicConstraint;
 import it.imt.erode.crn.symbolic.constraints.BasicConstraintComparator;
 import it.imt.erode.crn.symbolic.constraints.BooleanConnector;
@@ -132,8 +146,14 @@ public class MyCRNProgramExecutor {
 		List<String> commands = MyParserUtil.parseCommands(mec,/*projectPath*/absoluteParentPath);
 		
 		List<IConstraint> constraints = parseConstraints(mec.getConstraintsListXTEXT(),consoleOut,bwOut);
-		LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions = parseBooleanUpdateFunctions(mec.getBooleanUpdateFunctionsXTEXT(), consoleOut, bwOut);
-				
+		LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions = new LinkedHashMap<>(0);
+		if(mec.getBooleanUpdateFunctionsXTEXT()!=null) {
+			booleanUpdateFunctions=parseBooleanUpdateFunctions(mec.getBooleanUpdateFunctionsXTEXT(), consoleOut, bwOut);
+		}
+		else if(mec.getMVBooleanUpdateFunctionsXTEXT() !=null) {
+			booleanUpdateFunctions=parseMVUpdateFunctions(mec.getMVBooleanUpdateFunctionsXTEXT(), consoleOut, bwOut);
+		}
+						
 				/*load constraints
 				parse constraints as in qflan. steal classes, so that we reuse the parsing to z3
 				check constraints in validation and other places
@@ -266,6 +286,150 @@ public class MyCRNProgramExecutor {
 		//console.setCompleted();
 	}
 	
+	private LinkedHashMap<String,IUpdateFunction> parseMVUpdateFunctions(EList<it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinition> mvBoleanUpdateFunctionsXTEXT, MessageConsoleStream out,BufferedWriter bwOut) {
+		LinkedHashMap<String,IUpdateFunction> mvUpdateFunctions=null;
+		if(mvBoleanUpdateFunctionsXTEXT==null){
+			return new LinkedHashMap<>(0);
+		}
+		else{
+			mvUpdateFunctions=new LinkedHashMap<String,IUpdateFunction>(mvBoleanUpdateFunctionsXTEXT.size());
+			for (MVNodeDefinition nodeDef: mvBoleanUpdateFunctionsXTEXT) {
+				MVNode node = nodeDef.getName();
+				
+				ExprReferenceToMVNodeOrValue updFunc = nodeDef.getUpdateFunction();
+				int max=Math.max(nodeDef.getName().getMax(),1);
+				IUpdateFunction parsedUpdateFunc=visitArithExprMVUpdateFunc_xtextToCore(updFunc,max);
+				//IUpdateFunction parsedUpdateFunc=visitMVUpdateFunction(upFunc,out,bwOut);
+				mvUpdateFunctions.put(node.getName(), parsedUpdateFunc);
+				
+				/*
+				EList<MVUpdateFunctions> addends = nodeDef.getUpdateFunction().getCaseFunction();
+				ArrayList<IUpdateFunction> addends_parsed=new ArrayList<>(addends.size());
+				for(MVUpdateFunctions addend: addends) {
+					MVUpdateFunctions mvUpdFunc = addend;//nodeDef.getUpdateFunction();
+					EList<caseMV> cases = mvUpdFunc.getCasesMV();
+					LinkedHashMap<Integer, IUpdateFunction> parsedCases = new LinkedHashMap<>(cases.size());
+					for(caseMV cur_case : cases) {
+						Integer cur_val= cur_case.getVal();
+						IUpdateFunction parsedCase=null;
+						if(cur_case.getACaseMV()==null) {
+							parsedCase = new Otherwise();
+						}
+						else {
+							parsedCase = visitMVUpdateFunction(cur_case.getACaseMV(),out,bwOut);
+						}
+						parsedCases.put(cur_val, parsedCase);
+					}
+					MVUpdateFunction addend_parsed = new MVUpdateFunction(parsedCases, node.getMax());
+					addends_parsed.add(addend_parsed);
+				}
+				mvUpdateFunctions.put(node.getName(), new MVUpdateFunctionSum(addends_parsed));
+				//mvUpdateFunctions.put(node.getName(), new MVUpdateFunction(parsedCases, node.getMax()));
+				*/
+			}
+			return mvUpdateFunctions;
+		}
+	}
+	
+	private IUpdateFunction/*_ArithExprRefToNode_Value*/ visitArithExprMVUpdateFunc_xtextToCore(/*ReferenceToMVNodeOrValue*//*SumReferenceToMVNodeOrValue*/ExprReferenceToMVNodeOrValue arithExprUpdFunc,int max) {
+		if(arithExprUpdFunc instanceof it.imt.erode.crn.chemicalReactionNetwork.ReferenceToMVNode) {
+			return new ReferenceToNodeUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.ReferenceToMVNode) arithExprUpdFunc).getReference().getName());
+		}
+		else if(arithExprUpdFunc instanceof it.imt.erode.crn.chemicalReactionNetwork.Value) {
+			return new ValUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.Value) arithExprUpdFunc).getVal());
+		}
+		else if(arithExprUpdFunc instanceof MulReferenceToMVNodeOrValue) {
+			return new BinaryExprIUpdateFunction(
+					visitArithExprMVUpdateFunc_xtextToCore(((MulReferenceToMVNodeOrValue)arithExprUpdFunc).getLeft(),max),
+					visitArithExprMVUpdateFunc_xtextToCore(((MulReferenceToMVNodeOrValue)arithExprUpdFunc).getRight(),max),
+					ArithmeticConnector.MUL);
+		}
+		else if(arithExprUpdFunc instanceof SumReferenceToMVNodeOrValue) {
+			return new BinaryExprIUpdateFunction(
+					visitArithExprMVUpdateFunc_xtextToCore(((SumReferenceToMVNodeOrValue)arithExprUpdFunc).getLeft(),max),
+					visitArithExprMVUpdateFunc_xtextToCore(((SumReferenceToMVNodeOrValue)arithExprUpdFunc).getRight(),max),
+					ArithmeticConnector.SUM);
+		}
+		else if(arithExprUpdFunc instanceof MVUpdateFunctions) {
+			EList<caseMV> cases = ((MVUpdateFunctions) arithExprUpdFunc).getCasesMV();
+			LinkedHashMap<Integer, IUpdateFunction> parsedCases = new LinkedHashMap<>(cases.size());
+			for(caseMV cur_case : cases) {
+				Integer cur_val= cur_case.getVal();
+				IUpdateFunction parsedCase=null;
+				if(cur_case.getACaseMV()==null) {
+					parsedCase = new Otherwise();
+				}
+				else {
+					parsedCase = visitMVUpdateFunction_BooleanPart(cur_case.getACaseMV(),max);
+				}
+				parsedCases.put(cur_val, parsedCase);
+			}
+			return new MVUpdateFunctionByCases(parsedCases, max);
+		}
+		else {
+			throw new UnsupportedOperationException("Unsupported ref to node or val:"+arithExprUpdFunc);
+		}
+	}
+	
+	private IUpdateFunction visitMVUpdateFunction_BooleanPart(MVExpr caseMVUpdateFunctionXText,int max/*, MessageConsoleStream out, BufferedWriter bwOut*/) {
+		if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.False){
+			return new FalseUpdateFunction();
+		}
+		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.True){
+			return new TrueUpdateFunction();
+		}
+//		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.SumReferenceToMVNodeOrValue){
+//			left = ((it.imt.erode.crn.chemicalReactionNetwork.SumReferenceToMVNodeOrValue) caseMVUpdateFunctionXText).getLeft();
+//			right= ((it.imt.erode.crn.chemicalReactionNetwork.SumReferenceToMVNodeOrValue) caseMVUpdateFunctionXText).getRight();
+//		}
+		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.PrimaryMVComparison){
+			ExprReferenceToMVNodeOrValue left = ((it.imt.erode.crn.chemicalReactionNetwork.PrimaryMVComparison) caseMVUpdateFunctionXText).getLeft();
+			ExprReferenceToMVNodeOrValue right = ((it.imt.erode.crn.chemicalReactionNetwork.PrimaryMVComparison) caseMVUpdateFunctionXText).getRight();
+			String comp = ((it.imt.erode.crn.chemicalReactionNetwork.PrimaryMVComparison) caseMVUpdateFunctionXText).getComp();
+			return new MVComparison(visitArithExprMVUpdateFunc_xtextToCore(left,max),visitArithExprMVUpdateFunc_xtextToCore(right,max),toComparator(comp));
+		}
+		else  if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.NotMVExpr){
+			MVExpr left = ((it.imt.erode.crn.chemicalReactionNetwork.NotMVExpr)caseMVUpdateFunctionXText).getLeft();
+			return new NotBooleanUpdateFunction(visitMVUpdateFunction_BooleanPart(left,max));
+		}
+//		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.NEqMVExpr){
+//			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) caseMVUpdateFunctionXText).getLeft(),out,bwOut);
+//			IUpdateFunction visitedRight = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) caseMVUpdateFunctionXText).getRight(),out,bwOut);
+//			return new BooleanBinaryExprUpdateFunction(visitedLeft,visitedRight,BooleanConnector.NEQ);
+//		}
+//		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr){
+//			IUpdateFunction visitedLeft = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) caseMVUpdateFunctionXText).getLeft(),out,bwOut);
+//			IUpdateFunction visitedRight = visitUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.EqBooleanExpr) caseMVUpdateFunctionXText).getRight(),out,bwOut);
+//			return new BooleanBinaryExprUpdateFunction(visitedLeft,visitedRight,BooleanConnector.EQ);
+//		}
+		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.AndMVExpr){
+			IUpdateFunction visitedLeft = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.AndMVExpr) caseMVUpdateFunctionXText).getLeft(),max);
+			IUpdateFunction visitedRight = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.AndMVExpr) caseMVUpdateFunctionXText).getRight(),max);
+			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.AND);
+		}
+		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.OrMVExpr){
+			IUpdateFunction visitedLeft = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.OrMVExpr) caseMVUpdateFunctionXText).getLeft(),max);
+			IUpdateFunction visitedRight = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.OrMVExpr) caseMVUpdateFunctionXText).getRight(),max);
+			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.OR);
+		}
+		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.XorMVExpr){
+			IUpdateFunction visitedLeft = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.XorMVExpr) caseMVUpdateFunctionXText).getLeft(),max);
+			IUpdateFunction visitedRight = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.XorMVExpr) caseMVUpdateFunctionXText).getRight(),max);
+			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.XOR);
+		}
+		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.ImpliesMVExpr){
+			IUpdateFunction visitedLeft = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.ImpliesMVExpr) caseMVUpdateFunctionXText).getLeft(),max);
+			IUpdateFunction visitedRight = visitMVUpdateFunction_BooleanPart(((it.imt.erode.crn.chemicalReactionNetwork.ImpliesMVExpr) caseMVUpdateFunctionXText).getRight(),max);
+			return new BooleanUpdateFunctionExpr(visitedLeft,visitedRight,BooleanConnector.IMPLIES);
+		}
+//		else if(caseMVUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.ReferenceToNode){
+//			Node node = ((it.imt.erode.crn.chemicalReactionNetwork.ReferenceToNode) caseMVUpdateFunctionXText).getReference();
+//			return new ReferenceToNodeUpdateFunction(node.getName());
+//		}
+		else{
+			throw new UnsupportedOperationException("The model has a not supported update function.");
+		}
+	}
 	private LinkedHashMap<String,IUpdateFunction> parseBooleanUpdateFunctions(EList<it.imt.erode.crn.chemicalReactionNetwork.NodeDefinition> booleanUpdateFunctionsXTEXT, MessageConsoleStream out,BufferedWriter bwOut) {
 		LinkedHashMap<String,IUpdateFunction> booleanUpdateFunctions=null;
 		if(booleanUpdateFunctionsXTEXT==null){
@@ -289,8 +453,7 @@ public class MyCRNProgramExecutor {
 		else if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.True){
 			return new TrueUpdateFunction();
 		}
-		else
-		if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.NotBooleanExpr){
+		else  if(booleanUpdateFunctionXText instanceof it.imt.erode.crn.chemicalReactionNetwork.NotBooleanExpr){
 			BoolExpr left = ((it.imt.erode.crn.chemicalReactionNetwork.NotBooleanExpr)booleanUpdateFunctionXText).getLeft();
 			return new NotBooleanUpdateFunction(visitUpdateFunction(left,out,bwOut));
 		}
@@ -386,10 +549,10 @@ public class MyCRNProgramExecutor {
 	}
 	private BasicConstraintComparator toComparator(String comp) {
 		if(comp.equals(">")){
-			return BasicConstraintComparator.GE;
+			return BasicConstraintComparator.GT;
 		}
 		else if(comp.equals("<")){
-			return BasicConstraintComparator.LE;
+			return BasicConstraintComparator.LT;
 		}
 		else if(comp.equals(">=")){
 			return BasicConstraintComparator.GEQ;
@@ -412,9 +575,9 @@ public class MyCRNProgramExecutor {
 		ICommandLine cl=null;
 		boolean failed=false;
 		//I have to launch the new thread starting from here
-		if(mec.getModelDefKind().equals(ModelDefKind.BOOLEAN)){
+		if(mec.getModelDefKind().equals(ModelDefKind.BOOLEAN)||mec.getModelDefKind().equals(ModelDefKind.BOOLEANMV)){
 			boolean printBooleanNetwork=false;
-			GUIBooleanNetworkImporter bnImporter = new GUIBooleanNetworkImporter(consoleOut,bwOut,msgVisualizer);
+			GUIBooleanNetworkImporter bnImporter = new GUIBooleanNetworkImporter(mec.getModelDefKind().equals(ModelDefKind.BOOLEANMV),consoleOut,bwOut,msgVisualizer);
 			try {
 				bnImporter.importBooleanNetwork(true, printBooleanNetwork, true, mec.getModelName(), mec.getInitialConcentrations(), booleanUpdateFunctions, mec.getUserPartition(), consoleOut);
 			} catch (IOException e) {
@@ -466,7 +629,7 @@ public class MyCRNProgramExecutor {
 				else if (mec.getModelDefKind().equals(ModelDefKind.IMPORTFOLDER)){
 					((CRNReducerCommandLine)cl).importModelsFromFolder(mec.getImportFolderString(), true,ignoreCommands,consoleOut,bwOut);
 				}
-				else { //mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORTFOLDER)
+				else if (mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORTFOLDER)){
 					((CRNReducerCommandLine)cl).importBooleanModelsFromFolder(mec.getImportFolderString(), true,ignoreCommands,consoleOut,bwOut);
 				}
 				/* ICRN crn = cl.getCRN();

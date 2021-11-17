@@ -12,8 +12,10 @@ import java.util.Map.Entry;
 
 import org.eclipse.ui.console.MessageConsoleStream;
 
+import com.microsoft.z3.ArithExpr;
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
+import com.microsoft.z3.Expr;
 import com.microsoft.z3.Solver;
 import com.microsoft.z3.Sort;
 import com.microsoft.z3.Status;
@@ -26,11 +28,14 @@ import it.imt.erode.auxiliarydatastructures.PartitionAndStringAndBoolean;
 import it.imt.erode.booleannetwork.auxiliarydatastructures.BNandPartition;
 import it.imt.erode.booleannetwork.implementations.BooleanNetwork;
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
+import it.imt.erode.booleannetwork.updatefunctions.ArithmeticConnector;
+import it.imt.erode.booleannetwork.updatefunctions.BinaryExprIUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.BooleanUpdateFunctionExpr;
 import it.imt.erode.booleannetwork.updatefunctions.FalseUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.TrueUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.UpdateFunctionCompiler;
+import it.imt.erode.booleannetwork.updatefunctions.ValUpdateFunction;
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.Terminator;
 
@@ -59,16 +64,22 @@ public class SMTForwardBooleanEquivalence {
 	private Context ctx;
 	private /*static*/ Solver solver;
 	boolean initialized=false;
-	private HashMap<ISpecies, BoolExpr> speciesToODENames;
-	private HashMap<ISpecies, BoolExpr> speciesToODEsDef;
+	private HashMap<ISpecies, /*Bool*/Expr> speciesToODENames;
+	private HashMap<ISpecies, /*Bool*/Expr> speciesToODEsDef;
 	//private BoolExpr allODEsDef;
 	//private HashMap<ISpecies, HashSet<ISpecies>> speciesInTheODEs;
 
-	private HashMap<IBlock,BoolExpr> odeSums;
+	private HashMap<IBlock,/*Bool*/Expr> odeSums;
+	private Sort sort;
 
 	public static final boolean SHOWTIMEATEACHSTEP = false;
 	public static final boolean DOONLYCHECKSWITHWHOLEPARTITION = false;
 	public static final int MAXINNERITERATIONS = 30000;//Integer.MAX_VALUE;
+	
+	/**
+	 * For MV networks, I want to explicitly state the domain of each species (from 0 to max)
+	 */
+	private BoolExpr speciesDomainsAssertion;
 
 	private double totalSMTChecksSeconds=0.0;
 	private double initSMTTime=0.0;
@@ -76,7 +87,7 @@ public class SMTForwardBooleanEquivalence {
 	public List<Double> getSMTChecksSecondsAtStep(){
 		return smtChecksSecondsAtStep;
 	}
-	private HashMap<ISpecies, BoolExpr> speciesToPopulation;
+	private HashMap<ISpecies, /*Bool*/Expr> speciesToPopulation;
 	//private HashMap<String, BoolExpr> symbParNameToSymbParZ3;
 	private boolean simplify;
 
@@ -87,7 +98,7 @@ public class SMTForwardBooleanEquivalence {
 
 	/**
 	 * 
-	 * @param crn
+	 * @param bn
 	 * @param partition the partition to be refined. It is not modified, but instead a new one is created and returned
 	 * @param verbose
 	 * @param terminator 
@@ -95,10 +106,10 @@ public class SMTForwardBooleanEquivalence {
 	 * @throws Z3Exception 
 	 * @throws IOException 
 	 */
-	public PartitionAndStringAndBoolean computeOFLsmt(IBooleanNetwork crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut,boolean print, Terminator terminator) throws Z3Exception, IOException{
+	public PartitionAndStringAndBoolean computeOFLsmt(IBooleanNetwork bn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut,boolean print, Terminator terminator) throws Z3Exception, IOException{
 
 		if(verbose){
-			CRNReducerCommandLine.println(out,bwOut,"FBE Reducing: "+crn.getName()+" with aggregation function "+aggregationFunction+" exploiting Microsoft z3");
+			CRNReducerCommandLine.println(out,bwOut,"FBE Reducing: "+bn.getName()+" with aggregation function "+aggregationFunction+" exploiting Microsoft z3");
 		}
 		else {
 			CRNReducerCommandLine.print(out,bwOut," using "+aggregationFunction+"...");
@@ -112,19 +123,19 @@ public class SMTForwardBooleanEquivalence {
 			if(obtainedPartition.size()==1){
 				blocks = " block";
 			}
-			CRNReducerCommandLine.println(out,bwOut,"Before partitioning we have "+ obtainedPartition.size() + blocks +" and "+crn.getSpecies().size()+ " species.");
+			CRNReducerCommandLine.println(out,bwOut,"Before partitioning we have "+ obtainedPartition.size() + blocks +" and "+bn.getSpecies().size()+ " species.");
 		}
 
 		long begin = System.currentTimeMillis();
 		long beginInit = System.currentTimeMillis();
-		init(crn,verbose,out,bwOut,terminator);
+		init(bn,verbose,out,bwOut,terminator);
 		long endInit = System.currentTimeMillis();
 		initSMTTime = (double)(endInit-beginInit) / 1000.0;
 		if(SHOWTIMEATEACHSTEP){	
 			CRNReducerCommandLine.println(out,bwOut,"Init requred: "+String.format(CRNReducerCommandLine.MSFORMAT,(initSMTTime))+" (s)");
 		}
 
-		IntegerAndPartition iterationsAndPartition = refineFBE(crn,obtainedPartition,verbose,begin,out,bwOut,terminator);
+		IntegerAndPartition iterationsAndPartition = refineFBE(bn,obtainedPartition,verbose,begin,out,bwOut,terminator);
 		//int iterations = iterationsAndPartition.getInteger();
 		obtainedPartition = iterationsAndPartition.getPartition();
 		boolean succeeded = iterationsAndPartition.getInteger()>=0;
@@ -151,7 +162,7 @@ public class SMTForwardBooleanEquivalence {
 
 		if(verbose){
 			long end = System.currentTimeMillis();
-			CRNReducerCommandLine.println(out,bwOut,"OFL Partitioning completed. From "+ crn.getSpecies().size() +" species to "+ obtainedPartition.size() + " blocks. Time necessary: "+(end-begin)+ " (ms)");
+			CRNReducerCommandLine.println(out,bwOut,"OFL Partitioning completed. From "+ bn.getSpecies().size() +" species to "+ obtainedPartition.size() + " blocks. Time necessary: "+(end-begin)+ " (ms)");
 			CRNReducerCommandLine.println(out,bwOut,"");
 		}
 		return new PartitionAndStringAndBoolean(obtainedPartition, smtTimes,succeeded);
@@ -160,16 +171,16 @@ public class SMTForwardBooleanEquivalence {
 
 	/**
 	 * 
-	 * @param crn
+	 * @param bn
 	 * @param partition the partition to be refined. Note that the partition is modified, thus first invoke copy if you want to preserve it.
 	 * @param terminator 
 	 * @param labels
 	 * @throws Z3Exception 
 	 */
-	private IntegerAndPartition refineFBE(IBooleanNetwork crn, IPartition partition,boolean verbose,long begin,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws Z3Exception {
+	private IntegerAndPartition refineFBE(IBooleanNetwork bn, IPartition partition,boolean verbose,long begin,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws Z3Exception {
 
 		partition.initializeAllBST();
-		odeSums = new HashMap<IBlock, BoolExpr>(partition.size());
+		odeSums = new HashMap<>(partition.size());
 
 		//remove blocks-sums of splitted blocks
 		//compute list of new blocks, and compute sums only for them
@@ -178,7 +189,7 @@ public class SMTForwardBooleanEquivalence {
 		int totalInnerIteration=0;
 		int prevPartitionSize;
 		Symbol redistributorAppSymbol = ctx.mkSymbol("app");
-		BoolExpr redistributorApp = (BoolExpr) ctx.mkConst(redistributorAppSymbol, ctx.getBoolSort());
+		Expr redistributorApp = ctx.mkConst(redistributorAppSymbol, sort);
 
 		ArrayList<IBlock> sumsToBeRemoved = new ArrayList<IBlock>();
 		int partitionSizeOfPrevDoWhileIter = partition.size();
@@ -203,13 +214,13 @@ public class SMTForwardBooleanEquivalence {
 			sumsToBeRemoved=new ArrayList<IBlock>();//Reinitialize the list of blocks whose cumulative ODEs have to be removed.
 
 			IBlock currentSplitterBlock = partition.getFirstBlock();
-			BoolExpr[] sumsOfTheBlocks = new BoolExpr[partition.size()];
+			/*Bool*/Expr[] sumsOfTheBlocks = new /*Bool*/Expr[partition.size()];
 			int b=0;
 			while(currentSplitterBlock!=null){
 				if(Terminator.hasToTerminate(terminator)){
 					break;
 				}
-				BoolExpr odeSumOfCurrentBlock = odeSums.get(currentSplitterBlock);
+				/*Bool*/Expr odeSumOfCurrentBlock = odeSums.get(currentSplitterBlock);
 				if(odeSumOfCurrentBlock==null){
 					odeSumOfCurrentBlock=computeOdeSum(currentSplitterBlock);
 				}
@@ -236,7 +247,7 @@ public class SMTForwardBooleanEquivalence {
 					//IPartition partitionOfBlock = refineBlockDecomposeBinaryFDEWithOneSplitterAtTime(blockToSplit,crn,partition,redistributor,redistributorApp,oneMinusRedistributor,sumsOfTheBlocks,verbose);
 					//IPartition partitionOfBlock = refineBlockAllSplittersAtOnce(blockToSplit,crn,partition,redistributor,redistributorApp,oneMinusRedistributor,sumsOfTheBlocks,verbose);
 					//totalInnerIteration contains the sum of all inneriterations
-					totalInnerIteration=refineBlockDecomposeBinaryFBEWithOneSplitterAtTime(blockToSplit,crn,partition,/*,redistributor,*/redistributorApp,/*oneMinusRedistributor*/
+					totalInnerIteration=refineBlockDecomposeBinaryFBEWithOneSplitterAtTime(blockToSplit,bn,partition,/*,redistributor,*/redistributorApp,/*oneMinusRedistributor*/
 							sumsOfTheBlocks,verbose,partitionSizeOfPrevDoWhileIter/*prevPartitionSize*/,out,bwOut,terminator,totalInnerIteration);
 					//refineBlockAllSplittersAtOnce(blockToSplit,crn,partition,redistributor,redistributorApp,oneMinusRedistributor,sumsOfTheBlocks,verbose,prevPartitionSize);				
 
@@ -314,8 +325,8 @@ public class SMTForwardBooleanEquivalence {
 	}
 
 
-	private int refineBlockDecomposeBinaryFBEWithOneSplitterAtTime(IBlock blockToSplit,IBooleanNetwork crn, IPartition partition, /*ArithExpr redistributor,*/ BoolExpr redistributorApp, /*ArithExpr oneMinusRedistributor,*/ 
-			BoolExpr[] sumsOfTheBlocks, boolean verbose, int sizeOfPartiton,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, int totalInnerIteration) throws Z3Exception {
+	private int refineBlockDecomposeBinaryFBEWithOneSplitterAtTime(IBlock blockToSplit,IBooleanNetwork crn, IPartition partition, /*ArithExpr redistributor,*/ /*Bool*/Expr redistributorApp, /*ArithExpr oneMinusRedistributor,*/ 
+			/*Bool*/Expr[] sumsOfTheBlocks, boolean verbose, int sizeOfPartiton,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, int totalInnerIteration) throws Z3Exception {
 		int indexOfSplitterBlock=0;
 		//int innerIteration=0;
 		//IBlock lastBlockOfPartition = partition.getLastBlock();
@@ -333,7 +344,7 @@ public class SMTForwardBooleanEquivalence {
 				break;
 			}
 			ISpecies currentSpecies=iterator.next();
-			BoolExpr currentSpeciesPop = speciesToPopulation.get(currentSpecies);
+			/*Bool*/Expr currentSpeciesPop = speciesToPopulation.get(currentSpecies);
 			//I now have to check if currentSpecies has to belong to an existing block of partitionOfBlock, or if a new one has to be create
 			boolean correctSubBlockFoundForCurrentSpecies=false;
 			IBlock currentSubBlock = firstSubBlock;
@@ -345,30 +356,40 @@ public class SMTForwardBooleanEquivalence {
 //				if(repOfCurrentSubBlock.equals(currentSpecies)) {
 //					System.out.println("ciao");
 //				}
-				BoolExpr repOfCurrentSubBlockPop = speciesToPopulation.get(repOfCurrentSubBlock);
+				/*Bool*/Expr repOfCurrentSubBlockPop = speciesToPopulation.get(repOfCurrentSubBlock);
 				indexOfSplitterBlock=0;
-				BoolExpr sumOfThetwo = sumExpressions(new BoolExpr[]{currentSpeciesPop,repOfCurrentSubBlockPop});
+				Expr sumOfThetwo;
+				if(isBooleanAggrFunc()) {
+					sumOfThetwo = sumExpressions(new BoolExpr[]{(BoolExpr)currentSpeciesPop,(BoolExpr)repOfCurrentSubBlockPop});
+				}
+				else {
+					sumOfThetwo = sumExpressions(new ArithExpr[]{(ArithExpr)currentSpeciesPop,(ArithExpr)repOfCurrentSubBlockPop});
+				}
 				IBlock currentSplitterBlock = partition.getFirstBlock();
 				while(currentSplitterBlock!=null && !checkIfSpeciesBelongsToNextSubBlock && totalInnerIteration < MAXINNERITERATIONS){
 					if(Terminator.hasToTerminate(terminator)){
 						break;
 					}
-					BoolExpr cumulativeODEsOfCSB = sumsOfTheBlocks[indexOfSplitterBlock];
-					BoolExpr swappedSum = (BoolExpr) cumulativeODEsOfCSB.substitute(repOfCurrentSubBlockPop, redistributorApp);
+					/*Bool*/Expr cumulativeODEsOfCSB = sumsOfTheBlocks[indexOfSplitterBlock];
+					/*Bool*/Expr swappedSum = cumulativeODEsOfCSB.substitute(repOfCurrentSubBlockPop, redistributorApp);
 					// Replace currentSpecies with neutral element
-					BoolExpr swappedSum_phi_ij = (BoolExpr)swappedSum.substitute(currentSpeciesPop, neutralElement());
+					/*Bool*/Expr swappedSum_phi_ij = swappedSum.substitute(currentSpeciesPop, neutralElement());
 					//Replace repOfCurrentSubBlock with sum of block
-					swappedSum_phi_ij =  (BoolExpr)swappedSum_phi_ij.substitute(redistributorApp, sumOfThetwo);
-					swappedSum_phi_ij=(BoolExpr)swappedSum_phi_ij.simplify();
+					swappedSum_phi_ij =  swappedSum_phi_ij.substitute(redistributorApp, sumOfThetwo);
+					swappedSum_phi_ij=swappedSum_phi_ij.simplify();
 					
 					//I also have to do the other way around:
 					//Replace currentSpecies with sum of block
-					BoolExpr swappedSum_phi_ji = (BoolExpr)swappedSum.substitute(currentSpeciesPop, sumOfThetwo);
+					/*Bool*/Expr swappedSum_phi_ji = swappedSum.substitute(currentSpeciesPop, sumOfThetwo);
 					//Replace repOfCurrentSubBlock with neutral element
-					swappedSum_phi_ji =  (BoolExpr)swappedSum_phi_ji.substitute(redistributorApp, neutralElement());
-					swappedSum_phi_ji=(BoolExpr)swappedSum_phi_ji.simplify();
+					swappedSum_phi_ji =  swappedSum_phi_ji.substitute(redistributorApp, neutralElement());
+					swappedSum_phi_ji=swappedSum_phi_ji.simplify();
 					
 					solver.reset();
+					
+					if(crn.isMultiValued()) {
+						solver.add(speciesDomainsAssertion);
+					}
 					
 					BoolExpr phi_ij__and__phi_ji = ctx.mkAnd(new BoolExpr[]{ctx.mkEq(cumulativeODEsOfCSB, swappedSum_phi_ij),ctx.mkEq(cumulativeODEsOfCSB, swappedSum_phi_ji)});
 					solver.add(ctx.mkNot(phi_ij__and__phi_ji));
@@ -528,21 +549,50 @@ public class SMTForwardBooleanEquivalence {
 	//	}
 
 
-	private BoolExpr computeOdeSum(IBlock block) throws Z3Exception {
+	private /*Bool*/Expr computeOdeSum(IBlock block) throws Z3Exception {
 		int s=0;
-		BoolExpr[] odesOfBlock = new BoolExpr[block.getSpecies().size()];
-		for (ISpecies species : block.getSpecies()) {
-			odesOfBlock[s]=speciesToODEsDef.get(species);
-			s++;
+		Expr odeSum;
+		
+		if(isBooleanAggrFunc()) {
+			BoolExpr[] odesOfBlock = new BoolExpr[block.getSpecies().size()];
+			for (ISpecies species : block.getSpecies()) {
+				odesOfBlock[s]=(BoolExpr)speciesToODEsDef.get(species);
+				s++;
+			}
+			odeSum = sumExpressions(odesOfBlock);
+		}
+		else if(isArithAggrFunc()) {
+			ArithExpr[] odesOfBlock = new ArithExpr[block.getSpecies().size()];
+			for (ISpecies species : block.getSpecies()) {
+				odesOfBlock[s]=(ArithExpr)speciesToODEsDef.get(species);
+				s++;
+			}
+			odeSum = sumExpressions(odesOfBlock);
+		} 
+		else {
+			throw new UnsupportedOperationException("Not supported FBE aggregation function: "+aggregationFunction);
 		}
 
-		BoolExpr odeSum = sumExpressions(odesOfBlock);
-
-
-
-		odeSum=(BoolExpr)odeSum.simplify();
+		odeSum=odeSum.simplify();
 		odeSums.put(block, odeSum);
 		return odeSum; 
+	}
+
+	private boolean isBooleanAggrFunc() {
+		if(aggregationFunction.equals(FBEAggregationFunctions.OR)||aggregationFunction.equals(FBEAggregationFunctions.AND)) {
+			return true;
+		}
+		else {
+			return false;
+		} 
+	}
+	private boolean isArithAggrFunc() {
+		if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
+			return true;
+		}
+		else {
+			return false;
+		} 
 	}
 
 	private BoolExpr sumExpressions(BoolExpr[] expressions) {
@@ -558,16 +608,29 @@ public class SMTForwardBooleanEquivalence {
 		}
 		return odeSum;
 	}
+	private ArithExpr sumExpressions(ArithExpr[] expressions) {
+		ArithExpr odeSum=null;
+		if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
+			odeSum = ctx.mkAdd(expressions);
+		}
+		else {
+			throw new UnsupportedOperationException("Not supported FBE aggregation function: "+aggregationFunction);
+		}
+		return odeSum;
+	}
 
-	private BoolExpr neutralElement() {
+	private /*Bool*/Expr neutralElement() {
 		if(aggregationFunction.equals(FBEAggregationFunctions.OR)) {
 			return ctx.mkFalse();
 		}
 		else if(aggregationFunction.equals(FBEAggregationFunctions.AND)) {
 			return ctx.mkTrue();
-		} 
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
+			return ctx.mkInt(0);
+		}
 		else {
-			throw new UnsupportedOperationException("Not supported FBE aggregation function: "+aggregationFunction);
+			throw new UnsupportedOperationException("Not supported FBE/FME aggregation function: "+aggregationFunction);
 		}
 	}
 
@@ -578,6 +641,9 @@ public class SMTForwardBooleanEquivalence {
 		else if(aggregationFunction.equals(FBEAggregationFunctions.AND)) {
 			return new TrueUpdateFunction();
 		} 
+		else if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
+			return new ValUpdateFunction(0);
+		}
 		else {
 			throw new UnsupportedOperationException("Not supported FBE aggregation function: "+aggregationFunction);
 		}
@@ -594,7 +660,7 @@ public class SMTForwardBooleanEquivalence {
 		initialized=false;
 	}
 
-	private void init(IBooleanNetwork crn, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws Z3Exception, IOException {
+	private void init(IBooleanNetwork bn, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws Z3Exception, IOException {
 
 		smtChecksSecondsAtStep=new ArrayList<Double>();
 		totalSMTChecksSeconds=0.0;
@@ -609,14 +675,27 @@ public class SMTForwardBooleanEquivalence {
 			CRNReducerCommandLine.println(out,bwOut,"");
 		}
 	
-		Sort boolSort = ctx.mkBoolSort();
+		if(bn.isMultiValued()) {
+			sort= ctx.mkIntSort();
+		}
+		else {
+			sort= ctx.mkBoolSort();
+		}
 
-		speciesToODENames = new HashMap<>(crn.getSpecies().size());
-		speciesToPopulation = new HashMap<ISpecies, BoolExpr>(crn.getSpecies().size());
-		speciesToODEsDef = new HashMap<ISpecies, BoolExpr>(crn.getSpecies().size());
+		speciesToODENames = new HashMap<>(bn.getSpecies().size());
+		speciesToPopulation = new HashMap<>(bn.getSpecies().size());
+		speciesToODEsDef = new HashMap<>(bn.getSpecies().size());
 
-		HashMap<String, ISpecies> speciesNameToSpecies = new HashMap<>(crn.getSpecies().size());
-		for (ISpecies species : crn.getSpecies()) {
+		BoolExpr[] speciesDomainsAssertions = null;
+		int s=0;
+		ArithExpr zero=null;
+		if(bn.isMultiValued()) {
+			speciesDomainsAssertions=new BoolExpr[bn.getSpecies().size()];
+			zero = ctx.mkInt(0);
+		}
+		
+		HashMap<String, ISpecies> speciesNameToSpecies = new HashMap<>(bn.getSpecies().size());
+		for (ISpecies species : bn.getSpecies()) {
 			if(Terminator.hasToTerminate(terminator)){
 				break;
 			}
@@ -624,18 +703,23 @@ public class SMTForwardBooleanEquivalence {
 			//create the z3 constants for the populations
 			String speciesNameInZ3 = z3Importer.nameInZ3(species);
 			Symbol declNames = ctx.mkSymbol(speciesNameInZ3);
-			BoolExpr population = (BoolExpr) ctx.mkConst(declNames,boolSort);
+			/*Bool*/Expr population = ctx.mkConst(declNames,sort);
 			speciesToPopulation.put(species,population);
-			//BoolExpr positivePop = ctx.mkGt(population, zero);
-			//positivePopulationAssertions[s] = positivePop;
-			//s++;
+			
+			if(bn.isMultiValued()) {
+				BoolExpr domain_min = ctx.mkGe((ArithExpr)population, zero);
+				int max=bn.getNameToMax(species.getName());
+				BoolExpr domain_max = ctx.mkLe((ArithExpr)population, ctx.mkInt(max));
+				speciesDomainsAssertions[s]=ctx.mkAnd(domain_min,domain_max);
+				s++;
+			}
 
-			BoolExpr ode = (BoolExpr) ctx.mkConst(declNames,boolSort);
+			/*Bool*/Expr ode = ctx.mkConst(declNames,sort);
 			speciesToODENames.put(species, ode);
 			//speciesToODEsDef.put(species, zero);
 		}
-		//if(IMPOSEpositivePopulationsAssertion)
-		//	positivePopulationsAssertion = ctx.mkAnd(positivePopulationAssertions);
+		if(bn.isMultiValued())
+			speciesDomainsAssertion = ctx.mkAnd(speciesDomainsAssertions);
 
 		//		symbParNameToSymbParZ3 = new HashMap<>(crn.getSymbolicParameters().size());
 		//		for(String symbPar : crn.getSymbolicParameters()){
@@ -670,13 +754,13 @@ public class SMTForwardBooleanEquivalence {
 		 * (assert (= ds0 (+ 0.0  (* 6.0  s0 -1) (* 2.0  s0 -1))))
 		 */
 		long beginODESBPopulation = System.currentTimeMillis();
-		BoolExpr[] allODEsDefArray = new BoolExpr[crn.getSpecies().size()];
+		/*Bool*/Expr[] allODEsDefArray = new /*Bool*/Expr[bn.getSpecies().size()];
 		int j=0;
-		for (Entry<String, IUpdateFunction> entry : crn.getUpdateFunctions().entrySet()) {
+		for (Entry<String, IUpdateFunction> entry : bn.getUpdateFunctions().entrySet()) {
 			ISpecies species = speciesNameToSpecies.get(entry.getKey());
 			IUpdateFunction updateFunction = entry.getValue();
-			BoolExpr updateFunctionZ3 = updateFunction.toZ3(ctx, speciesNameToSpecies, speciesToPopulation);
-			updateFunctionZ3=(BoolExpr)updateFunctionZ3.simplify();
+			/*Bool*/Expr updateFunctionZ3 = updateFunction.toZ3(ctx, speciesNameToSpecies, speciesToPopulation);
+			updateFunctionZ3=updateFunctionZ3.simplify();
 			speciesToODEsDef.put(species, updateFunctionZ3);
 			allODEsDefArray[j]=ctx.mkEq(speciesToODENames.get(species), updateFunctionZ3);
 			j++;
@@ -724,7 +808,7 @@ public class SMTForwardBooleanEquivalence {
 	 */
 	public BNandPartition computeReducedFBE(IBooleanNetwork bn,String name, IPartition partition,String commSymbol,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator
 			,FBEAggregationFunctions aggregationFunction) throws IOException {
-		IBooleanNetwork reducedBN = new BooleanNetwork(name, out, bwOut);
+		IBooleanNetwork reducedBN = new BooleanNetwork(name, out, bwOut,bn.isMultiValued());
 
 
 		HashMap<String, ISpecies> speciesNameToSpecies = new HashMap<String, ISpecies>(bn.getSpecies().size());
@@ -749,12 +833,16 @@ public class SMTForwardBooleanEquivalence {
 		while(currentBlock!=null){
 		 */
 
+		ArithmeticConnector opArith=null;
 		BooleanConnector op=null;
 		if(aggregationFunction.equals(FBEAggregationFunctions.OR)){
 			op=BooleanConnector.OR;
 		}
 		else if(aggregationFunction.equals(FBEAggregationFunctions.AND)){
 			op=BooleanConnector.AND;
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
+			opArith=ArithmeticConnector.SUM;
 		}
 		else {
 			throw new UnsupportedOperationException("Unsupported aggregation function: "+aggregationFunction);
@@ -777,15 +865,23 @@ public class SMTForwardBooleanEquivalence {
 			 */
 			String nameRep=blockRepresentative.getName();
 			BigDecimal ic = currentBlock.getBlockConcentration();
-			String icExpr="false";
-			if(ic.compareTo(BigDecimal.ZERO)>0) {
-				ic=BigDecimal.ONE;
-				icExpr="true";
+			
+			String icExpr;
+			if(bn.isMultiValued()) {
+				icExpr=String.valueOf(ic);
 			}
+			else {
+				ic=cumulIC_BN(ic,currentBlock.getSpecies().size());				
+				icExpr=ic.compareTo(BigDecimal.ZERO)==0? "false":"true";
+			}
+			
 
 			ISpecies reducedSpecies;
 			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, ic,/*currentBlock.computeBlockConcentrationExpr()*/icExpr,blockRepresentative.isAlgebraic());
 			reducedBN.addSpecies(reducedSpecies);
+			if(bn.isMultiValued()) {
+				reducedBN.setMax(reducedSpecies, bn.cumulMax(currentBlock.getSpecies()));
+			}
 			
 			reducedSpecies.addCommentLines(currentBlock.computeBlockComment());
 			correspondenceBlock_ReducedSpecies.put(currentBlock, reducedSpecies);
@@ -795,10 +891,10 @@ public class SMTForwardBooleanEquivalence {
 			IBlock currentBlock=entry.getKey();
 			//ISpecies reducedSpecies=entry.getValue();
 			
-			IUpdateFunction sum =computeUpdateFunctionSumPreservingRepresentative(bn,currentBlock,op,partition, correspondenceBlock_ReducedSpecies, speciesNameToSpecies,aggregationFunction);
+			IUpdateFunction sum =computeUpdateFunctionSumPreservingRepresentative(bn,currentBlock,op,opArith,partition, correspondenceBlock_ReducedSpecies, speciesNameToSpecies,aggregationFunction);
 			if(simplify) {
-				BoolExpr z3Sum = sum.toZ3(ctx, speciesNameToSpecies, speciesToODENames);
-				BoolExpr z3SumSimpl=(BoolExpr)z3Sum.simplify();
+				Expr z3Sum = sum.toZ3(ctx, speciesNameToSpecies, speciesToODENames);
+				Expr z3SumSimpl=z3Sum.simplify();
 				IUpdateFunction sumSimplified=compiler.toUpdateFunction(z3SumSimpl);
 				correspondenceBlock_sumOfUpdateFunctions.put(currentBlock, sumSimplified);
 			}
@@ -876,20 +972,57 @@ public class SMTForwardBooleanEquivalence {
 		return new BNandPartition(reducedBN, trivialPartition);
 	}
 
-	private static IUpdateFunction computeUpdateFunctionSumPreservingRepresentative(IBooleanNetwork crn, IBlock currentBlock, BooleanConnector op,
+	/**
+	 * for boolean networks (no multivalued). This method transforms the cumulative ic of a block in 1 (true) or 0 (false) depending on the aggregation function 
+	 * @param cumulIC
+	 * @param spInTheBlock
+	 * @return
+	 */
+	private BigDecimal cumulIC_BN(BigDecimal cumulIC, int spInTheBlock) {
+		if(this.aggregationFunction.equals(FBEAggregationFunctions.OR)) {
+			if(cumulIC.compareTo(BigDecimal.ZERO)>0) {
+				return BigDecimal.ONE;
+			}
+			return BigDecimal.ZERO;
+		}
+		else if(this.aggregationFunction.equals(FBEAggregationFunctions.AND)) {
+			if(cumulIC.compareTo(BigDecimal.valueOf(spInTheBlock))==0) {
+				return BigDecimal.ONE;
+			}
+			return BigDecimal.ZERO;
+		} 
+		return null;
+	}
+
+	private static IUpdateFunction computeUpdateFunctionSumPreservingRepresentative(IBooleanNetwork crn, IBlock currentBlock, BooleanConnector op,ArithmeticConnector opArith,
 			IPartition partition,
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
 			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction
 			) {
 		IUpdateFunction sum=null;
+		
 		for(ISpecies sp : currentBlock.getSpecies()) {
 			IUpdateFunction c= crn.getUpdateFunctions().get(sp.getName());
 			c=c.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies, speciesNameToOriginalSpecies, aggregationFunction);
 			if(sum==null) {
 				sum=c;
+				/*if(crn.isMultiValued()) {
+					ArrayList<IUpdateFunction> addends=new ArrayList<>(1);
+					addends.add(c);
+					sum=new REMOVE_MVUpdateFunctionSum(addends);
+				}
+				else {
+					sum=c;
+				}*/
 			}
 			else {
-				sum = new BooleanUpdateFunctionExpr(sum, c, op);
+				if(crn.isMultiValued()) {
+					//((REMOVE_MVUpdateFunctionSum)sum).add(c);
+					sum=new BinaryExprIUpdateFunction(sum,c,opArith);
+				}
+				else {
+					sum = new BooleanUpdateFunctionExpr(sum, c, op);
+				}	
 			}
 		}
 		return sum;

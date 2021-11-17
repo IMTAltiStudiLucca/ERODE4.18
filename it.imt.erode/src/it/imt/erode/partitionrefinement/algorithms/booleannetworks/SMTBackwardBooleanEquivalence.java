@@ -30,6 +30,7 @@ import it.imt.erode.booleannetwork.auxiliarydatastructures.BNandPartition;
 import it.imt.erode.booleannetwork.implementations.BooleanNetwork;
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.UpdateFunctionCompiler;
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.IMessageDialogShower;
 import it.imt.erode.commandline.Terminator;
@@ -55,12 +56,15 @@ public class SMTBackwardBooleanEquivalence {
 	private Context ctx;
 	private /*static*/ Solver solver;
 	boolean initialized=false;
-	private HashMap<ISpecies, BoolExpr> speciesToODENames;
-	private HashMap<ISpecies, BoolExpr> speciesToODEsDef;
+	private HashMap<ISpecies, /*Bool*/Expr> speciesToODENames;
+	private HashMap<ISpecies, /*Bool*/Expr> speciesToODEsDef;
 	private BoolExpr allODEsDef;
+	private Sort sort;
 	
 	public static final boolean SHOWTIMEATEACHSTEP = false;
 	public static final boolean DOONLYCHECKSWITHWHOLEPARTITION = false;
+	
+	private boolean simplify;
 	
 	private double totalSMTChecksSeconds=0.0;
 	private double initSMTTime=0.0;
@@ -70,9 +74,13 @@ public class SMTBackwardBooleanEquivalence {
 	}
 	
 	//private MathEval math;
-	private HashMap<ISpecies, BoolExpr> speciesToPopulation;
+	private HashMap<ISpecies, /*Bool*/Expr> speciesToPopulation;
 	//private HashMap<String, BoolExpr> symbParNameToSymbParZ3;	
 
+	public SMTBackwardBooleanEquivalence(boolean simplify) {
+		this.simplify=simplify;
+	}
+	
 	/**
 	 * 
 	 * @param bn
@@ -233,8 +241,8 @@ public class SMTBackwardBooleanEquivalence {
 		return new PartitionAndString(obtainedPartition,smtTimes);
 	}
 
-	public static BNandPartition computeReducedBBE(IBooleanNetwork bn, String name, IPartition partition,String commentSymbol,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) {
-		IBooleanNetwork reducedBN = new BooleanNetwork(name, out, bwOut);
+	public BNandPartition computeReducedBBE(IBooleanNetwork bn, String name, IPartition partition,String commentSymbol,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator)throws IOException {
+		IBooleanNetwork reducedBN = new BooleanNetwork(name, out, bwOut,bn.isMultiValued());
 		
 		HashMap<String, ISpecies> speciesNameToSpecies = new HashMap<String, ISpecies>(bn.getSpecies().size());
 		for (ISpecies species : bn.getSpecies()) {
@@ -250,6 +258,12 @@ public class SMTBackwardBooleanEquivalence {
 		ISpecies[] representativeSpecies = CRNBisimulationsNAry.getSortedBlockRepresentatives(partition, terminator);
 		
 		LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies = new LinkedHashMap<IBlock, ISpecies>(partition.size());
+		
+		UpdateFunctionCompiler compiler=null;
+		if(simplify) {
+			init(bn,false,out,bwOut,terminator);
+			compiler = new UpdateFunctionCompiler(bn, speciesToPopulation);
+		}
 		
 		for(int i=0;i<representativeSpecies.length;i++) {
 			if(Terminator.hasToTerminate(terminator)){
@@ -268,6 +282,9 @@ public class SMTBackwardBooleanEquivalence {
 			
 			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, blockRepresentative.getInitialConcentration(),blockRepresentative.getInitialConcentrationExpr(),blockRepresentative.getNameAlphanumeric(),false);
 			reducedBN.addSpecies(reducedSpecies);
+			if(bn.isMultiValued()) {
+				reducedBN.setMax(reducedSpecies, bn.cumulMax(currentBlock.getSpecies()));
+			}
 			
 			reducedSpecies.addCommentLines(currentBlock.computeBlockComment());
 			uniqueBlock.addSpecies(reducedSpecies);
@@ -279,7 +296,18 @@ public class SMTBackwardBooleanEquivalence {
 			ISpecies reducedSpecies = entry.getValue();
 			IUpdateFunction updateFunctionOfRep = bn.getUpdateFunctions().get(reducedSpecies.getName());
 			IUpdateFunction reducedUpdateFunction = updateFunctionOfRep.cloneReplacingWithRepresentative(partition,correspondenceBlock_ReducedSpecies,speciesNameToSpecies);
+			
+			if(simplify) {
+				Expr z3reducedUpdateFunction = reducedUpdateFunction.toZ3(ctx, speciesNameToSpecies, speciesToPopulation);
+				Expr z3reducedUpdateFunctionSimpl=z3reducedUpdateFunction.simplify();
+				IUpdateFunction reducedUpdateFunctionSimpl=compiler.toUpdateFunction(z3reducedUpdateFunctionSimpl);
+				reducedUpdateFunction=reducedUpdateFunctionSimpl;
+			}
 			reducedBN.addUpdateFunction(reducedSpecies.getName(), reducedUpdateFunction);
+		}
+		
+		if(simplify) {
+			dispose();
 		}
 		
 		return new BNandPartition(reducedBN, trivialPartition);
@@ -308,7 +336,13 @@ public class SMTBackwardBooleanEquivalence {
 		s.add(file);
 		check(s);*/
 		
-		Sort boolSort = ctx.mkBoolSort();
+		//Sort boolSort = ctx.mkBoolSort();
+		if(bn.isMultiValued()) {
+			sort= ctx.mkIntSort();
+		}
+		else {
+			sort= ctx.mkBoolSort();
+		}
 		
 
 		
@@ -334,7 +368,7 @@ public class SMTBackwardBooleanEquivalence {
 			//create the z3 constants for the populations
 			String speciesNameInZ3 = z3Importer.nameInZ3(species);
 			Symbol declPopulation = ctx.mkSymbol(speciesNameInZ3);
-			BoolExpr population = (BoolExpr) ctx.mkConst(declPopulation,boolSort);
+			/*Bool*/Expr population = ctx.mkConst(declPopulation,sort);
 			speciesToPopulation.put(species,population);
 			//BoolExpr positivePop = ctx.mkGt(population, zero);
 			//positivePopulationsAssertion = ctx.mkAnd(new BoolExpr[] { positivePop, positivePopulationsAssertion });
@@ -346,7 +380,7 @@ public class SMTBackwardBooleanEquivalence {
 			//decls=ctx.mkConstDecl(declNames,ctx.mkRealSort());
 			
 			
-			BoolExpr ode = (BoolExpr) ctx.mkConst(declNames,boolSort);
+			/*Bool*/Expr ode = ctx.mkConst(declNames,sort);
 			speciesToODENames.put(species, ode);
 			
 			//speciesToODEsDef.put(species, falseZ3);
@@ -399,8 +433,8 @@ public class SMTBackwardBooleanEquivalence {
 		for (Entry<String, IUpdateFunction> entry : bn.getUpdateFunctions().entrySet()) {
 			ISpecies species = speciesNameToSpecies.get(entry.getKey());
 			IUpdateFunction updateFunction = entry.getValue();
-			BoolExpr updateFunctionZ3 = updateFunction.toZ3(ctx, /*bn,*/ speciesNameToSpecies, speciesToPopulation);
-			updateFunctionZ3=(BoolExpr)updateFunctionZ3.simplify();
+			Expr updateFunctionZ3 = updateFunction.toZ3(ctx, /*bn,*/ speciesNameToSpecies, speciesToPopulation);
+			updateFunctionZ3=updateFunctionZ3.simplify();
 			speciesToODEsDef.put(species, updateFunctionZ3);
 			allODEsDefArray[j]=ctx.mkEq(speciesToODENames.get(species), updateFunctionZ3);
 			j++;
@@ -439,7 +473,7 @@ public class SMTBackwardBooleanEquivalence {
 	
 	
 
-	protected static boolean partitionBlocksAccordingToz3Model(IPartition partition, IBooleanNetwork crn, Model model, Collection<IBlock> splittedBlocks, IBlock blockSPL, HashMap<ISpecies, BoolExpr> speciesToSpliitingExpression) throws Z3Exception {
+	protected static boolean partitionBlocksAccordingToz3Model(IPartition partition, IBooleanNetwork bn, Model model, Collection<IBlock> splittedBlocks, IBlock blockSPL, HashMap<ISpecies, Expr> speciesToSpliitingExpression) throws Z3Exception {
  
 		boolean blockSPLHasBeenSplit=false;
 
@@ -447,36 +481,42 @@ public class SMTBackwardBooleanEquivalence {
 		while(!blockSPL.getSpecies().isEmpty()){
 			blockSPLHasBeenSplit=true;
 			ISpecies species = blockSPL.getSpecies().iterator().next();
-			Expr expr=null;
+			Expr expr= model.eval(speciesToSpliitingExpression.get(species), false);
+			BigDecimal valBD=getSplitValue(bn, expr);
 			//double val=0;
-			boolean val=false;
-
-			expr = model.eval(speciesToSpliitingExpression.get(species), false);
-			val = Boolean.valueOf(expr.toString());
-			//val = math.evaluate(expr.toString());
-			//CRNReducerCommandLine.println(out,bwOut,val);
-			
-			
-			BigDecimal valBD = (val)? BigDecimal.ONE:BigDecimal.ZERO;
 			partition.splitBlock(splittedBlocks, species,blockSPL, valBD);
 			//Now I am sure that a species has been removed from the block 
 		}
 		return blockSPLHasBeenSplit;
 	}
+
+	private static BigDecimal getSplitValue(IBooleanNetwork bn, Expr expr) {
+		BigDecimal valBD;
+		if(bn.isMultiValued()) {
+			int val = Integer.valueOf(expr.toString());
+			valBD= BigDecimal.valueOf(val);
+		}
+		else {
+			boolean val=Boolean.valueOf(expr.toString());
+			//val = math.evaluate(expr.toString());
+			//CRNReducerCommandLine.println(out,bwOut,val);				
+			valBD = (val)? BigDecimal.ONE:BigDecimal.ZERO;
+		}
+		return valBD;
+	}
 	
-	protected static void partitionBlocksAccordingToz3Model(IPartition partition, IBooleanNetwork crn, Model model, Collection<IBlock> splittedBlocks, HashMap<ISpecies, BoolExpr> speciesToSpliitingExpression) throws Z3Exception {
+	protected static void partitionBlocksAccordingToz3Model(IPartition partition, IBooleanNetwork bn, Model model, Collection<IBlock> splittedBlocks, HashMap<ISpecies, Expr> speciesToSpliitingExpression) throws Z3Exception {
 		
 		//for (ISpecies species : blockSPL.getSpecies()) {
-		for(ISpecies species : crn.getSpecies()){
-			Expr expr=null;
-			//double val=0;
-			boolean val = false;
-
-			expr = model.eval(speciesToSpliitingExpression.get(species), false);
-			val = Boolean.valueOf(expr.toString()); 
-			//val = math.evaluate(expr.toString());
+		for(ISpecies species : bn.getSpecies()){
+			Expr expr= model.eval(speciesToSpliitingExpression.get(species), false);
+			BigDecimal valBD=getSplitValue(bn, expr);
 			
-			BigDecimal valBD = (val)? BigDecimal.ONE:BigDecimal.ZERO;
+//			//double val=0;
+//			boolean val = false;
+//			val = Boolean.valueOf(expr.toString()); 
+//			//val = math.evaluate(expr.toString());
+//			BigDecimal valBD = (val)? BigDecimal.ONE:BigDecimal.ZERO;
 
 			partition.splitBlockOnlyIfKeyIsNotZero(splittedBlocks, species,null, valBD);
 		}
@@ -624,8 +664,8 @@ public class SMTBackwardBooleanEquivalence {
 				BoolExpr[] equalODEs = new BoolExpr[currentBlock.getSpecies().size()-1];
 				int s=0;
 				ISpecies rep = currentBlock.getRepresentative();
-				BoolExpr popRep = speciesToPopulation.get(rep);
-				BoolExpr odeNameRep = speciesToODENames.get(rep);
+				/*Bool*/Expr popRep = speciesToPopulation.get(rep);
+				/*Bool*/Expr odeNameRep = speciesToODENames.get(rep);
 				for (ISpecies species : currentBlock.getSpecies()) {
 					if(!species.equals(rep)){
 						BoolExpr ic = ctx.mkEq(popRep, speciesToPopulation.get(species));
@@ -662,8 +702,8 @@ public class SMTBackwardBooleanEquivalence {
 				}
 				int s=0;
 				ISpecies rep = currentBlock.getRepresentative();
-				BoolExpr popRep = speciesToPopulation.get(rep);
-				BoolExpr odeNameRep = speciesToODENames.get(rep);
+				/*Bool*/Expr popRep = speciesToPopulation.get(rep);
+				/*Bool*/Expr odeNameRep = speciesToODENames.get(rep);
 				for (ISpecies species : currentBlock.getSpecies()) {
 					if(!species.equals(rep)){
 						BoolExpr ic = ctx.mkEq(popRep, speciesToPopulation.get(species));

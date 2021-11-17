@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
+import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.crn.interfaces.ISpecies;
@@ -33,8 +34,8 @@ public class NotBooleanUpdateFunction implements IUpdateFunction {
 
 	@Override
 	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, BoolExpr> nodeToTruthValue) throws Z3Exception {
-		return ctx.mkNot(innerUpdateFunction.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
+			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
+		return ctx.mkNot((BoolExpr)innerUpdateFunction.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
 	}
 	
 	@Override
@@ -50,6 +51,11 @@ public class NotBooleanUpdateFunction implements IUpdateFunction {
 			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction) {
 		IUpdateFunction innerCloned = innerUpdateFunction.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
 		return new NotBooleanUpdateFunction(innerCloned);
+	}
+	
+	@Override
+	public boolean seemsInputSpecies(String sp) {
+		return false;
 	}
 			
 }

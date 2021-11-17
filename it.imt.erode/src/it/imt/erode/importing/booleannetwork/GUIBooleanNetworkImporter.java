@@ -1,6 +1,7 @@
 package it.imt.erode.importing.booleannetwork;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -12,7 +13,11 @@ import java.util.LinkedHashMap;
 //import java.util.List;
 import java.util.Map.Entry;
 
+import javax.xml.stream.XMLStreamException;
+
 import org.eclipse.ui.console.MessageConsoleStream;
+import org.sbml.jsbml.SBMLDocument;
+import org.sbml.jsbml.SBMLWriter;
 
 import it.imt.erode.booleannetwork.implementations.BooleanNetwork;
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
@@ -28,6 +33,8 @@ import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
+import sbml.conversion.document.ISBMLConverter;
+import sbml.conversion.document.SBMLManager;
 
 public class GUIBooleanNetworkImporter {
 	
@@ -37,11 +44,13 @@ public class GUIBooleanNetworkImporter {
 	protected IMessageDialogShower msgDialogShower;
 	private InfoBooleanNetworkImporting infoImporting;
 	private BooleanNetwork booleanNetwork;
+	private boolean mv=false;
 	
 	private IPartition initialPartition;
 
-	public GUIBooleanNetworkImporter(MessageConsoleStream out, BufferedWriter bwOut,
+	public GUIBooleanNetworkImporter(boolean mv,MessageConsoleStream out, BufferedWriter bwOut,
 			IMessageDialogShower msgDialogShower) {
+		this.mv=mv;
 		this.out=out;
 		this.bwOut=bwOut;
 		//furtherCommands=new ArrayList<String>();
@@ -69,12 +78,25 @@ public class GUIBooleanNetworkImporter {
 		
 		HashMap<String, ISpecies> nodesStoredInHashMap = new HashMap<>();
 		for (ArrayList<String> initialConcentration : initialConcentrations) {
-			if(initialConcentration.size()==3){
-				addNode(initialConcentration.get(0), initialConcentration.get(2),Boolean.valueOf(initialConcentration.get(1)), nodesStoredInHashMap);
+			if(mv) {
+				//name,ic,max,[origname] -> name,[origname],ic - max
+				if(initialConcentration.size()==4){
+					addMVNode(initialConcentration.get(0), initialConcentration.get(3),Integer.valueOf(initialConcentration.get(1)),Integer.valueOf(initialConcentration.get(2)),  nodesStoredInHashMap);
+				}
+				else{
+					addMVNode(initialConcentration.get(0), null                       ,Integer.valueOf(initialConcentration.get(1)),Integer.valueOf(initialConcentration.get(2)), nodesStoredInHashMap);
+				}
 			}
-			else{
-				addNode(initialConcentration.get(0), null,Boolean.valueOf(initialConcentration.get(1)), nodesStoredInHashMap);
+			else {
+				//name,ic,[origname] -> name,[origname],ic
+				if(initialConcentration.size()==3){
+					addNode(initialConcentration.get(0), initialConcentration.get(2),Boolean.valueOf(initialConcentration.get(1)), nodesStoredInHashMap);
+				}
+				else{
+					addNode(initialConcentration.get(0), null,Boolean.valueOf(initialConcentration.get(1)), nodesStoredInHashMap);
+				}
 			}
+			
 			
 		}
 		
@@ -126,6 +148,14 @@ public class GUIBooleanNetworkImporter {
 		this.initialPartition = initialPartition;
 	}
 	
+	protected ISpecies addMVNode(String name,String originalName, int ic, int max, HashMap<String, ISpecies> nodesStoredInHashMap){
+		int id = booleanNetwork.getSpecies().size();
+		ISpecies node = new Species(name, originalName,id, BigDecimal.valueOf(ic),String.valueOf(ic),false);
+		nodesStoredInHashMap.put(name, node);
+		booleanNetwork.addSpecies(node);
+		booleanNetwork.setMax(node, max);
+		return node;
+	}
 	
 	protected ISpecies addNode(String name,String originalName, boolean ic, HashMap<String, ISpecies> nodesStoredInHashMap){
 			int id = booleanNetwork.getSpecies().size();
@@ -148,7 +178,7 @@ public class GUIBooleanNetworkImporter {
 	}
 
 	protected void initBooleanNetwork(String name) {
-		booleanNetwork = new BooleanNetwork(name, out, bwOut);
+		booleanNetwork = new BooleanNetwork(name, out, bwOut,mv);
 	}
 
 	public IPartition getInitialPartition() {
@@ -216,9 +246,44 @@ public class GUIBooleanNetworkImporter {
 
 		
 	}
+
+	public static void printToSBMLQualFIle(IBooleanNetwork bn, IPartition partition, String name,
+			Collection<String> preambleCommentLines, boolean verbose, MessageConsoleStream out,
+			BufferedWriter bwOut) {
+	//public static void printToSBMLQualFIle(IBooleanNetwork bn,IPartition partition, String name, 
+		//			Collection<String> preambleCommentLines, boolean verbose, MessageConsoleStream out,BufferedWriter bwOut){
+		String fileName = name;
+
+		fileName=AbstractImporter.overwriteExtensionIfEnabled(fileName,".sbml");
+		if(verbose){
+			CRNReducerCommandLine.print(out,bwOut,"Writing model in file "+fileName);
+		}
+
+		AbstractImporter.createParentDirectories(fileName);
+
+		ISBMLConverter converter = SBMLManager.create(bn);
+		SBMLDocument sbmlDocument = converter.getSbmlDocument();
+
+		try {
+			File sbmlFile = new File(fileName);
+			if(sbmlFile.createNewFile()) {
+				System.out.println("Created file: " + sbmlFile.getName() + "at path: " + sbmlFile.getPath());
+			}
+			System.out.println("Writing to file...");
+			SBMLWriter.write(sbmlDocument, sbmlFile, "SBMLConverter", "1.0");
+			System.out.println("Finished");
+		} catch (IOException | XMLStreamException e) {
+			CRNReducerCommandLine.println(out,bwOut,"Problems in printToSBMLQualFIle, exception raised while writing the SBML file for: "+fileName);
+			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			return;
+		}
+		if(verbose){
+			CRNReducerCommandLine.println(out,bwOut,"Writing model in file "+fileName+" completed");
+		}
+	}
 	
 	public static void printToBNERODEFIle(IBooleanNetwork bn,IPartition partition, String name, Collection<String> preambleCommentLines, 
-			boolean verbose, MessageConsoleStream out,BufferedWriter bwOut, boolean originalNames){
+			boolean verbose, MessageConsoleStream out,BufferedWriter bwOut, boolean originalNames, Collection<String> commands){
 		String fileName = name;
 		
 		fileName=AbstractImporter.overwriteExtensionIfEnabled(fileName,".ode");
@@ -246,7 +311,13 @@ public class GUIBooleanNetworkImporter {
 			}
 			//bw.write("\n\n");
 			
-			bw.write("begin Boolean network ");
+			if(bn.isMultiValued()) {
+				bw.write("begin Multivalued Boolean network ");
+			}
+			else {
+				bw.write("begin Boolean network ");
+			}
+			
 			if(bn.getName()!=null&&bn.getName()!=""){
 				String nam = GUICRNImporter.getModelName(name);
 				bw.write(nam+"\n");
@@ -255,8 +326,7 @@ public class GUIBooleanNetworkImporter {
 				bw.write("unnamed\n");
 			}
 			
-			
-			GUICRNImporter.writeInitBlock(bw, bn.getSpecies(), originalNames, null, false);
+			GUICRNImporter.writeInitBlock(bw, bn.getSpecies(), originalNames, null, false,bn.getNameToMax());
 			GUICRNImporter.writeInitPartition(bw, bn.getUserDefinedPartition(), null, false);
 			
 			bw.write("begin update functions\n");
@@ -268,6 +338,12 @@ public class GUIBooleanNetworkImporter {
 				bw.write("\n");
 			}
 			bw.write("end update functions\n");
+			
+			if(commands!=null) {
+				for(String command: commands) {
+					bw.write(" "+command+"\n");
+				}
+			}
 			
 			boolean printedBeginEndComments = false;
 			//bw.write("\n //Comments associated to the species\n");
@@ -300,9 +376,12 @@ public class GUIBooleanNetworkImporter {
 //				}
 //			}
 
-			//CRNReducerCommandLine.print(out, "end model\n\n");
-			bw.write("\n"+"end Boolean network\n\n");
-			//CRNReducerCommandLine.print(out, "end model\n\n");
+			if(bn.isMultiValued()) {
+				bw.write("end Multivalued Boolean network ");
+			}
+			else {
+				bw.write("end Boolean network ");
+			}
 
 			
 
@@ -328,6 +407,9 @@ public class GUIBooleanNetworkImporter {
 
 		
 	}
+
+	
+
 	
 
 }

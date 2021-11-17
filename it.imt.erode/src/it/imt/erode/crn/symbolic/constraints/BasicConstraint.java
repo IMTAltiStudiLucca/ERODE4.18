@@ -38,15 +38,15 @@ public class BasicConstraint implements IConstraint {
 		this.comp = comp;
 	}
 
-	private String getMathSymbol(BasicConstraintComparator c) {
+	public static String getMathSymbol(BasicConstraintComparator c) {
 		switch (c) {
 		case EQ:
 			return "=";
-		case GE:
+		case GT:
 			return ">";
 		case GEQ:
 			return ">=";
-		case LE:
+		case LT:
 			return "<";
 		case LEQ:
 			return "<=";
@@ -73,11 +73,11 @@ public class BasicConstraint implements IConstraint {
 		switch (comp) {
 		case EQ:
 			return ctx.mkEq(lhsZ3, rhsz3);
-		case GE:
+		case GT:
 			return ctx.mkGt(lhsZ3, rhsz3);
 		case GEQ:
 			return ctx.mkGe(lhsZ3, rhsz3);
-		case LE:
+		case LT:
 			return ctx.mkLt(lhsZ3, rhsz3);
 		case LEQ:
 			return ctx.mkLe(lhsZ3, rhsz3);

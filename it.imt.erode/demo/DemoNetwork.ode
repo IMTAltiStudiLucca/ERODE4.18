@@ -1,0 +1,12 @@
+begin Boolean network DemoNetwork
+ begin init
+  S_1
+  S_2
+  S_3
+ end init
+begin update functions
+  S_1 = ((S_2 = true) XOR (S_3 = true))
+  S_2 = ((S_1 = true)&(S_3 != true))
+  S_3 = (S_1 -> (S_2 = true))
+end update functions
+end Boolean network 

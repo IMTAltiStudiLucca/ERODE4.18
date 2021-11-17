@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
+import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.crn.interfaces.ISpecies;
@@ -14,7 +15,8 @@ import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
 
 public class BooleanUpdateFunctionExpr implements IUpdateFunction {
-
+	//BooleanBinaryExprUpdateFunction
+	
 	private IUpdateFunction first;
 	private IUpdateFunction second;
 	private BooleanConnector op;
@@ -63,16 +65,16 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 
 	@Override
 	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, BoolExpr> nodeToTruthValue) throws Z3Exception {
+			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
 		switch (op) {
 		case AND:
-			return ctx.mkAnd(new BoolExpr[] {first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
+			return ctx.mkAnd(new BoolExpr[] {(BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
 		case IMPLIES:
-			return ctx.mkImplies(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
+			return ctx.mkImplies((BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
 		case OR:
-			return ctx.mkOr(new BoolExpr[] {first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
+			return ctx.mkOr(new BoolExpr[] {(BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
 		case XOR:
-			return ctx.mkXor(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
+			return ctx.mkXor((BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
 		case EQ:
 			return ctx.mkEq(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
 		case NEQ:
@@ -97,5 +99,10 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 		IUpdateFunction firstCloned = first.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
 		IUpdateFunction secondCloned = second.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
 		return new BooleanUpdateFunctionExpr(firstCloned, secondCloned, op);
+	}
+	
+	@Override
+	public boolean seemsInputSpecies(String sp) {
+		return false;
 	}
 }
