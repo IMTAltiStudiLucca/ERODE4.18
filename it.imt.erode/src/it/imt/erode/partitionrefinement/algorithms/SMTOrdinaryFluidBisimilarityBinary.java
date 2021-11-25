@@ -60,7 +60,7 @@ public class SMTOrdinaryFluidBisimilarityBinary {
 
 	public static final boolean SHOWTIMEATEACHSTEP = false;
 	public static final boolean DOONLYCHECKSWITHWHOLEPARTITION = false;
-	public static final int MAXINNERITERATIONS = 30000;//Integer.MAX_VALUE;
+	public static final int MAXINNERITERATIONS = Integer.MAX_VALUE;//30000;//
 
 	private double totalSMTChecksSeconds=0.0;
 	private double initSMTTime=0.0;

@@ -4,6 +4,7 @@ import org.sbml.jsbml.ASTNode;
 
 import it.imt.erode.booleannetwork.updatefunctions.FalseUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.NotBooleanUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.ReferenceToNodeUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.TrueUpdateFunction;
 import it.imt.erode.crn.symbolic.constraints.BasicConstraintComparator;
@@ -54,6 +55,12 @@ public class BinaryReader extends BinaryASTConverter {
             		else if(r instanceof ReferenceToNodeUpdateFunction && l instanceof TrueUpdateFunction) {
             			this.updateFunction=r;
             		}
+            		else if(r instanceof ReferenceToNodeUpdateFunction && l instanceof FalseUpdateFunction) {
+            			this.updateFunction= new NotBooleanUpdateFunction(r);
+            		} 
+            		else if(l instanceof ReferenceToNodeUpdateFunction && r instanceof FalseUpdateFunction) {
+            			this.updateFunction= new NotBooleanUpdateFunction(l);
+            		}  
             		else {
             			this.updateFunction = operator.equals(l,r);
             		}
@@ -82,7 +89,8 @@ public class BinaryReader extends BinaryASTConverter {
             		this.updateFunction = operator.comparison(l,r,BasicConstraintComparator.GEQ);
             	}
             	else {
-            		throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
+            		this.updateFunction = operator.bn_comparison(l, r, BasicConstraintComparator.GEQ);
+            		//throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
             	}
                 break;
             case RELATIONAL_GT:
@@ -90,7 +98,8 @@ public class BinaryReader extends BinaryASTConverter {
             		this.updateFunction = operator.comparison(l,r,BasicConstraintComparator.GT);
             	}
             	else {
-            		throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
+            		this.updateFunction = operator.bn_comparison(l, r, BasicConstraintComparator.GT);
+            		//throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
             	}
                 break;
             case RELATIONAL_LEQ:
@@ -98,7 +107,8 @@ public class BinaryReader extends BinaryASTConverter {
             		this.updateFunction = operator.comparison(l,r,BasicConstraintComparator.LEQ);
             	}
             	else {
-            		throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
+            		this.updateFunction = operator.bn_comparison(l, r, BasicConstraintComparator.LEQ);
+            		//throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
             	}
                 break;
             case RELATIONAL_LT:
@@ -106,7 +116,8 @@ public class BinaryReader extends BinaryASTConverter {
             		this.updateFunction = operator.comparison(l,r,BasicConstraintComparator.LT);
             	}
             	else {
-            		throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
+            		this.updateFunction = operator.bn_comparison(l, r, BasicConstraintComparator.LT);
+            		//throw new IllegalArgumentException("Comparisons are supported only for multivalued networks.");
             	}
                 break;
             case SUM:

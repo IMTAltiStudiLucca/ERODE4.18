@@ -11,14 +11,19 @@ import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.auxiliarydatastructures.IPartitionAndBoolean;
 import it.imt.erode.auxiliarydatastructures.PartitionAndString;
+import it.imt.erode.auxiliarydatastructures.PartitionAndStringAndBoolean;
 import it.imt.erode.booleannetwork.auxiliarydatastructures.BNandPartition;
 import it.imt.erode.booleannetwork.implementations.InfoBooleanNetworkReduction;
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.implementations.InfoCRNReduction;
+import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.importing.CRNImporter;
 import it.imt.erode.importing.GUICRNImporter;
 import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
+import it.imt.erode.partition.implementations.Block;
+import it.imt.erode.partition.implementations.Partition;
+import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.CRNBisimulationsNAry;
 import it.imt.erode.partitionrefinement.algorithms.ExactFluidBisimilarity;
@@ -468,9 +473,15 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			long begin = System.currentTimeMillis();
 			initial= CRNBisimulationsNAry.prepartitionUserDefined(bn.getSpecies(),bn.getUserDefinedPartition(), false, out,bwOut,terminator);
 			long end = System.currentTimeMillis();
+			setPartition(initial);
 			if(print){
 				//CRNReducerCommandLine.println(out,bwOut," completed. The "+crn.getSpecies().size()+" species have been prepartitioned in "+initial.size()+" blocks. Time necessary: "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)");
 				CRNReducerCommandLine.println(out,bwOut," completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".\n\tThe "+bn.getSpecies().size()+" species have been prepartitioned in "+ blockOrBlocks(initial.size()));
+			}
+		}
+		else {
+			if(getPartition()==null) {
+				setPartition();
 			}
 		}
 
@@ -520,11 +531,12 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			//SMTOrdinaryFluidBisimilarity9 smtOFL = new SMTOrdinaryFluidBisimilarity9();
 			//obtainedPartition = smtOFL.computeOFLsmt(crn, initial, verbose);			
 			smtFBE = new SMTForwardBooleanEquivalence(aggr/*FBEAggregationFunctions.OR*/,simplify.equalsIgnoreCase("true"));
-			PartitionAndString ps = smtFBE.computeOFLsmt(bn, initial, CRNReducerCommandLine.verbose, out, bwOut, print, terminator);
+			PartitionAndStringAndBoolean ps = smtFBE.computeOFLsmt(bn, initial, CRNReducerCommandLine.verbose, out, bwOut, print, terminator);
 			 
 			obtainedPartition = ps.getPartition();
 			smtTime=ps.getString();
 			smtChecksTime=smtFBE.getSMTChecksSecondsAtStep();
+			succeeded=ps.booleanValue();
 			//smtFBE=null;
 			 
 		}
@@ -535,11 +547,12 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			//SMTOrdinaryFluidBisimilarity9 smtOFL = new SMTOrdinaryFluidBisimilarity9();
 			//obtainedPartition = smtOFL.computeOFLsmt(crn, initial, verbose);			
 			smtFBE = new SMTForwardBooleanEquivalence(aggr/*FBEAggregationFunctions.OR*/,simplify.equalsIgnoreCase("true"));
-			PartitionAndString ps = smtFBE.computeOFLsmt(bn, initial, CRNReducerCommandLine.verbose, out, bwOut, print, terminator);
+			PartitionAndStringAndBoolean ps = smtFBE.computeOFLsmt(bn, initial, CRNReducerCommandLine.verbose, out, bwOut, print, terminator);
 			 
 			obtainedPartition = ps.getPartition();
 			smtTime=ps.getString();
 			smtChecksTime=smtFBE.getSMTChecksSecondsAtStep();
+			succeeded=ps.booleanValue();
 			//smtFBE=null;
 			 
 		}
@@ -697,6 +710,9 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			}
 
 		}
+		else if(!succeeded) {
+			writeReductionNotSucceededInfoInCSVFile(out, bwOut, csvFile, bn, reductionName, initial.size());
+		}
 		smtBBE=null;
 		smtFBE=null;
 		return new IPartitionAndBoolean(obtainedPartition, succeeded);
@@ -709,7 +725,17 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 	
 	
 	
-//
+	private void setPartition() {
+		IPartition def = new Partition(bn.getSpecies().size());
+		IBlock b = new Block();
+		def.add(b);
+		for(ISpecies sp : bn.getSpecies()) {
+			b.addSpecies(sp);
+		}
+		setPartition(def);
+	}
+
+	//
 //	@SuppressWarnings("unused")
 //	private void defaultReduction(boolean print, MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
 //		boolean verbose=false;

@@ -24,6 +24,7 @@ import org.eclipse.ui.console.MessageConsoleStream;
 import it.imt.erode.commandline.necessaryNativeSources.RequireNativeSources;
 import it.imt.erode.crn.implementations.InfoCRNReduction;
 import it.imt.erode.crn.interfaces.ICRN;
+import it.imt.erode.crn.interfaces.IModel;
 import it.imt.erode.importing.AbstractImporter;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.simulation.output.DataOutputHandler;
@@ -477,7 +478,8 @@ public abstract class AbstractCommandLine implements ICommandLine {
 		}
 	}
 
-	protected void writeReductionNotSucceededInfoInCSVFile(MessageConsoleStream out, BufferedWriter bwOut, String csvFile, ICRN crn, String reduction,int initPartitionSize) {
+	protected void writeReductionNotSucceededInfoInCSVFile(MessageConsoleStream out, BufferedWriter bwOut, String csvFile, IModel crn, 
+			String reduction,int initPartitionSize) {
 		if(csvFile!=null) {
 			List<String> csvLabels = createCsvReductionLabels();
 			List<String> csvValues = new ArrayList<String>();
@@ -490,10 +492,16 @@ public abstract class AbstractCommandLine implements ICommandLine {
 			csvValues.add(String.valueOf(initPartitionSize));
 			
 			csvValues.add(String.valueOf(crn.getSpecies().size()));
-			csvValues.add(String.valueOf(-1));
+			csvValues.add("-1");
 			csvValues.add("-1");
 			
-			csvValues.add(String.valueOf(crn.getReactions().size()));
+			if(crn instanceof ICRN) {
+				csvValues.add(String.valueOf(((ICRN)crn).getReactions().size()));
+			}
+			else {
+				csvValues.add(String.valueOf(crn.getSpecies().size()));
+			}
+			
 			csvValues.add(String.valueOf(-1));
 			
 			csvValues.add(String.valueOf(crn.getParameters().size()));

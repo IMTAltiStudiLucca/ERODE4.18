@@ -319,6 +319,11 @@ public class GUIBooleanNetworkImporter {
 			}
 			
 			if(bn.getName()!=null&&bn.getName()!=""){
+				//String nam = GUICRNImporter.getModelName(name);
+				String nam = GUICRNImporter.getModelName(bn.getName());
+				bw.write(nam+"\n");
+			}
+			else if(name!=null&&name!=""){
 				String nam = GUICRNImporter.getModelName(name);
 				bw.write(nam+"\n");
 			}

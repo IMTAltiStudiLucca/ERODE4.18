@@ -62,6 +62,7 @@ import it.imt.erode.importing.BNetImporter;
 import it.imt.erode.importing.BioNetGenImporter;
 import it.imt.erode.importing.BoolCubeImporter;
 import it.imt.erode.importing.C2E2Exporter;
+import it.imt.erode.importing.CNFImporter;
 import it.imt.erode.importing.CRNImporter;
 import it.imt.erode.importing.ExportSingleUseOfParams;
 import it.imt.erode.importing.FluidCompilerImporter;
@@ -80,6 +81,7 @@ import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.importing.z3Importer;
 import it.imt.erode.importing.automaticallygeneratedmodels.RandomBNG;
 import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
+import it.imt.erode.importing.booleannetwork.GuessPrepartitionBN;
 import it.imt.erode.importing.csv.CompactCSVMatrixImporter;
 import it.imt.erode.importing.sbml.FluxBalanceAnalysisModel;
 import it.imt.erode.importing.sbml.NegativeStoichiometryException;
@@ -581,6 +583,11 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			crn=null;
 			partition=null;
 			handleImportSBMLQualFolderCommand(command,out,bwOut);
+		}
+		else if(command.startsWith("importCNFFolder(")){
+			crn=null;
+			partition=null;
+			handleImportCNFFolderCommand(command,out,bwOut);
 		}
 		else{
 			CRNReducerCommandLine.println(out,bwOut,"Unknown command \""+command+"\". I skip it."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut, "Type --help for usage instructions.");
@@ -7654,7 +7661,8 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		return true;
 	}
 	
-	private boolean handleImportSBMLQualFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
+	@SuppressWarnings("unused")
+	private boolean handleImportCNFFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
 		String[] parameters = CRNReducerCommandLine.getParameters(command);
 		if(parameters==null){
 			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
@@ -7678,6 +7686,161 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					return false;
 				}
 				folderOut = parameters[p].substring("folderOut=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].equals("")){
+				continue;
+			}
+			else{
+				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+				return false;
+			}
+		}
+		if(folderIn ==null || folderIn.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the folder to be loaded. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return false;
+		}
+		if(folderOut ==null || folderOut.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the target folder. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return false;
+		}
+		try {
+			//new String[]{String.valueOf(forceMassAction)},
+			
+			File foldOut = new File(folderOut);
+			String foldoutPrefix = foldOut.getAbsolutePath()+File.separator;
+			
+			File foldIn = new File(folderIn);
+			if(foldIn.isDirectory()) {
+				String[] allFiles = foldIn.list();
+				CRNReducerCommandLine.println(out,bwOut,"Loading all CNF files in folder:");
+				CRNReducerCommandLine.println(out,bwOut,"\t"+folderIn);
+				CRNReducerCommandLine.println(out,bwOut,"The folder contains "+allFiles.length+" files:");
+				for(int i=0;i<allFiles.length;i++) {
+					CRNReducerCommandLine.println(out,bwOut,"\t"+allFiles[i]);
+				}
+				CRNReducerCommandLine.println(out,bwOut,"");
+				for(int i=0;i<allFiles.length;i++) {
+					String current = foldIn.getAbsolutePath()+File.separator+allFiles[i];
+					if(allFiles[i].toLowerCase().endsWith(".cnf")) {
+						String fileOut = foldoutPrefix+AbstractImporter.overwriteExtensionIfEnabled(allFiles[i],".ode",true);
+						
+						CNFImporter cnfImporter = new CNFImporter(current, out, bwOut, messageDialogShower);
+						ArrayList<String> comments=cnfImporter.readCNF(true);
+				        IBooleanNetwork bn = cnfImporter.getBN();
+				        Collection<String> preambleComments=new ArrayList<String>(3+comments.size());
+				        preambleComments.add("Automatically imported by "+TOOLNAME+" from");
+				        preambleComments.add(current);
+				        preambleComments.add("User partition obtained by singling out the extra 'output' variable");
+				        preambleComments.addAll(comments);
+				        
+				        Collection<String> commands = new ArrayList<String>(2);
+				        Collection<String> commandsCL = new ArrayList<String>(2);
+				        
+				        String preserving="OutputPreserving";
+				        
+//				        commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+"BBE.txt\",csvFile=\"reductionsMaximalBBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+"BBE.ode\")");
+//				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+//				        	commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+"BBE.txt\",csvFile=\"reductions"+preserving+"BBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+"BBE.ode\",prePartition=USER)\n");
+//				        }
+				        
+				        ArrayList<String> aggrs=new ArrayList<>(4);
+				        String technique="FBE";
+				        if(bn.isMultiValued()) {
+				        	technique="FME";
+				        	aggrs.add("PLUS");
+				        	aggrs.add("TIMES");
+				        	aggrs.add("MIN");
+				        	aggrs.add("MAX");
+				        }
+				        else {
+				        	aggrs.add("AND");
+				        	aggrs.add("OR");
+//				        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"FBE_OR.txt\",csvFile=\"reductionsMaximalFBE_OR.csv\",reducedFile=\""+bn.getName()+"FBE_OR.ode\")");
+//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+//					        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_OR.txt\",csvFile=\"reductions"+preserving+"FBE_OR.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_OR.ode\",prePartition=USER)\n");
+//					        }
+//					        commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"FBE_AND.txt\",csvFile=\"reductionsMaximalFBE_AND.csv\",reducedFile=\""+bn.getName()+"FBE_AND.ode\")");
+//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+//					        	commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_AND.txt\",csvFile=\"reductions"+preserving+"FBE_AND.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_AND.ode\",prePartition=USER)\n");
+//					        }
+				        }
+				        for(String aggr:aggrs) {
+				        	//commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".txt\",csvFile=\"reductionsMaximal"+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".ode\")");
+					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+					        	commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+".txt\",csvFile=\"reductions"+preserving+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+"._ode\",prePartition=USER)\n");
+					        	String outPathRed = foldOut.getAbsolutePath()+ File.separator +"red"+File.separator;
+					        	commandsCL.add("reduce"+technique+"({aggregationFunction=>"+aggr+",fileWhereToStorePartition=>"+outPathRed+bn.getName()+preserving+technique+"_"+aggr+".txt,csvFile=>"+outPathRed+"reductions"+preserving+technique+"_"+aggr+".csv,reducedFile=>"+outPathRed+bn.getName()+preserving+technique+"_"+aggr+"._ode,prePartition=>USER})\n");
+					        }
+				        }
+				        
+				        BooleanNetworkCommandLine bnCL = new BooleanNetworkCommandLine(null, bn, partition);
+				        for(String com : commandsCL) {
+				        	bnCL.handleReduceCommand(com, false, technique, out, bwOut);
+				        }
+				        
+				        
+						//GUIBooleanNetworkImporter.printToBNERODEFIle(bn, cnfImporter.getInitialPartition(),
+				        //		fileOut,preambleComments, true, out, bwOut, false,commands);
+						
+						CRNReducerCommandLine.println(out,bwOut,"");
+					}
+				}
+			}
+		} catch (UnsupportedFormatException e) {
+			if(e.getMessage()!=null){
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of "+folderIn+" failed.\nError message:\n"+e.getMessage(),DialogType.Error);
+			}
+			else{
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of "+folderIn+" failed.",DialogType.Error);
+			}
+			return false;
+		} catch (IOException e) {
+			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled IO errors.\nError message:\n"+e.getMessage(),DialogType.Error);
+			//CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			return false;
+		} 
+		
+		return true;
+	}
+	
+	private boolean handleImportSBMLQualFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
+		String[] parameters = CRNReducerCommandLine.getParameters(command);
+		if(parameters==null){
+			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			return false;
+		}
+		String folderIn=null;
+		String folderOut=null;
+		GuessPrepartitionBN guessPrep=GuessPrepartitionBN.INPUTS;
+		for(int p=0;p<parameters.length;p++){
+			if(parameters[p].startsWith("folderIn=>")){
+				if(parameters[p].length()<="folderIn=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the folder from which to read. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return false;
+				}
+				folderIn = parameters[p].substring("folderIn=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("folderOut=>")){
+				if(parameters[p].length()<="folderOut=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the folder where to write the imported models. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return false;
+				}
+				folderOut = parameters[p].substring("folderOut=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("guessPrep=>")){
+				if(parameters[p].length()<="guessPrep=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify INPUTS or OUTPUTS for the type of guessed prepartition. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return false;
+				}
+				String gp = parameters[p].substring("guessPrep=>".length(), parameters[p].length());
+				if(gp.equalsIgnoreCase("outputs")) {
+					guessPrep=GuessPrepartitionBN.OUTPUTS;
+				}
 			}
 			else if(parameters[p].equals("")){
 				continue;
@@ -7713,30 +7876,62 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					if(allFiles[i].toLowerCase().endsWith(".sbml")) {
 						String fileOut = foldoutPrefix+AbstractImporter.overwriteExtensionIfEnabled(allFiles[i],".ode",true);
 						
+						String nameFromFile=GUICRNImporter.getModelName(current);
 				        SBMLDocument sbmlDocument = (SBMLDocument) SBMLManager.read(current);
-				        ISBMLConverter sbmlConverter = SBMLManager.create(sbmlDocument);
+				        ISBMLConverter sbmlConverter = SBMLManager.create(sbmlDocument,guessPrep,out,bwOut,nameFromFile);
 				        GUIBooleanNetworkImporter guiBooleanNetworkImporter = sbmlConverter.getGuiBnImporter();
 				        IBooleanNetwork bn = guiBooleanNetworkImporter.getBooleanNetwork();
 				        Collection<String> preambleComments=new ArrayList<String>(2);
 				        preambleComments.add("Automatically imported by "+TOOLNAME+" from");
 				        preambleComments.add(current);
+				        String gp="inputs";
+				        if(guessPrep.equals(GuessPrepartitionBN.OUTPUTS)) {
+				        	gp="outputs";
+				        }
+				        preambleComments.add("User partition obtained by singling out guessed "+gp);
 				        
 				        Collection<String> commands = new ArrayList<String>(2);
 				        
-				        commands.add("reduceBBE(fileWhereToStorePartition=\""+bn.getName()+"BBE.txt\",csvFile=\"reductionsMaximalBBE.csv\",reducedFile=\""+bn.getName()+"BBE.ode\")");
-				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
-				        	commands.add("reduceBBE(fileWhereToStorePartition=\""+bn.getName()+"InputPreservingBBE.txt\",csvFile=\"reductionsIPBBE.csv\",reducedFile=\""+bn.getName()+"InputPreservingBBE.ode\",prePartition=USER)\n");
+				        String preserving="InputPreserving";
+				        if(guessPrep.equals(GuessPrepartitionBN.OUTPUTS)) {
+				        	preserving="OutputPreserving";
 				        }
-				        commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"FBE_OR.txt\",csvFile=\"reductionsMaximalFBE_OR.csv\",reducedFile=\""+bn.getName()+"FBE_OR.ode\")");
-				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
-				        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"InputPreservingFBE_OR.txt\",csvFile=\"reductionsIPFBE_OR.csv\",reducedFile=\""+bn.getName()+"InputPreservingFBE_OR.ode\",prePartition=USER)\n");
+				        
+//				        commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+"BBE.txt\",csvFile=\"reductionsMaximalBBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+"BBE.ode\")");
+//				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+//				        	commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+"BBE.txt\",csvFile=\"reductions"+preserving+"BBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+"BBE.ode\",prePartition=USER)\n");
+//				        }
+				        
+				        ArrayList<String> aggrs=new ArrayList<>(4);
+				        String technique="FBE";
+				        if(bn.isMultiValued()) {
+				        	technique="FME";
+				        	aggrs.add("PLUS");
+				        	aggrs.add("TIMES");
+				        	aggrs.add("MIN");
+				        	aggrs.add("MAX");
 				        }
-				        commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"FBE_AND.txt\",csvFile=\"reductionsMaximalFBE_AND.csv\",reducedFile=\""+bn.getName()+"FBE_AND.ode\")");
-				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
-				        	commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"InputPreservingFBE_AND.txt\",csvFile=\"reductionsIPFBE_AND.csv\",reducedFile=\""+bn.getName()+"InputPreservingFBE_AND.ode\",prePartition=USER)\n");
+				        else {
+				        	aggrs.add("AND");
+				        	aggrs.add("OR");
+//				        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"FBE_OR.txt\",csvFile=\"reductionsMaximalFBE_OR.csv\",reducedFile=\""+bn.getName()+"FBE_OR.ode\")");
+//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+//					        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_OR.txt\",csvFile=\"reductions"+preserving+"FBE_OR.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_OR.ode\",prePartition=USER)\n");
+//					        }
+//					        commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"FBE_AND.txt\",csvFile=\"reductionsMaximalFBE_AND.csv\",reducedFile=\""+bn.getName()+"FBE_AND.ode\")");
+//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+//					        	commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_AND.txt\",csvFile=\"reductions"+preserving+"FBE_AND.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_AND.ode\",prePartition=USER)\n");
+//					        }
 				        }
+				        for(String aggr:aggrs) {
+				        	commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".txt\",csvFile=\"reductionsMaximal"+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".ode\")");
+					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+					        	commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+".txt\",csvFile=\"reductions"+preserving+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+".ode\",prePartition=USER)\n");
+					        }
+				        }
+				        
 						GUIBooleanNetworkImporter.printToBNERODEFIle(bn,guiBooleanNetworkImporter.getInitialPartition(),
-				        		fileOut,preambleComments, true, null, null, false,commands);
+				        		fileOut,preambleComments, true, out, bwOut, false,commands);
 						
 						//BNetImporter bnet = new BNetImporter(current, out, bwOut, messageDialogShower);
 						//bnet.readAndExportBNet(true, fileOut);

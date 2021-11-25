@@ -7,6 +7,7 @@ import javax.xml.stream.XMLStreamException;
 import org.sbml.jsbml.SBMLDocument;
 
 import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
+import it.imt.erode.importing.booleannetwork.GuessPrepartitionBN;
 import sbml.conversion.document.ISBMLConverter;
 import sbml.conversion.document.SBMLManager;
 
@@ -28,7 +29,7 @@ public class ErodeExporter {
         SBMLDocument sbmlDocument = (SBMLDocument) SBMLManager.read(path);
 
 
-        ISBMLConverter sbmlConverter = SBMLManager.create(sbmlDocument);
+        ISBMLConverter sbmlConverter = SBMLManager.create(sbmlDocument,GuessPrepartitionBN.INPUTS,null,null,null);
 
         GUIBooleanNetworkImporter guiBooleanNetworkImporter = sbmlConverter.getGuiBnImporter();
         System.out.println(guiBooleanNetworkImporter.getBooleanNetwork().getSpecies().toString());

@@ -9,6 +9,7 @@ import org.sbml.jsbml.SBMLDocument;
 import org.sbml.jsbml.SBMLWriter;
 
 import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
+import it.imt.erode.importing.booleannetwork.GuessPrepartitionBN;
 import sbml.conversion.document.ISBMLConverter;
 import sbml.conversion.document.SBMLManager;
 
@@ -23,7 +24,7 @@ public class SBMLExporter {
         SBMLDocument sbmlDocument = (SBMLDocument) SBMLManager.read(path);
 
 
-        ISBMLConverter converter = SBMLManager.create(sbmlDocument);
+        ISBMLConverter converter = SBMLManager.create(sbmlDocument,GuessPrepartitionBN.INPUTS,null,null,null);
         GUIBooleanNetworkImporter guiBooleanNetworkImporter = converter.getGuiBnImporter();
         GUIBooleanNetworkImporter.printToBNERODEFIle(guiBooleanNetworkImporter.getBooleanNetwork(),guiBooleanNetworkImporter.getInitialPartition(),
                 "DemoNetwork.ode", null, true, null, null, false,null);

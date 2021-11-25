@@ -36,6 +36,8 @@ import it.imt.erode.crn.chemicalReactionNetwork.MVExpr;
 import it.imt.erode.crn.chemicalReactionNetwork.MVNode;
 import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinition;
 import it.imt.erode.crn.chemicalReactionNetwork.MVUpdateFunctions;
+import it.imt.erode.crn.chemicalReactionNetwork.MaxArithExprReferenceToMVNodeOrValue;
+import it.imt.erode.crn.chemicalReactionNetwork.MinArithExprReferenceToMVNodeOrValue;
 import it.imt.erode.crn.chemicalReactionNetwork.ModelDefinition;
 import it.imt.erode.crn.chemicalReactionNetwork.MulReferenceToMVNodeOrValue;
 import it.imt.erode.crn.chemicalReactionNetwork.Node;
@@ -349,6 +351,18 @@ public class MyCRNProgramExecutor {
 					visitArithExprMVUpdateFunc_xtextToCore(((SumReferenceToMVNodeOrValue)arithExprUpdFunc).getLeft(),max),
 					visitArithExprMVUpdateFunc_xtextToCore(((SumReferenceToMVNodeOrValue)arithExprUpdFunc).getRight(),max),
 					ArithmeticConnector.SUM);
+		}
+		else if(arithExprUpdFunc instanceof MinArithExprReferenceToMVNodeOrValue) {
+			return new BinaryExprIUpdateFunction(
+					visitArithExprMVUpdateFunc_xtextToCore(((MinArithExprReferenceToMVNodeOrValue)arithExprUpdFunc).getLeft(),max),
+					visitArithExprMVUpdateFunc_xtextToCore(((MinArithExprReferenceToMVNodeOrValue)arithExprUpdFunc).getRight(),max),
+					ArithmeticConnector.MIN);
+		}
+		else if(arithExprUpdFunc instanceof MaxArithExprReferenceToMVNodeOrValue) {
+			return new BinaryExprIUpdateFunction(
+					visitArithExprMVUpdateFunc_xtextToCore(((MaxArithExprReferenceToMVNodeOrValue)arithExprUpdFunc).getLeft(),max),
+					visitArithExprMVUpdateFunc_xtextToCore(((MaxArithExprReferenceToMVNodeOrValue)arithExprUpdFunc).getRight(),max),
+					ArithmeticConnector.MAX);
 		}
 		else if(arithExprUpdFunc instanceof MVUpdateFunctions) {
 			EList<caseMV> cases = ((MVUpdateFunctions) arithExprUpdFunc).getCasesMV();

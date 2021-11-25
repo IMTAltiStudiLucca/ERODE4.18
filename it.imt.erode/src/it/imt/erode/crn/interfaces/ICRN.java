@@ -13,11 +13,11 @@ import it.imt.erode.crn.symbolic.constraints.IConstraint;
 import it.imt.erode.expression.evaluator.MathEval;
 import it.imt.erode.importing.ODEorNET;
 
-public interface ICRN{
+public interface ICRN extends IModel{
 	
 	public MessageConsoleStream getOut();
 	public BufferedWriter getBWOut();
-	public List<ISpecies> getSpecies();
+	
 	public int getSpeciesSize();
 	
 	public Set<IComposite> computeSetOfReagents();
@@ -25,8 +25,6 @@ public interface ICRN{
 	
 	public void addParameter(String parameterName, String parameterExpression);
 	public void addParameter(String parameterName, String parameterExpression, boolean updateMathEval);
-
-	public List<String> getParameters();
 
 	public List<ICRNReaction> getReactions();
 	
@@ -44,7 +42,7 @@ public interface ICRN{
 
 	//public TreeSet<IComposite> getProducts();
 
-	public String getName();
+	
 	
 	public boolean isZeroSpecies(ISpecies species);
 

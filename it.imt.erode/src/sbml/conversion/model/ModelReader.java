@@ -7,8 +7,8 @@ import sbml.conversion.qualmodel.QualModelManager;
 
 class ModelReader extends ModelConverter {
 
-    public ModelReader(Model model) {
-        super(model);
+    public ModelReader(Model model,String nameFromFile) {
+        super(model,nameFromFile);
         this.qualModelConverter = QualModelManager.create(this.tryGetQualModel());
     }
 

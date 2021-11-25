@@ -2,7 +2,6 @@ package it.imt.erode.booleannetwork.implementations;
 
 import java.io.BufferedWriter;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,6 +21,7 @@ public class BooleanNetwork implements IBooleanNetwork {
 	private LinkedHashMap<String, IUpdateFunction> updateFunctions;
 	private LinkedHashMap<String, Integer> nameToMax;
 	private String name;
+	private ArrayList<String> fakeParams=new ArrayList<>(0);
 	
 	private MessageConsoleStream out;
 	private BufferedWriter bwOut;
@@ -165,18 +165,18 @@ public class BooleanNetwork implements IBooleanNetwork {
 		}
 	}
 
-	@Override
-	public int cumulMax(Collection<ISpecies> species) {
-		int cumul=0;
-		for(ISpecies sp : species) {
-			Integer cur=nameToMax.get(sp.getName());
-			if(cur==null) {
-				cur=1;
-			}
-			cumul+=cur;
-		}
-		return cumul;
-	}
+//	@Override
+//	public int cumulMax(Collection<ISpecies> species) {
+//		int cumul=0;
+//		for(ISpecies sp : species) {
+//			Integer cur=nameToMax.get(sp.getName());
+//			if(cur==null) {
+//				cur=1;
+//			}
+//			cumul+=cur;
+//		}
+//		return cumul;
+//	}
 	
 	@Override
 	public LinkedHashMap<String, Integer> getNameToMax(){
@@ -191,6 +191,11 @@ public class BooleanNetwork implements IBooleanNetwork {
 		else {
 			return ret;
 		}
+	}
+
+	@Override
+	public List<String> getParameters() {
+		return fakeParams;
 	}
 
 }

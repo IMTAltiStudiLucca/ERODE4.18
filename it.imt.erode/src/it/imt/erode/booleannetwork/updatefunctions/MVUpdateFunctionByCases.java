@@ -2,6 +2,7 @@ package it.imt.erode.booleannetwork.updatefunctions;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 
@@ -10,6 +11,7 @@ import com.microsoft.z3.Context;
 import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
+import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
@@ -73,7 +75,7 @@ public class MVUpdateFunctionByCases implements IUpdateFunction {
 		for(Entry<Integer, IUpdateFunction> cur_case : casesNoOtherwise.entrySet()) {
 			//sb.append("\t");
 			sb.append(cur_case.getKey());
-			sb.append(" if "+cur_case.getValue()+", ");
+			sb.append(" if "+cur_case.getValue()+"; ");
 			//sb.append("\n");
 		}
 		//sb.append("\t");
@@ -120,11 +122,12 @@ public class MVUpdateFunctionByCases implements IUpdateFunction {
 	@Override
 	public IUpdateFunction cloneReplacingNorRepresentativeWithNeutral(IPartition partition,
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
-			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction) {
+			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction
+			, IBooleanNetwork bn) {
 		LinkedHashMap<Integer, IUpdateFunction> clonedCases = new LinkedHashMap<Integer, IUpdateFunction>(casesNoOtherwise.size());
 		for(Entry<Integer, IUpdateFunction> cur_case : casesNoOtherwise.entrySet()) {
 			clonedCases.put(cur_case.getKey(), 
-							cur_case.getValue().cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies, speciesNameToOriginalSpecies, aggregationFunction));
+							cur_case.getValue().cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies, speciesNameToOriginalSpecies, aggregationFunction,bn));
 		}
 		clonedCases.put(otherwiseVal, new Otherwise());
 		return new MVUpdateFunctionByCases(clonedCases, max);
@@ -149,6 +152,12 @@ public class MVUpdateFunctionByCases implements IUpdateFunction {
 			}
 		}
 		return false;
+	}
+	@Override
+	public void dropNonOutputSpecies(String sp, HashSet<String> guessedOutputs) {
+		for(IUpdateFunction cur_case:casesNoOtherwise.values()) {
+			cur_case.dropNonOutputSpecies(sp, guessedOutputs);
+		}
 	}
 
 }

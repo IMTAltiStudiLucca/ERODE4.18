@@ -39,7 +39,11 @@ class SpeciesReader extends SpeciesConverter {
         	//q.getInitialLevel();
             ISpecies s = erodeSpeciesBuilder.createSpecies(id, q.getId(), init);
             erodeSpecies.add(s);
-            setMaxValue(s.getName(),q.getMaxLevel());
+            int max=1;
+            if(q.isSetMaxLevel()) {
+            	max=q.getMaxLevel();
+            }
+            setMaxValue(s.getName(),max);
             id++;
         }
         

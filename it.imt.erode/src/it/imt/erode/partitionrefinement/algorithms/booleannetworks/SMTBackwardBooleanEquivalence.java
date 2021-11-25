@@ -283,7 +283,8 @@ public class SMTBackwardBooleanEquivalence {
 			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, blockRepresentative.getInitialConcentration(),blockRepresentative.getInitialConcentrationExpr(),blockRepresentative.getNameAlphanumeric(),false);
 			reducedBN.addSpecies(reducedSpecies);
 			if(bn.isMultiValued()) {
-				reducedBN.setMax(reducedSpecies, bn.cumulMax(currentBlock.getSpecies()));
+				//reducedBN.setMax(reducedSpecies, bn.cumulMax(currentBlock.getSpecies()));
+				reducedBN.setMax(reducedSpecies, bn.getNameToMax(reducedSpecies.getName()));
 			}
 			
 			reducedSpecies.addCommentLines(currentBlock.computeBlockComment());

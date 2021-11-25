@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -25,6 +26,7 @@ import com.microsoft.z3.Z3Exception;
 import it.imt.erode.auxiliarydatastructures.DoubleAndStatus;
 import it.imt.erode.auxiliarydatastructures.IntegerAndPartition;
 import it.imt.erode.auxiliarydatastructures.PartitionAndStringAndBoolean;
+import it.imt.erode.auxiliarydatastructures.StringAndBigDecimal;
 import it.imt.erode.booleannetwork.auxiliarydatastructures.BNandPartition;
 import it.imt.erode.booleannetwork.implementations.BooleanNetwork;
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
@@ -53,7 +55,8 @@ import it.imt.erode.partitionrefinement.algorithms.CRNBisimulationsNAry;
 
 public class SMTForwardBooleanEquivalence {
 
-
+	public final static int neutralMax = 0;//Integer.MIN_VALUE
+	
 
 	private FBEAggregationFunctions aggregationFunction;
 
@@ -74,7 +77,7 @@ public class SMTForwardBooleanEquivalence {
 
 	public static final boolean SHOWTIMEATEACHSTEP = false;
 	public static final boolean DOONLYCHECKSWITHWHOLEPARTITION = false;
-	public static final int MAXINNERITERATIONS = 30000;//Integer.MAX_VALUE;
+	public static final int MAXINNERITERATIONS = Integer.MAX_VALUE;
 	
 	/**
 	 * For MV networks, I want to explicitly state the domain of each species (from 0 to max)
@@ -251,9 +254,7 @@ public class SMTForwardBooleanEquivalence {
 							sumsOfTheBlocks,verbose,partitionSizeOfPrevDoWhileIter/*prevPartitionSize*/,out,bwOut,terminator,totalInnerIteration);
 					//refineBlockAllSplittersAtOnce(blockToSplit,crn,partition,redistributor,redistributorApp,oneMinusRedistributor,sumsOfTheBlocks,verbose,prevPartitionSize);				
 
-					if(totalInnerIteration >= MAXINNERITERATIONS) {
-						break;
-					}
+					
 					//I finished to partition the block
 
 					/*
@@ -293,6 +294,10 @@ public class SMTForwardBooleanEquivalence {
 						prevPartitionSize=partition.size();//NEW
 						blockToSplit=nextBlockToSplit;	
 					}
+					
+					if(totalInnerIteration >= MAXINNERITERATIONS) {
+						break;
+					}
 				}
 			}
 			//partition=refinedPartition;
@@ -312,7 +317,7 @@ public class SMTForwardBooleanEquivalence {
 		}
 
 		if(totalInnerIteration >= MAXINNERITERATIONS) {
-			CRNReducerCommandLine.println(out,bwOut," INTERRUPTED after "+totalInnerIteration+" SMT checks due to limit on max SMT checks ("+MAXINNERITERATIONS+") ");
+			CRNReducerCommandLine.println(out,bwOut,"\n\tINTERRUPTED after "+totalInnerIteration+" SMT checks due to limit on max SMT checks ("+MAXINNERITERATIONS+") ");
 			//return new IntegerAndPartition(iteration, partition);
 			return new IntegerAndPartition(-1, partition);
 		}
@@ -325,7 +330,7 @@ public class SMTForwardBooleanEquivalence {
 	}
 
 
-	private int refineBlockDecomposeBinaryFBEWithOneSplitterAtTime(IBlock blockToSplit,IBooleanNetwork crn, IPartition partition, /*ArithExpr redistributor,*/ /*Bool*/Expr redistributorApp, /*ArithExpr oneMinusRedistributor,*/ 
+	private int refineBlockDecomposeBinaryFBEWithOneSplitterAtTime(IBlock blockToSplit,IBooleanNetwork bn, IPartition partition, /*ArithExpr redistributor,*/ /*Bool*/Expr redistributorApp, /*ArithExpr oneMinusRedistributor,*/ 
 			/*Bool*/Expr[] sumsOfTheBlocks, boolean verbose, int sizeOfPartiton,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, int totalInnerIteration) throws Z3Exception {
 		int indexOfSplitterBlock=0;
 		//int innerIteration=0;
@@ -373,7 +378,8 @@ public class SMTForwardBooleanEquivalence {
 					/*Bool*/Expr cumulativeODEsOfCSB = sumsOfTheBlocks[indexOfSplitterBlock];
 					/*Bool*/Expr swappedSum = cumulativeODEsOfCSB.substitute(repOfCurrentSubBlockPop, redistributorApp);
 					// Replace currentSpecies with neutral element
-					/*Bool*/Expr swappedSum_phi_ij = swappedSum.substitute(currentSpeciesPop, neutralElement());
+					Expr neutralElement = neutralElement(bn,currentSpecies,repOfCurrentSubBlock);
+					/*Bool*/Expr swappedSum_phi_ij = swappedSum.substitute(currentSpeciesPop, neutralElement);
 					//Replace repOfCurrentSubBlock with sum of block
 					swappedSum_phi_ij =  swappedSum_phi_ij.substitute(redistributorApp, sumOfThetwo);
 					swappedSum_phi_ij=swappedSum_phi_ij.simplify();
@@ -382,12 +388,12 @@ public class SMTForwardBooleanEquivalence {
 					//Replace currentSpecies with sum of block
 					/*Bool*/Expr swappedSum_phi_ji = swappedSum.substitute(currentSpeciesPop, sumOfThetwo);
 					//Replace repOfCurrentSubBlock with neutral element
-					swappedSum_phi_ji =  swappedSum_phi_ji.substitute(redistributorApp, neutralElement());
+					swappedSum_phi_ji =  swappedSum_phi_ji.substitute(redistributorApp, neutralElement);
 					swappedSum_phi_ji=swappedSum_phi_ji.simplify();
 					
 					solver.reset();
 					
-					if(crn.isMultiValued()) {
+					if(bn.isMultiValued()) {
 						solver.add(speciesDomainsAssertion);
 					}
 					
@@ -587,7 +593,10 @@ public class SMTForwardBooleanEquivalence {
 		} 
 	}
 	private boolean isArithAggrFunc() {
-		if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
+		if(		aggregationFunction.equals(FBEAggregationFunctions.PLUS) || 
+				aggregationFunction.equals(FBEAggregationFunctions.TIMES)||
+				aggregationFunction.equals(FBEAggregationFunctions.MIN)  ||
+				aggregationFunction.equals(FBEAggregationFunctions.MAX)	    ) {
 			return true;
 		}
 		else {
@@ -613,13 +622,87 @@ public class SMTForwardBooleanEquivalence {
 		if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
 			odeSum = ctx.mkAdd(expressions);
 		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.TIMES)) {
+			odeSum = ctx.mkMul(expressions);
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MIN)||
+				aggregationFunction.equals(FBEAggregationFunctions.MAX)) {
+			if(expressions.length==1) {
+				odeSum=expressions[0];
+			}
+			else {
+				/*
+				 * (define-fun min ((x Int) (y Int)) Int
+					  (ite (< x y) x y))
+				 */
+				/*
+				 * (define-fun max ((x Int) (y Int)) Int
+					  (ite (> x y) x y))
+				 */				
+				BoolExpr guard;
+				if(aggregationFunction.equals(FBEAggregationFunctions.MIN)){
+					guard=ctx.mkLt(expressions[0], expressions[1]);
+				}
+				else {
+					guard=ctx.mkGt(expressions[0], expressions[1]);
+				}
+				odeSum= (ArithExpr) ctx.mkITE(guard, expressions[0], expressions[1]);
+				for(int i=2;i<expressions.length;i++) {
+					if(aggregationFunction.equals(FBEAggregationFunctions.MIN)){
+						guard=ctx.mkLt(odeSum, expressions[i]);
+					}
+					else {
+						guard=ctx.mkGt(odeSum, expressions[i]);
+					}
+					odeSum= (ArithExpr) ctx.mkITE(guard, odeSum, expressions[i]);
+				}
+			}
+		}
+//		else if(aggregationFunction.equals(FBEAggregationFunctions.MIN)) {
+//			if(expressions.length==1) {
+//				odeSum=expressions[0];
+//			}
+//			else {
+//				/*
+//				 * (define-fun min ((x Int) (y Int)) Int
+//					  (ite (< x y) x y))
+//				 */
+//				BoolExpr guard = ctx.mkLt(expressions[0], expressions[1]);
+//				odeSum= (ArithExpr) ctx.mkITE(guard, expressions[0], expressions[1]);
+//				for(int i=2;i<expressions.length;i++) {
+//					guard = ctx.mkLt(odeSum, expressions[i]);
+//					odeSum= (ArithExpr) ctx.mkITE(guard, odeSum, expressions[i]);
+//				}
+//			}
+//		}
+//		else if(aggregationFunction.equals(FBEAggregationFunctions.MAX)) {
+//			if(expressions.length==1) {
+//				odeSum=expressions[0];
+//			}
+//			else {
+//				/*
+//				 * (define-fun max ((x Int) (y Int)) Int
+//					  (ite (< x y) y x))
+//				 */
+//				BoolExpr guard = ctx.mkLt(expressions[0], expressions[1]);
+//				odeSum= (ArithExpr) ctx.mkITE(guard, expressions[1], expressions[0]);
+//				for(int i=2;i<expressions.length;i++) {
+//					guard = ctx.mkLt(odeSum, expressions[i]);
+//					odeSum= (ArithExpr) ctx.mkITE(guard, expressions[i],odeSum);
+//				}
+//			}
+//		}
 		else {
 			throw new UnsupportedOperationException("Not supported FBE aggregation function: "+aggregationFunction);
 		}
 		return odeSum;
 	}
 
-	private /*Bool*/Expr neutralElement() {
+	/**
+	 * Computes the neutral element for an aggregation function (for two compared species)
+	 * @return
+	 */
+	private /*Bool*/Expr neutralElement(IBooleanNetwork bn, ISpecies first,ISpecies second) {
 		if(aggregationFunction.equals(FBEAggregationFunctions.OR)) {
 			return ctx.mkFalse();
 		}
@@ -629,12 +712,24 @@ public class SMTForwardBooleanEquivalence {
 		else if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
 			return ctx.mkInt(0);
 		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.TIMES)) {
+			return ctx.mkInt(1);
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MIN)) {
+			int m1=bn.getNameToMax(first.getName());
+			int m2=bn.getNameToMax(second.getName());
+			return ctx.mkInt((m1>m2)? m1 : m2);
+			//return ctx.mkInt(Integer.MAX_VALUE);
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MAX)) {
+			return ctx.mkInt(neutralMax);
+		}
 		else {
 			throw new UnsupportedOperationException("Not supported FBE/FME aggregation function: "+aggregationFunction);
 		}
 	}
 
-	public static IUpdateFunction neutralElementUpdFunc(FBEAggregationFunctions aggregationFunction) {
+	public static IUpdateFunction neutralElementUpdFunc(FBEAggregationFunctions aggregationFunction, Collection<ISpecies> speciesToCompareWith, IBooleanNetwork originalBN) {
 		if(aggregationFunction.equals(FBEAggregationFunctions.OR)) {
 			return new FalseUpdateFunction();
 		}
@@ -643,6 +738,24 @@ public class SMTForwardBooleanEquivalence {
 		} 
 		else if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
 			return new ValUpdateFunction(0);
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.TIMES)) {
+			return new ValUpdateFunction(1);
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MIN)) {
+			//return new ValUpdateFunction(Integer.MAX_VALUE);
+			//All other update functions are simple. For min I take the max of the domains of the species I'm comparing (or of the species in the block).
+			int max= Integer.MIN_VALUE;
+			for(ISpecies sp : speciesToCompareWith) {
+				int cur=originalBN.getNameToMax(sp.getName());
+				if(cur>max) {
+					max=cur;
+				}
+			}
+			return new ValUpdateFunction(max);
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MAX)) {
+			return new ValUpdateFunction(neutralMax);
 		}
 		else {
 			throw new UnsupportedOperationException("Not supported FBE aggregation function: "+aggregationFunction);
@@ -677,6 +790,25 @@ public class SMTForwardBooleanEquivalence {
 	
 		if(bn.isMultiValued()) {
 			sort= ctx.mkIntSort();
+			
+//			//Create min and max functions
+//			/*
+//			 * (define-fun min ((x Int) (y Int)) Int
+//				  (ite (< x y) x y))
+//			 */
+//			/*
+//			 * (define-fun max ((x Int) (y Int)) Int
+//				  (ite (< x y) y x))
+//			 */
+//			Sort[] args = new Sort[2];
+//			FuncDecl minDecl = ctx.mkFuncDecl("min", args, sort);
+//			//ctx.fun
+//			
+//			/*
+//			 * 
+//			 * ctx.mkFuncDecl(null, null, sort)
+//			 */
+			
 		}
 		else {
 			sort= ctx.mkBoolSort();
@@ -844,6 +976,15 @@ public class SMTForwardBooleanEquivalence {
 		else if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
 			opArith=ArithmeticConnector.SUM;
 		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.TIMES)) {
+			opArith=ArithmeticConnector.MUL;
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MIN)) {
+			opArith=ArithmeticConnector.MIN;
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MAX)) {
+			opArith=ArithmeticConnector.MAX;
+		}
 		else {
 			throw new UnsupportedOperationException("Unsupported aggregation function: "+aggregationFunction);
 		}
@@ -864,23 +1005,29 @@ public class SMTForwardBooleanEquivalence {
 			ISpecies blockRepresentative = currentBlock.getRepresentative(CRNReducerCommandLine.COMPUTEREPRESENTATIVEBYMINOUTSIDEPARTITIONREFINEMENT);
 			 */
 			String nameRep=blockRepresentative.getName();
-			BigDecimal ic = currentBlock.getBlockConcentration();
+			StringAndBigDecimal icandExpr = aggregatedIC(currentBlock);
+			BigDecimal ic = icandExpr.getBigDecimal();
+			String icExpr = icandExpr.getString();
 			
-			String icExpr;
-			if(bn.isMultiValued()) {
-				icExpr=String.valueOf(ic);
-			}
-			else {
-				ic=cumulIC_BN(ic,currentBlock.getSpecies().size());				
-				icExpr=ic.compareTo(BigDecimal.ZERO)==0? "false":"true";
-			}
+//			BigDecimal ic = currentBlock.getBlockConcentration();
+//			String icExpr;
+//			if(bn.isMultiValued()) {
+//				icExpr=String.valueOf(ic);
+//			}
+//			else {
+//				ic=cumulIC_BN(ic,currentBlock.getSpecies().size());				
+//				icExpr=ic.compareTo(BigDecimal.ZERO)==0? "false":"true";
+//			}
+			
+			
 			
 
 			ISpecies reducedSpecies;
 			reducedSpecies = new Species(nameRep, blockRepresentative.getOriginalName(),i, ic,/*currentBlock.computeBlockConcentrationExpr()*/icExpr,blockRepresentative.isAlgebraic());
 			reducedBN.addSpecies(reducedSpecies);
 			if(bn.isMultiValued()) {
-				reducedBN.setMax(reducedSpecies, bn.cumulMax(currentBlock.getSpecies()));
+				int aggrMax = aggregatedMax(currentBlock.getSpecies(),bn,aggregationFunction);
+				reducedBN.setMax(reducedSpecies, aggrMax);
 			}
 			
 			reducedSpecies.addCommentLines(currentBlock.computeBlockComment());
@@ -972,29 +1119,124 @@ public class SMTForwardBooleanEquivalence {
 		return new BNandPartition(reducedBN, trivialPartition);
 	}
 
+
+//	/**
+//	 * for boolean networks (no multivalued). This method transforms the cumulative ic of a block in 1 (true) or 0 (false) depending on the aggregation function 
+//	 * @param cumulIC
+//	 * @param spInTheBlock
+//	 * @return
+//	 */
+//	private BigDecimal cumulIC_BN(BigDecimal cumulIC, int spInTheBlock) {
+//		if(this.aggregationFunction.equals(FBEAggregationFunctions.OR)) {
+//			if(cumulIC.compareTo(BigDecimal.ZERO)>0) {
+//				return BigDecimal.ONE;
+//			}
+//			return BigDecimal.ZERO;
+//		}
+//		else if(this.aggregationFunction.equals(FBEAggregationFunctions.AND)) {
+//			if(cumulIC.compareTo(BigDecimal.valueOf(spInTheBlock))==0) {
+//				return BigDecimal.ONE;
+//			}
+//			return BigDecimal.ZERO;
+//		} 
+//		return null;
+//	}
+	
 	/**
-	 * for boolean networks (no multivalued). This method transforms the cumulative ic of a block in 1 (true) or 0 (false) depending on the aggregation function 
-	 * @param cumulIC
-	 * @param spInTheBlock
+	 * This method computes the 'aggregated IC' of a block for the considered aggregation function.
+	 *
+	 * @param block
 	 * @return
 	 */
-	private BigDecimal cumulIC_BN(BigDecimal cumulIC, int spInTheBlock) {
-		if(this.aggregationFunction.equals(FBEAggregationFunctions.OR)) {
-			if(cumulIC.compareTo(BigDecimal.ZERO)>0) {
-				return BigDecimal.ONE;
+	private StringAndBigDecimal aggregatedIC(IBlock block) {
+		if(aggregationFunction.equals(FBEAggregationFunctions.OR)||
+				aggregationFunction.equals(FBEAggregationFunctions.AND)||
+					//|| aggregationFunction.equals(FBEAggregationFunctions.XOR)||
+					aggregationFunction.equals(FBEAggregationFunctions.PLUS)){
+			BigDecimal sum= block.getBlockConcentration();
+			if(aggregationFunction.equals(FBEAggregationFunctions.OR)){
+				if(sum.compareTo(BigDecimal.ZERO)>0) {
+					return new StringAndBigDecimal("1", BigDecimal.ONE);
+				}
+				return new StringAndBigDecimal("0", BigDecimal.ZERO);
 			}
-			return BigDecimal.ZERO;
+			else if(aggregationFunction.equals(FBEAggregationFunctions.AND)){
+				if(sum.compareTo(BigDecimal.valueOf(block.getSpecies().size()))==0) {
+					return new StringAndBigDecimal("1", BigDecimal.ONE);
+				}
+				return new StringAndBigDecimal("0", BigDecimal.ZERO);
+			} 
+			else {
+				//FBEAggregationFunctions.PLUS
+				return new StringAndBigDecimal(sum.toPlainString(), sum);
+			}
 		}
-		else if(this.aggregationFunction.equals(FBEAggregationFunctions.AND)) {
-			if(cumulIC.compareTo(BigDecimal.valueOf(spInTheBlock))==0) {
-				return BigDecimal.ONE;
+		else if(aggregationFunction.equals(FBEAggregationFunctions.TIMES)) {
+			BigDecimal prod = BigDecimal.ONE;
+			for(ISpecies sp : block.getSpecies()) {
+				prod = prod.multiply(sp.getInitialConcentration());
 			}
-			return BigDecimal.ZERO;
-		} 
-		return null;
+			return new StringAndBigDecimal(prod.toPlainString(), prod);
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MIN)||aggregationFunction.equals(FBEAggregationFunctions.MAX)) {
+			BigDecimal chosen = block.getSpecies().iterator().next().getInitialConcentration();
+			for(ISpecies sp : block.getSpecies()) {
+				if(aggregationFunction.equals(FBEAggregationFunctions.MIN)) {
+					chosen = chosen.min(sp.getInitialConcentration());
+				}
+				else {
+					chosen = chosen.max(sp.getInitialConcentration());
+				}
+			}
+			return new StringAndBigDecimal(chosen.toPlainString(), chosen);
+		}
+		else {
+			throw new UnsupportedOperationException("Unsupportd FBE/FME aggregation function "+aggregationFunction);
+		}
+	}
+	
+	/**
+	 * For mv networks only. To be used to compute the max value of a reduced species
+	 * @param species all species to consider 
+	 * @param originalBN the BN from which to take the max of each species
+	 * @param aggregationFunction the aggr func to use
+	 * @return the result of aggregationFunction on all max of the species
+	 */
+	protected static int aggregatedMax(Collection<ISpecies> species, IBooleanNetwork originalBN, FBEAggregationFunctions aggregationFunction) {
+		if(aggregationFunction.equals(FBEAggregationFunctions.PLUS)) {
+			int sum = 0;
+			for(ISpecies sp : species) {
+				sum = sum + originalBN.getNameToMax(sp.getName());
+			}
+			return sum;
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.TIMES)) {
+			int prod = 1;
+			for(ISpecies sp : species) {
+				prod = prod * originalBN.getNameToMax(sp.getName());
+			}
+			return prod;
+		}
+		else if(aggregationFunction.equals(FBEAggregationFunctions.MIN)||aggregationFunction.equals(FBEAggregationFunctions.MAX)) {
+			int chosen = originalBN.getNameToMax(species.iterator().next().getName());
+			for(ISpecies sp : species) {
+				if(aggregationFunction.equals(FBEAggregationFunctions.MIN)) {
+					chosen = Math.min(chosen,originalBN.getNameToMax(sp.getName()));
+				}
+				else {
+					chosen = Math.max(chosen,originalBN.getNameToMax(sp.getName()));
+				}
+			}
+			return chosen;
+		}
+		else {
+			throw new UnsupportedOperationException("Unsupportd FBE/FME aggregation function "+aggregationFunction);
+		}
 	}
 
-	private static IUpdateFunction computeUpdateFunctionSumPreservingRepresentative(IBooleanNetwork crn, IBlock currentBlock, BooleanConnector op,ArithmeticConnector opArith,
+	
+
+	private static IUpdateFunction computeUpdateFunctionSumPreservingRepresentative(IBooleanNetwork bn, IBlock currentBlock, BooleanConnector op,ArithmeticConnector opArith,
 			IPartition partition,
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
 			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction
@@ -1002,8 +1244,8 @@ public class SMTForwardBooleanEquivalence {
 		IUpdateFunction sum=null;
 		
 		for(ISpecies sp : currentBlock.getSpecies()) {
-			IUpdateFunction c= crn.getUpdateFunctions().get(sp.getName());
-			c=c.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies, speciesNameToOriginalSpecies, aggregationFunction);
+			IUpdateFunction c= bn.getUpdateFunctions().get(sp.getName());
+			c=c.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies, speciesNameToOriginalSpecies, aggregationFunction,bn);
 			if(sum==null) {
 				sum=c;
 				/*if(crn.isMultiValued()) {
@@ -1016,7 +1258,7 @@ public class SMTForwardBooleanEquivalence {
 				}*/
 			}
 			else {
-				if(crn.isMultiValued()) {
+				if(bn.isMultiValued()) {
 					//((REMOVE_MVUpdateFunctionSum)sum).add(c);
 					sum=new BinaryExprIUpdateFunction(sum,c,opArith);
 				}

@@ -8,6 +8,7 @@ import org.sbml.jsbml.SBMLDocument;
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.importing.InfoBooleanNetworkImporting;
 import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
+import it.imt.erode.importing.booleannetwork.GuessPrepartitionBN;
 import sbml.configurations.SBMLConfiguration;
 import sbml.conversion.model.IModelConverter;
 
@@ -22,9 +23,11 @@ abstract class SBMLConverter implements ISBMLConverter {
     protected InfoBooleanNetworkImporting infoImporting;
     protected GUIBooleanNetworkImporter guiBnImporter;
     protected IBooleanNetwork booleanNetwork;
+    protected GuessPrepartitionBN guessPrepartitionOnInputs=GuessPrepartitionBN.INPUTS;
 
-    public SBMLConverter(@NotNull SBMLDocument sbmlDocument) throws IOException {
+    public SBMLConverter(@NotNull SBMLDocument sbmlDocument,GuessPrepartitionBN guessPrep) throws IOException {
         this.sbmlDocument = sbmlDocument;
+        this.guessPrepartitionOnInputs=guessPrep;
     }
 
     public SBMLConverter(IBooleanNetwork booleanNetwork) {

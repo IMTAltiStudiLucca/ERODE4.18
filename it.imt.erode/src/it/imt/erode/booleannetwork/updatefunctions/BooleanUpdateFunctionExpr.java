@@ -1,6 +1,7 @@
 package it.imt.erode.booleannetwork.updatefunctions;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 
 import com.microsoft.z3.BoolExpr;
@@ -8,6 +9,7 @@ import com.microsoft.z3.Context;
 import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
+import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.crn.symbolic.constraints.BooleanConnector;
 import it.imt.erode.partition.interfaces.IBlock;
@@ -42,6 +44,7 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 	@Override
 	public String toString() {
 		return "("+first.toString()+getSymbol(op)+second.toString()+")";
+		//return first.toString()+getSymbol(op)+second.toString();
 	}
 
 	private static String getSymbol(BooleanConnector op) {
@@ -95,14 +98,20 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 	@Override
 	public IUpdateFunction cloneReplacingNorRepresentativeWithNeutral(IPartition partition,
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
-			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction) {
-		IUpdateFunction firstCloned = first.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
-		IUpdateFunction secondCloned = second.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
+			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction
+			, IBooleanNetwork bn) {
+		IUpdateFunction firstCloned = first.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction,bn);
+		IUpdateFunction secondCloned = second.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction,bn);
 		return new BooleanUpdateFunctionExpr(firstCloned, secondCloned, op);
 	}
 	
 	@Override
 	public boolean seemsInputSpecies(String sp) {
 		return false;
+	}
+	@Override
+	public void dropNonOutputSpecies(String sp, HashSet<String> guessedOutputs) {
+		first.dropNonOutputSpecies(sp, guessedOutputs);
+		second.dropNonOutputSpecies(sp, guessedOutputs);
 	}
 }

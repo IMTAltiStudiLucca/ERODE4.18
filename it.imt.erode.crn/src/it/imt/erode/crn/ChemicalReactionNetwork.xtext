@@ -88,14 +88,17 @@ ImportFolder:
 ;
 
 BooleanImportFolder:
-	importBNetFolder|importSBMLQualFolder
+	importBNetFolder|importSBMLQualFolder|importCNFFolder
 ;
 importBNetFolder:
-	'importBNetFolder' '(' params = ParametersImportFolder ')'
+	'importBNetFolder' '(' params = ParametersImportFolder  ')'
 	//'importSBMLFolder' '(' 'folderIn' '=' folderIn = STRING ',' 'folderOut' '=' folderOut = STRING (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
 ;
 importSBMLQualFolder:
-	'importSBMLQualFolder' '(' params = ParametersImportFolder ')'
+	'importSBMLQualFolder' '(' params = ParametersImportFolder ',' 'guessPrepartition' '=' guessPrep = ('inputs'|'outputs') ')'
+;
+importCNFFolder:
+	'importCNFFolder' '(' params = ParametersImportFolder ')'
 ;
 
 /*ModelDefinition:	
@@ -1857,8 +1860,26 @@ MulReferenceToMVNodeOrValue returns ExprReferenceToMVNodeOrValue:
 PrimaryExprRefNodeOrValue  returns ExprReferenceToMVNodeOrValue:
 	ReferenceToMVNodeOrValue 
 	| MVUpdateFunctionByCases
+	| MinArithExprReferenceToMVNodeOrValue
+	|MaxArithExprReferenceToMVNodeOrValue
 	|'(' ArithExprReferenceToMVNodeOrValue ')'
 ;
+//Min returns Expression:
+// 'min' '(' Addition ({Min.left=current}','right=Addition) ')' ;
+MinArithExprReferenceToMVNodeOrValue  returns ExprReferenceToMVNodeOrValue:
+	//( {MinArithExprReferenceToMVNodeOrValue}'min'| {MaxArithExprReferenceToMVNodeOrValue}'max')
+	'min' '(' ArithExprReferenceToMVNodeOrValue ({MinArithExprReferenceToMVNodeOrValue.left=current}','
+			  right=ArithExprReferenceToMVNodeOrValue)')'
+;
+MaxArithExprReferenceToMVNodeOrValue  returns ExprReferenceToMVNodeOrValue:
+	//( {MinArithExprReferenceToMVNodeOrValue}'min'| {MaxArithExprReferenceToMVNodeOrValue}'max')
+	'max' '(' ArithExprReferenceToMVNodeOrValue ({MaxArithExprReferenceToMVNodeOrValue.left=current}','
+			  right=ArithExprReferenceToMVNodeOrValue)')'
+;
+
+//MaxWithSymbPar returns Expression:
+// 'max' '(' AdditionWithSymbPar ({MaxWithSymbPar.left=current}','right=AdditionWithSymbPar) ')'  
+// ;
 
 //MVUpdateFunctionsSum returns MVExpr: 
 //	MVUpdateFunctionsMul ({MVUpdateFunctionsSum.left=current}  ('+') right=MVUpdateFunctionsMul)* 
@@ -1885,7 +1906,7 @@ PrimaryExprRefNodeOrValue  returns ExprReferenceToMVNodeOrValue:
 
 MVUpdateFunctionByCases returns ExprReferenceToMVNodeOrValue: {MVUpdateFunctions}
 	//((
-	casesMV+=caseMV (',' (casesMV+=caseMV))*
+	casesMV+=caseMV (';' (casesMV+=caseMV))*
 	//)|(MVUpdateFunction))
 ;
 caseMV:
@@ -2132,7 +2153,7 @@ reduceFBE : {reduceFBE}
 //;
 
 reduceFME : {reduceFME}
-	'reduceFME' '(' 'aggregationFunction' '=' aggregationFunction=('PLUS'/* 'OR'|'AND'*/)  (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
+	'reduceFME' '(' 'aggregationFunction' '=' aggregationFunction=('PLUS'|'TIMES'|'MIN'|'MAX'/* 'OR'|'AND'*/)  (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
 ;
 
 FormattedOptionalParametersBooleanReductions: {FormattedOptionalParametersBooleanReductions}

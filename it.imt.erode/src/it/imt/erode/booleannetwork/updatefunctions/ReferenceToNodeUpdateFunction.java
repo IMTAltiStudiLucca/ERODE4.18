@@ -1,12 +1,15 @@
 package it.imt.erode.booleannetwork.updatefunctions;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 
 import com.microsoft.z3.Context;
 import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
+import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
@@ -48,7 +51,8 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction/*_ArithExp
 	@Override
 	public IUpdateFunction cloneReplacingNorRepresentativeWithNeutral(IPartition partition,
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
-			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction) {
+			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction
+			, IBooleanNetwork bn) {
 		
 		ISpecies original = speciesNameToOriginalSpecies.get(name);
 		IBlock block = partition.getBlockOf(original);
@@ -57,7 +61,8 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction/*_ArithExp
 			return new ReferenceToNodeUpdateFunction(reducedSpecies.getName());
 		}
 		else {
-			return SMTForwardBooleanEquivalence.neutralElementUpdFunc(aggregationFunction);
+			Collection<ISpecies> blockOfSpecies = partition.getBlockOf(original).getSpecies();
+			return SMTForwardBooleanEquivalence.neutralElementUpdFunc(aggregationFunction,blockOfSpecies,bn);
 		}
 	}
 	
@@ -65,5 +70,14 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction/*_ArithExp
 	public boolean seemsInputSpecies(String sp) {
 		return sp.equals(name);
 	}
+	@Override
+	public void dropNonOutputSpecies(String sp, HashSet<String> guessedOutputs) {
+		//A species that appears in the update function of other species, is not an output 
+		if(!sp.equals(name)){
+			guessedOutputs.remove(name);
+		}
+	}
+
+	
 		
 }

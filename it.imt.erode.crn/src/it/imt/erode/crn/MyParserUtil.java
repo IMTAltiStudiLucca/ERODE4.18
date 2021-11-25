@@ -985,6 +985,14 @@ public class MyParserUtil {
 		//
 		//String redFile ="/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/TCS_CMSB/ERODE models/mass-action kinetics/maExplicit/BIOMD0000000002FE.ode";
 		
+		//empty commands
+		//commands.clear();
+		//exportSBML
+//		String sbmlFile=computeFileName(mec.getModelName()+".sbml",absoluteParentPath);
+//		String exportSBML="exportSBMLQual({fileOut=>"+sbmlFile+"})";
+//		commands.add(exportSBML);
+		
+		
 		//automatic CoRNFE
 		//generateCommands(mec, absoluteParentPath, commands, new String[]{"CoRNFE"},false);
 		
@@ -1118,19 +1126,24 @@ public class MyParserUtil {
 	private static String parseBooleanImportFolder(BooleanImportFolder imp, String commandName, String absoluteParentPath) {
 		StringBuilder sb = new StringBuilder(commandName);
 		sb.append("({");
-		if(imp instanceof importBNetFolder|| imp instanceof importSBMLQualFolder) {
-			//imp.
-			ParametersImportFolder params = imp.getParams();
-			//BEGIN To be moved outside if when we will have more 'ImportFolder'
-			sb.append("folderIn=>");
-			sb.append(computeFileName(params.getFolderIn(), absoluteParentPath,false));
+		//if(imp instanceof importBNetFolder|| imp instanceof importSBMLQualFolder) {
+		//imp.
+		ParametersImportFolder params = imp.getParams();
+		//BEGIN To be moved outside if when we will have more 'ImportFolder'
+		sb.append("folderIn=>");
+		sb.append(computeFileName(params.getFolderIn(), absoluteParentPath,false));
+		sb.append(',');
+		sb.append("folderOut=>");
+		sb.append(computeFileName(params.getFolderOut(), absoluteParentPath,false));
+		sb.append(',');
+		if(imp instanceof importSBMLQualFolder) {
+			sb.append("guessPrep=>");
+			sb.append(((importSBMLQualFolder)imp).getGuessPrep());
 			sb.append(',');
-			sb.append("folderOut=>");
-			sb.append(computeFileName(params.getFolderOut(), absoluteParentPath,false));
-			sb.append(',');
-			//END To be moved outside if when we will have more 'ImportFolder'
 		}
-		
+		//END To be moved outside if when we will have more 'ImportFolder'
+		//}
+
 		sb.deleteCharAt(sb.length()-1);
 		sb.append("})");
 		return sb.toString();

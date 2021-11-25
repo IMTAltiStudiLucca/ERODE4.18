@@ -3,6 +3,7 @@ package sbml.conversion.nodes.operators;
 import org.sbml.jsbml.ASTNode;
 import org.sbml.jsbml.ASTNode.Type;
 
+import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
 import it.imt.erode.crn.symbolic.constraints.BasicConstraintComparator;
 
 public class SBMLOperator implements IOperator<ASTNode> {
@@ -76,5 +77,10 @@ public class SBMLOperator implements IOperator<ASTNode> {
 		default:
 			return null;
 		}
+	}
+
+	@Override
+	public IUpdateFunction bn_comparison(IUpdateFunction l, IUpdateFunction r, BasicConstraintComparator cmp) {
+		throw new UnsupportedOperationException("bn_comparison not implemented for SBMLOperator");
 	}
 }

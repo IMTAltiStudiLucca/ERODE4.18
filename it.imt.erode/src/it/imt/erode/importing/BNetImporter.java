@@ -106,7 +106,7 @@ public class BNetImporter extends AbstractImporter{
 			if(i!=-1) {
 				name=name.substring(i+1);
 			}
-			bw.write("begin Boolean network "+name+"\n");
+			bw.write("begin Boolean network "+GUICRNImporter.getModelName(name)+"\n");
 			
 			bw.write("begin init\n");
 			for(String species : speciesToUpdateFunction.keySet()) {
@@ -158,6 +158,12 @@ public class BNetImporter extends AbstractImporter{
 			for(Entry<String, String> pair : speciesToUpdateFunction.entrySet()) {
 				String species = pair.getKey();
 				String updateFunction = pair.getValue();
+				if(updateFunction.equals("1")) {
+					updateFunction="true";
+				}
+				else if(updateFunction.equals("0")) {
+					updateFunction="false";
+				}
 				bw.write("  "+species+ " = ");
 				bw.write(updateFunction);
 				bw.write("\n");

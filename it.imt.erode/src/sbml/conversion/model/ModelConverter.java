@@ -23,9 +23,13 @@ abstract class ModelConverter implements IModelConverter {
     protected IQualModelConverter qualModelConverter;
 
 
-    public ModelConverter(@NotNull Model model) {
+    public ModelConverter(@NotNull Model model,String nameFromFile) {
             this.model = model;
-            this.name = model.getId();
+            this.name = model.getId().replaceAll(" ", "_").replaceAll("-", "_");
+            if(name.equals("model_id") && nameFromFile!=null && nameFromFile.length()>0) {
+            	//name=model.getName();
+            	name=nameFromFile;
+            }
     }
 
     public ModelConverter(@NotNull IBooleanNetwork booleanNetwork) {

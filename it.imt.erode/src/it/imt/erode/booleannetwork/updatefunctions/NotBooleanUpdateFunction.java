@@ -2,6 +2,7 @@ package it.imt.erode.booleannetwork.updatefunctions;
 
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 
 import com.microsoft.z3.BoolExpr;
@@ -9,6 +10,7 @@ import com.microsoft.z3.Context;
 import com.microsoft.z3.Expr;
 import com.microsoft.z3.Z3Exception;
 
+import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
@@ -29,7 +31,13 @@ public class NotBooleanUpdateFunction implements IUpdateFunction {
 	
 	@Override
 	public String toString() {
-		return "(!"+innerUpdateFunction.toString()+")";
+		if(innerUpdateFunction instanceof ReferenceToNodeUpdateFunction ||innerUpdateFunction instanceof ValUpdateFunction) {
+			return "!"+innerUpdateFunction.toString();
+		}
+		else {
+			return "(!"+innerUpdateFunction.toString()+")";
+		}
+		
 	}
 
 	@Override
@@ -48,14 +56,19 @@ public class NotBooleanUpdateFunction implements IUpdateFunction {
 	@Override
 	public IUpdateFunction cloneReplacingNorRepresentativeWithNeutral(IPartition partition,
 			LinkedHashMap<IBlock, ISpecies> correspondenceBlock_ReducedSpecies,
-			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction) {
-		IUpdateFunction innerCloned = innerUpdateFunction.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction);
+			HashMap<String, ISpecies> speciesNameToOriginalSpecies, FBEAggregationFunctions aggregationFunction, IBooleanNetwork bn) {
+		IUpdateFunction innerCloned = innerUpdateFunction.cloneReplacingNorRepresentativeWithNeutral(partition, correspondenceBlock_ReducedSpecies,speciesNameToOriginalSpecies,aggregationFunction,bn);
 		return new NotBooleanUpdateFunction(innerCloned);
 	}
 	
 	@Override
 	public boolean seemsInputSpecies(String sp) {
 		return false;
+	}
+	
+	@Override
+	public void dropNonOutputSpecies(String sp, HashSet<String> guessedOutputs) {
+		innerUpdateFunction.dropNonOutputSpecies(sp, guessedOutputs);
 	}
 			
 }

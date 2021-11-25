@@ -567,7 +567,7 @@ public class GUICRNImporter  extends AbstractImporter {
 		if(name.startsWith("0")||name.startsWith("1")||name.startsWith("2")||name.startsWith("3")||name.startsWith("4")||name.startsWith("5")||name.startsWith("6")||name.startsWith("7")||name.startsWith("8")||name.startsWith("9")){
 			name="m"+name;
 		}
-		return name;
+		return name.replaceAll(" ", "_").replaceAll("-", "_");
 	}
 	
 	private static void writeOldCRNAndXtextImport(BufferedWriter bw, ICRN crn, ODEorNET type, boolean printView,MessageConsoleStream out,BufferedWriter bwOut, boolean rnEncoding, String fileName, IPartition partition)  throws IOException {

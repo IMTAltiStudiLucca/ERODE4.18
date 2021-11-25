@@ -7,9 +7,9 @@ import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 
 public class ModelManager {
     public static IModelConverter create(
-    	@NotNull Model model) {
+    	@NotNull Model model, String nameFromFile) {
     	
-        return new ModelReader(model);
+        return new ModelReader(model,nameFromFile);
     }
 
     public static IModelConverter create(
