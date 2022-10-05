@@ -3,6 +3,9 @@ package it.imt.erode.crn.implementations;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import it.imt.erode.partition.interfaces.IBlock;
+import it.imt.erode.partition.interfaces.IPartition;
+
 public abstract class InfoReduction {
 
 	private String originalNetwork;
@@ -11,13 +14,14 @@ public abstract class InfoReduction {
 	private int reducedSpecies;
 	private long timeInMS;
 	private int initPartitionSize;
-	private int partitionSize;
+	private int partitionSize,nonSingletonBlocks;
 	private int parameters;
 	private double redSizeOverOrigSize;
 	private String percRedSizeOverOrigSize;
 	
+
 	public InfoReduction(String originalNetwork, String reductionTechnique, int originalSpecies,  int parameters, double redSizeOverOrigSize,int reducedSpecies,
-			long timeInMS, int initPartitionSize,int partitionSize) {
+			long timeInMS, int initPartitionSize,/*int partitionSize,int nonSingletonBlocks*/IPartition obtainedPartition) {
 		super();
 		this.originalNetwork = originalNetwork;
 		this.reductionTechnique = reductionTechnique;
@@ -29,7 +33,8 @@ public abstract class InfoReduction {
 		
 		this.timeInMS = timeInMS;
 		this.initPartitionSize=initPartitionSize;
-		this.partitionSize = partitionSize;
+		this.partitionSize = obtainedPartition.size();
+		this.nonSingletonBlocks= nonSingletonBlocks(obtainedPartition);
 	}
 	
 	public int getInitPartitionSize() {
@@ -112,6 +117,22 @@ public abstract class InfoReduction {
 		return sb.toString();
 	}
 	
+	public int getNonSingletonBlocks() {
+		return nonSingletonBlocks;
+	}
 	
+
+	private static int nonSingletonBlocks(IPartition partition) {
+		IBlock current = partition.getFirstBlock();
+		int nonSingl=0;
+		while(current!=null) {
+			if(current.getSpecies().size()>1) {
+				nonSingl++;
+			}
+			current=current.getNext();
+		}
+		return nonSingl; 
+	}
 	
 }
+

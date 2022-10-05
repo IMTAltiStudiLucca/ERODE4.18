@@ -1,0 +1,418 @@
+/* Copyright (c) 2006, Sun Microsystems, Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *     * Redistributions of source code must retain the above copyright notice,
+ *       this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of the Sun Microsystems, Inc. nor the names of its
+ *       contributors may be used to endorse or promote products derived from
+ *       this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
+# model in BoolNet format
+# the header targets, factors is mandatory to be importable in the R package BoolNet
+
+targets, factors
+AKT,           !HSPs&PIP3&!PTCH1 | HSPs&!PTCH1
+AMPK,          !AMP_ATP&!ATM&!ATR&!EGFR&!FGFR3&HIF1 | !AMP_ATP&!ATM&ATR&!EGFR&!FGFR3 | !AMP_ATP&ATM&!EGFR&!FGFR3 | AMP_ATP&!EGFR&!FGFR3
+AMP_ATP,       !Nutrients
+
+
+
+obsAtStep(i,x) =
+ if ( s.rval("steps") == x )
+  then s.rval(i)
+  else # obsAtStep(i,x)
+ fi
+
+<ID>(ListOfParameters) = body
+
+body = if ( the)
+*/
+
+
+
+options {
+  LOOKAHEAD = 1;
+  CHOICE_AMBIGUITY_CHECK = 2;
+  OTHER_AMBIGUITY_CHECK = 1;
+  STATIC = false;
+  DEBUG_PARSER = false;
+  DEBUG_LOOKAHEAD = false;
+  DEBUG_TOKEN_MANAGER = false;
+  ERROR_REPORTING = true;
+  JAVA_UNICODE_ESCAPE = false;
+  UNICODE_INPUT = false;
+  IGNORE_CASE = false;
+  USER_TOKEN_MANAGER = false;
+  USER_CHAR_STREAM = false;
+  BUILD_PARSER = true;
+  BUILD_TOKEN_MANAGER = true;
+  SANITY_CHECK = true;
+  FORCE_LA_CHECK = false;
+}
+
+PARSER_BEGIN(BNetParser)
+
+package it.imt.erode.booleannetwork.bnetparser;
+
+import java.io.Reader;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.FileNotFoundException;
+
+import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.BooleanUpdateFunctionExpr;
+import it.imt.erode.booleannetwork.updatefunctions.NotBooleanUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.TrueUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.FalseUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.ReferenceToNodeUpdateFunction;
+import it.imt.erode.crn.symbolic.constraints.BooleanConnector;
+
+/*
+# model in BoolNet format
+# the header targets, factors is mandatory to be importable in the R package BoolNet
+
+targets, factors
+Ap,    1
+Ap2,   0
+Dl,    !Ap&N
+Dl2,   !Ap2&N2
+Fng,   Ap
+Fng2,  Ap2
+N,     !Fng&Ser2 | Fng&Dl2
+N2,    !Dl&Ser&!Fng2 | Dl&!Ser&Fng2 | Dl&Ser
+Ser,   Ap
+Ser2,  Ap2
+*/
+
+@SuppressWarnings("unused")
+/** A parser for BNetParser files. */
+public class BNetParser {
+
+  public final static String bnetExample="# model in BoolNet format\n"
+  		+ "# the header targets, factors is mandatory to be importable in the R package BoolNet\n"
+  		+ "\n"
+  		+ "targets, factors\n"
+  		+ "Ap,    1\n"
+  		+ "Ap2,   0\n"
+  		+ "Dl,    !Ap&N\n"
+  		+ "Dl2,   !Ap2&N2\n"
+  		+ "Fng,   Ap\n"
+  		+ "Fng2,  Ap2\n"
+  		+ "N,     !Fng&Ser2 | Fng&Dl2\n"
+  		+ "N2,    !Dl&Ser&!Fng2 | Dl&!Ser&Fng2 | Dl&Ser\n"
+  		+ "Ser,   Ap\n"
+  		+ "Ser2,  Ap2";
+
+
+  /** Main entry point for parsing a file from command line */
+  public static void main(String args[])  throws ParseException {
+    BNetParser parser = new BNetParser(System.in);
+    parser.BNetFile();
+  }
+
+  /** Main entry point for programmatically parsing a string */  
+  public static LinkedHashMap<String,IUpdateFunction> parseString(String bnetStr)  throws ParseException {
+	  Reader r = new StringReader(bnetStr);
+	  BNetParser parser = new BNetParser(r);
+	  LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions=parser.BNetFile();
+	  return booleanUpdateFunctions;
+  }
+  
+  /** Main entry point for programmatically parsing a file */  
+  public static LinkedHashMap<String,IUpdateFunction> parseFile(File file)  throws ParseException,FileNotFoundException {
+	  InputStream is = new FileInputStream(file);
+	  BNetParser parser = new BNetParser(is);
+	  LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions=parser.BNetFile();
+	  return booleanUpdateFunctions;
+  }
+
+}
+
+PARSER_END(BNetParser)
+
+/////////////////////////////////////////////////////////
+//    The BNetFileParser lexical grammar starts here      //
+/////////////////////////////////////////////////////////
+
+// Whitespace -- ignored
+SKIP: {" "|"\t"|"\n"|"\r"|"\f"}
+
+// Single line comment -- ignored
+SKIP: {<SINGLE_LINE_COMMENT: "#" (~["\n","\r"])* ("\n"|"\r"|"\r\n")>}
+
+// Reserved words
+TOKEN :
+{
+  < TARGETS: "targets" >
+| < FACTORS: "factors" >
+| < TRUE: "1" >
+| < FALSE: "0" >
+}
+
+// Operators (these could be combined with the reserved words)
+TOKEN:
+{
+  < LNOT: "!" >
+| < AND: "&" >
+| < OR: "|" >
+}
+
+// Functions (these could be combined with the reserved words)
+// TOKEN:
+// {
+//   < MIN: "min" >
+// | < MAX: "max" >
+// | < ABS: "abs" >
+// }
+
+// Separators (these could be combined with the reserved words)
+TOKEN:
+{
+  < LPAREN: "(" >
+| < RPAREN: ")" >
+| < COMMA: "," >
+}
+
+// Identifiers
+TOKEN:
+{
+  < ID: ["a"-"z","A"-"Z","_"] ( ["a"-"z","A"-"Z","_","0"-"9"] )* >
+}
+
+// Literals
+TOKEN:
+{
+ < STRING_LITERAL: "\"" (<ESC> | ~["\"","\\","\n","\r"])* "\"" >
+| < #ESC: "\\" ["n","t","b","r","f","\\","'","\""] >
+}
+
+/*
+// For anything else, we return an ERROR token. Without this
+// definition the TokenManager will throw an Error when a lexical
+// error occurs, making it impossible to recover from it. So we
+// define this ERROR token.
+TOKEN:
+{
+ < ERROR: ~[] >
+}
+*/
+
+
+/////////////////////////////////////////////////////////
+//  The BNetParser syntactical grammar starts here    //
+/////////////////////////////////////////////////////////
+
+/**
+ * Parse a BNet file.
+ * <pre>
+ *  BNet ::= [target, factors] ListOfNodeDef
+ * </pre>
+ *
+ * @return an AST for a BNet file.
+ */
+public LinkedHashMap<String, IUpdateFunction> BNetFile():{
+	//beggining code
+	LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions= new LinkedHashMap<>();
+	NameAndUpdateFunction nDef=null;
+	//ArrayList<String> nodeNames=new ArrayList<String>();
+}
+{
+try {
+	(<TARGETS> <COMMA> <FACTORS>)?
+	
+	(
+		nDef = nodeDef()
+		{
+			//opNames.add(opDef.getName());
+			booleanUpdateFunctions.put(nDef.getName(), nDef.getUpdateFunction() ); 
+		}
+		
+    )*
+        
+    {
+    	//return MultiQuaTExQueryCreator.create(opNames,nameToOpDef,evalPart);
+    	return booleanUpdateFunctions;
+    }
+} catch ( ParseException e ) {
+    //recoverFromError( e );
+    //System.out.println(e.getMessage());
+	throw(e);
+}    
+}
+
+/**
+ * Parse a node definition: name, updatefunction
+ * <pre>
+ *   NodeDef ::= name , updatefunction
+ * </pre>
+ *
+ * @return an AST for a TemporalOperatorDefinition.
+ */
+ public NameAndUpdateFunction nodeDef(): {
+    String name = null;
+    Token nameToken =null;
+    IUpdateFunction updateFunction=null;
+    //ArrayList<Variable> variables = new ArrayList<>();
+	//Variable variable = null;
+    //ITempOrStateExpression sExp=null;
+ }
+ {
+    try {
+        nameToken = <ID>
+        { name = nameToken.image; }
+        <COMMA>
+        updateFunction=boolExpr()
+    }
+    catch ( ParseException e ) {
+        //recoverFromError( e );
+        //System.out.println(e.getMessage());
+		throw(e);
+    }
+    {
+        return new NameAndUpdateFunction( name, updateFunction );
+    }
+ }
+ 
+ 
+ 
+  /**
+ * Parse an boolean expression on state expressions
+ * <pre>
+ *   boolExpr ::= True | False | ! boolE | boolE OP boolE | refToNode
+ * </pre>
+ *
+ * @return an AST for a TemporalOperatorDefinition.
+ */
+IUpdateFunction boolExpr(): {
+//IUpdateFunction left=null;
+IUpdateFunction right=null;
+//ArrayList<IUpdateFunction> all_or=new ArrayList<>();
+IUpdateFunction cumul_or = null;
+} 
+{ 
+ //left = andBoolExpr()
+ cumul_or = andBoolExpr()
+ (<OR> right = andBoolExpr() 
+ 	{//all_or.add(right);
+ 	//if(cumul_or == null)
+ 	//	cumul_or = right;
+ 	//else
+ 	//	cumul_or = new BooleanUpdateFunctionExpr(cumul_or,right,BooleanConnector.OR);
+ 	cumul_or = new BooleanUpdateFunctionExpr(cumul_or,right,BooleanConnector.OR);	
+ 	})*
+ //(<OR> right = andBoolExpr())*
+ //
+ //[(<OR> right = andBoolExpr())]
+ //[(<OR> right = boolExpr())]
+ //(<OR> right = boolExpr())*
+ {
+	//if(right==null) return left;
+	//else return new BooleanUpdateFunctionExpr(left,right,BooleanConnector.OR);
+	//if(all_or.size()==1) return all_or.get(0);
+	//else {return new BooleanUpdateFunctionExpr(all_or.get(0),all_or.get(0),BooleanConnector.OR);}
+	//if(cumul_or==null) return left;
+	//else return new BooleanUpdateFunctionExpr(left,cumul_or,BooleanConnector.OR);
+	return cumul_or;
+ }
+}
+ 
+ 
+IUpdateFunction andBoolExpr(): {
+//IUpdateFunction left=null;
+IUpdateFunction right=null;
+IUpdateFunction cumul_and = null;
+} 
+{ 
+ //left = simpleBoolExpr()
+ cumul_and=simpleBoolExpr()
+ (<AND> right = simpleBoolExpr()
+ 	{
+ 	cumul_and = new BooleanUpdateFunctionExpr(cumul_and,right,BooleanConnector.AND);
+ 	}
+ )*
+ //[(<AND> right = simpleBoolExpr())]
+ //[(<AND> right = andBoolExpr())]
+ //(<AND> right = andBoolExpr())*
+ {
+	//if(right==null) return left;
+	//else return new BooleanUpdateFunctionExpr(left,right,BooleanConnector.AND);
+	return cumul_and;
+	}
+}
+
+ /**
+ * Parse a simple boolean expression on state expressions
+ * <pre>
+ *   boolExpr ::= True | False | ! (boolE) | refToNode | (expr)
+ * </pre>
+ *
+ * @return an AST for a TemporalOperatorDefinition.
+ */
+ public IUpdateFunction simpleBoolExpr(): {
+	 IUpdateFunction left=null;
+	 Token nameToken =null;
+ }
+ {
+    try {
+    	(
+    	<TRUE>
+		{return new TrueUpdateFunction();}
+		)
+		|
+		(
+    	<FALSE>
+		{return new FalseUpdateFunction();}
+		)
+		|
+		(
+		nameToken = <ID>
+		{return new ReferenceToNodeUpdateFunction(nameToken.image);}
+		)
+		|
+		<LNOT>
+		left = simpleBoolExpr()
+		{return new NotBooleanUpdateFunction(left);}
+		|
+		////Here I must either use {comparison} or the lookahead.
+		////<LCURLY>
+		//LOOKAHEAD(TorSExp() comparisonOp())
+		//left = comparison()
+		////<RCURLY>
+		//{return left;}
+		//|
+		<LPAREN>
+		left = boolExpr()
+		<RPAREN>
+		{return left;}
+    }
+    catch ( ParseException e ) {
+        //recoverFromError( e );
+        //System.out.println(e.getMessage());
+		throw(e);
+    }
+ }

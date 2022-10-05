@@ -25,6 +25,7 @@ import it.imt.erode.crn.interfaces.ICRN;
 import it.imt.erode.crn.interfaces.ICRNReaction;
 import it.imt.erode.crn.interfaces.IComposite;
 import it.imt.erode.crn.interfaces.ISpecies;
+import it.imt.erode.importing.csv.CompactCSVMatrixImporter;
 import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
@@ -45,12 +46,21 @@ public class MRMCMarkovChainsImporter extends AbstractImporter{
 	//boolean lowMemory=true;
 	boolean lowMemory=true;
 	boolean addSelfLoops=false;
+	boolean asMatrix=false;
 
 	public MRMCMarkovChainsImporter(String fileName, String[] labellingFileName,MessageConsoleStream out,BufferedWriter bwOut,IMessageDialogShower msgDialogShower) {
 		super(fileName,out,bwOut,msgDialogShower);
 		this.labellingFileName=labellingFileName[0];
 		if(labellingFileName!=null&&labellingFileName.length>=0&&labellingFileName[0].endsWith("same")){
 			this.labellingFileName=fileName.replace(".tra", ".lab");
+		}
+		if(labellingFileName.length>1) {
+			if(labellingFileName[1].equalsIgnoreCase("true")) {
+				asMatrix=true;
+				if(addSelfLoops) {
+					throw new UnsupportedOperationException("addSelfLoops and asMatrix cannot be used together");
+				}
+			}
 		}
 	}
 	
@@ -372,6 +382,10 @@ public class MRMCMarkovChainsImporter extends AbstractImporter{
 		if(addSelfLoops) {
 			getCRN().setExpectedNumberOfReactions(numberOfReactions+getCRN().getSpecies().size());
 		}
+		else if(asMatrix) {
+			getCRN().setExpectedNumberOfReactions(numberOfReactions);
+			//getCRN().setExpectedNumberOfReactions(numberOfReactions*2);
+		}
 		else {
 			getCRN().setExpectedNumberOfReactions(numberOfReactions);
 		}
@@ -395,6 +409,8 @@ public class MRMCMarkovChainsImporter extends AbstractImporter{
 //		if(CRNReducerCommandLine.univoqueProducts){
 //			compositeIsProduct=new boolean[speciesIdToSpecies.length];
 //		}
+		
+		double min = Double.MAX_VALUE;
 		
 		while (line != null) {
 			//Skip comments or empty lines
@@ -432,7 +448,11 @@ public class MRMCMarkovChainsImporter extends AbstractImporter{
 				
 				//compute rate of the reaction 
 				String rateExpression = st.nextToken();
-				BigDecimal reactionRate = BigDecimal.valueOf(evaluate(rateExpression));
+				double d =evaluate(rateExpression);
+				if(d<min) {
+					min=d;
+				}
+				BigDecimal reactionRate = BigDecimal.valueOf(d);
 				
 				/*
 				ICRNReaction reaction = new CRNReaction(reactionRate, compositeReagents, compositeProducts, rateExpression,false,false);
@@ -445,14 +465,51 @@ public class MRMCMarkovChainsImporter extends AbstractImporter{
 				}
 				r++;*/
 				
-								
-				addReaction(compositeReagents, compositeProducts, reactionRate, rateExpression/*,compositeIsReagent,compositeIsProduct*/);
-				if(addSelfLoops) {
-					if(outgoingRates[reagentIDInt]==null){
-						outgoingRates[reagentIDInt]=reactionRate;
-					}
-					else{
-						outgoingRates[reagentIDInt]=outgoingRates[reagentIDInt].add(reactionRate);
+				if(asMatrix) {
+					//To obtain a matrix Ax, an edge Si -> Sj , k of a DTMC corresponds to:
+					//	d(Sj) = k*Si	A_{j,i}= k	row=j, col=i
+					ISpecies Si = compositeReagents.getFirstReagent();
+					ISpecies Sj = compositeProducts.getFirstReagent();
+					int row =Sj.getID();
+					int col= Si.getID();
+					CompactCSVMatrixImporter.loadReactionLinearSystemAX(row, col,
+							reactionRate,rateExpression,null,getCRN(),false);
+					
+					/*
+					//FIST BUGGY VERSION
+					//To obtain a matrix Ax, an edge Si -> Sj , k of a DTMC corresponds to:
+					//1)	d(Si) = -0.125*Si	A_{i,i}=-0.125	A_{row,col}
+					//2)  d(Sj) = 0.125*Si	A_{j,i}= 0.125	A_{row,col}
+					
+					//1)	A_{row,col}=A_{i,i}=-k
+					int row =compositeReagents.getFirstReagent().getID();
+					int col= compositeReagents.getFirstReagent().getID();
+					CompactCSVMatrixImporter.loadReactionLinearSystemAX(row, col,
+							BigDecimal.ZERO.subtract(reactionRate),"-("+rateExpression+")",null,getCRN(),false);
+					//2)	A_{row,col}=A_{j,i}= k
+					row =compositeProducts.getFirstReagent().getID();
+					col= compositeReagents.getFirstReagent().getID();
+					CompactCSVMatrixImporter.loadReactionLinearSystemAX(row, col,
+							reactionRate,rateExpression,null,getCRN(),false);
+					*/
+					
+					//addReaction(outgoingRates, i, row, col, val, valExpr,"");
+//					if(form.equals(MatrixForm.PQ)){
+//						loadReactionMarkovChainPQ(row,col,val,valExpr/*,speciesIdToSpecies*/,outgoingRates);
+//					}
+//					else{
+//						loadReactionLinearSystemAX(row, col, val,valExpr/*, speciesIdToSpecies*/,outgoingRates);
+//					}
+				}
+				else {
+					addReaction(compositeReagents, compositeProducts, reactionRate, rateExpression/*,compositeIsReagent,compositeIsProduct*/);
+					if(addSelfLoops) {
+						if(outgoingRates[reagentIDInt]==null){
+							outgoingRates[reagentIDInt]=reactionRate;
+						}
+						else{
+							outgoingRates[reagentIDInt]=outgoingRates[reagentIDInt].add(reactionRate);
+						}
 					}
 				}
 				
@@ -465,6 +522,8 @@ public class MRMCMarkovChainsImporter extends AbstractImporter{
 			
 			line = br.readLine();
 		}
+		
+		CRNReducerCommandLine.println(out,bwOut," (min rate ="+min+")");
 		
 		if(addSelfLoops) {
 			int i=0;

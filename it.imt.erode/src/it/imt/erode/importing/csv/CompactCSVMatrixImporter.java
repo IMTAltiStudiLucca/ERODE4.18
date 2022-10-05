@@ -60,6 +60,7 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 	private String bFile;
 	private String icFile;
 	private boolean createParameters=false;
+	private boolean addReverseEdges=false;
 	private boolean speciesIcreated=false;
 	//private int inputs=0;
 
@@ -132,6 +133,10 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 					createParameters = Boolean.valueOf(formAndOtherParameters[i+1]);
 					i++;
 				}
+				else if(formAndOtherParameters[i].equalsIgnoreCase("addReverseEdges")){
+					addReverseEdges = Boolean.valueOf(formAndOtherParameters[i+1]);
+					i++;
+				}
 //				else if(formAndOtherParameters[i].equalsIgnoreCase("inputs")){
 //					inputs = Integer.valueOf(formAndOtherParameters[i+1]);
 //					i++;
@@ -146,6 +151,7 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 		CRNReducerCommandLine.println(out,bwOut,"\nImporting linear system with inputs:");
 		CRNReducerCommandLine.println(out,bwOut,"\tA : "+getFileName());
 		CRNReducerCommandLine.println(out,bwOut,"\tb"+" : "+bFile+".csv");
+		
 		
 		init();
 		
@@ -202,6 +208,9 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 			CRNReducerCommandLine.println(out,bwOut,"\tA : "+getFileName());
 			CRNReducerCommandLine.println(out,bwOut,"\tb : "+bFile);
 			CRNReducerCommandLine.println(out,bwOut,"\tIC: "+icFile);
+			if(addReverseEdges) {
+				CRNReducerCommandLine.println(out,bwOut,"\tAdding reverse edges: for every edge (i,j,w) we add the reverse one (j,i,w).");
+			}
 		}
 
 		init();
@@ -569,17 +578,9 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 			int col = currentCSVEntry.getCol();
 			BigDecimal val = currentCSVEntry.getVal();
 			String valExpr = val.toPlainString();
-			if(createParameters) {
-				String paramName = "p" + i;
-				addParameter(paramName, valExpr);
-				valExpr=paramName;
-			}
-
-			if(form.equals(MatrixForm.PQ)){
-				loadReactionMarkovChainPQ(row,col,val,valExpr/*,speciesIdToSpecies*/,outgoingRates);
-			}
-			else{
-				loadReactionLinearSystemAX(row, col, val,valExpr/*, speciesIdToSpecies*/,outgoingRates);
+			addReaction(outgoingRates, i, row, col, val, valExpr,"");
+			if(addReverseEdges) {
+				addReaction(outgoingRates, i, col, row, val, valExpr,"_rev");
 			}
 
 			/*if(sumsOfEachCol[col]==null){
@@ -622,6 +623,89 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 		}
 
 		return outgoingRates;
+	}
+
+	public void addReaction(BigDecimal[] outgoingRates, int i, int row, int col, BigDecimal val, String valExpr,String suffixParam)
+			throws IOException {
+		//TODO: REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE
+		
+		/*
+		MathContext mc = new MathContext(1, RoundingMode.HALF_UP);
+		val =val.round(mc);
+		valExpr=val.toPlainString();
+		*/
+		/*
+		valExpr="1";
+		val=BigDecimal.ONE;
+		*/
+		
+		
+		/*
+		//luca_test2inv
+		int scale=1;
+		double threshold=0.19;
+		//MathContext mc = new MathContext(0, RoundingMode.HALF_UP);
+		//val =val.round(mc);
+		val =val.setScale(scale,RoundingMode.HALF_UP);
+		valExpr=val.toPlainString();
+		if(val.compareTo(BigDecimal.ZERO)==0) {
+			val=BigDecimal.ZERO;
+			valExpr="0";
+			return;
+		}
+		if(val.compareTo(new BigDecimal(threshold))>=0) {
+			val=BigDecimal.ZERO;
+			valExpr="0";
+			return;
+		}
+		else {
+			val=BigDecimal.ONE;
+			valExpr="1";
+		}
+		*/
+		
+		/*
+		//swiss inv
+		int scale=2;
+		double threshold=0.155;
+		//MathContext mc = new MathContext(0, RoundingMode.HALF_UP);
+		//val =val.round(mc);
+		val =val.setScale(scale,RoundingMode.HALF_UP);
+		valExpr=val.toPlainString();
+		if(val.compareTo(BigDecimal.ZERO)==0) {
+			val=BigDecimal.ZERO;
+			valExpr="0";
+			return;
+		}
+		if(val.compareTo(new BigDecimal(threshold))>=0) {
+			val=BigDecimal.ZERO;
+			valExpr="0";
+			return;
+		}
+		else {
+			val=BigDecimal.ONE;
+			valExpr="1";
+		}
+		*/
+		
+		
+		
+		//TODO: REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE REMOVE
+		
+		
+		if(createParameters) {
+			String paramName = "p" + i+suffixParam;
+			addParameter(paramName, valExpr);
+			valExpr=paramName;
+		}
+
+		if(form.equals(MatrixForm.PQ)){
+			loadReactionMarkovChainPQ(row,col,val,valExpr/*,speciesIdToSpecies*/,outgoingRates);
+		}
+		else{
+			loadReactionLinearSystemAX(row, col, val,valExpr/*, speciesIdToSpecies*/,outgoingRates);
+		}
+		//return valExpr;
 	}
 
 	private HashSet<ISpecies> loadBWithInputsAndAddItToDrift(BigDecimal[] outgoingRates/*, ISpecies[] speciesIdToSpecies*/) throws IOException, UnsupportedFormatException {
@@ -883,18 +967,51 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 		//1882,1882,1882
 		//2,1,1.000000
 
-		IComposite compositeReagents = (IComposite)(getCRN().getSpecies().get(col));//speciesIdToSpecies[col];
+		loadReactionLinearSystemAX(row, col, val, valExpr, outgoingRates,getCRN(),normalize);
+//		IComposite compositeReagents = (IComposite)(getCRN().getSpecies().get(col));//speciesIdToSpecies[col];
+////		if(CRNReducerCommandLine.univoqueReagents){
+////			compositeReagents = getCRN().addReagentsIfNew(compositeReagents);
+////		}
+//
+//		IComposite compositeProducts = new Composite(getCRN().getSpecies()/*speciesIdToSpecies*/,col,row);
+////		if(CRNReducerCommandLine.univoqueProducts){
+////			compositeProducts = getCRN().addProductIfNew(compositeProducts);
+////		}
+//
+//		ICRNReaction reaction = new CRNReaction(val, compositeReagents, compositeProducts, valExpr,null);
+//		loadReaction(reaction, compositeReagents, compositeProducts);
+//
+//		if(outgoingRates!=null && normalize){
+//			if(outgoingRates[col]==null){
+//				outgoingRates[col]=val;
+//			}
+//			else{
+//				outgoingRates[col]=outgoingRates[col].add(val);
+//			}
+//		}
+
+	}
+	
+	public static void loadReactionLinearSystemAX(int row, int col, BigDecimal val, String valExpr/*,ISpecies[] speciesIdToSpecies*/, BigDecimal[] outgoingRates,
+			ICRN crn, boolean normalize) throws IOException {
+		//CORRECT:	An entry A_{row,col} represents 
+		//"\dot{x_{row}} = A_{row,col} * x_{col}" =CRN=> 
+		//x_{col} -{A_{row,col}}-> x_{col} + x_{row}
+		//1882,1882,1882
+		//2,1,1.000000
+
+		IComposite compositeReagents = (IComposite)(crn.getSpecies().get(col));//speciesIdToSpecies[col];
 //		if(CRNReducerCommandLine.univoqueReagents){
 //			compositeReagents = getCRN().addReagentsIfNew(compositeReagents);
 //		}
 
-		IComposite compositeProducts = new Composite(getCRN().getSpecies()/*speciesIdToSpecies*/,col,row);
+		IComposite compositeProducts = new Composite(crn.getSpecies()/*speciesIdToSpecies*/,col,row);
 //		if(CRNReducerCommandLine.univoqueProducts){
 //			compositeProducts = getCRN().addProductIfNew(compositeProducts);
 //		}
 
 		ICRNReaction reaction = new CRNReaction(val, compositeReagents, compositeProducts, valExpr,null);
-		loadReaction(reaction, compositeReagents, compositeProducts);
+		loadReaction(reaction, compositeReagents, compositeProducts,crn);
 
 		if(outgoingRates!=null && normalize){
 			if(outgoingRates[col]==null){
@@ -907,7 +1024,8 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 
 	}
 
-	private void loadReactionLinearSystemAXFromEntryOfB(int row, BigDecimal val, String valExpr/*,ISpecies[] speciesIdToSpecies*/, BigDecimal[] outgoingRates, ISpecies constantSpeciesIOrInput) throws IOException {
+	private void loadReactionLinearSystemAXFromEntryOfB(int row, BigDecimal val, String valExpr, BigDecimal[] outgoingRates, 
+			ISpecies constantSpeciesIOrInput) throws IOException {
 
 		//CORRECT:	An entry b_{row} represents "\dot{x_{row}} = b_{row}" =CRN=> I -{b_{row}}-> I + x_{row}
 		//CORRECT:	An entry A_{row,col} represents "\dot{x_{row}} = A_{row,col} x_{col}" =CRN=> x_{col} -{A_{row,col}}-> x_{col} + x_{row}
@@ -924,7 +1042,7 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 //		}
 
 		ICRNReaction reaction = new CRNReaction(val, compositeReagents, compositeProducts, valExpr,null);
-		loadReaction(reaction, compositeReagents, compositeProducts);
+		loadReaction(reaction, compositeReagents, compositeProducts,getCRN());
 
 	}
 
@@ -943,7 +1061,7 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 //		}
 
 		ICRNReaction reaction = new CRNReaction(val, compositeReagents, compositeProducts, valExpr,null);
-		loadReaction(reaction, compositeReagents, compositeProducts);
+		loadReaction(reaction, compositeReagents, compositeProducts,getCRN());
 
 		if(outgoingRates!=null && normalize){
 			if(outgoingRates[col]==null){
@@ -986,11 +1104,11 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 		BigDecimal rate = BigDecimal.ONE.divide(Drow,mc);
 		rate = rate.multiply(Brow);
 		ICRNReaction reaction = new CRNReaction(rate, compositeReagents, compositeProducts, rate.toPlainString(),null);
-		loadReaction(reaction, compositeReagents, compositeProducts);
+		loadReaction(reaction, compositeReagents, compositeProducts,getCRN());
 	}
 
-	private void loadReaction(ICRNReaction reaction, IComposite compositeReagents, IComposite compositeProducts){
-		getCRN().addReaction(reaction);
+	private static void loadReaction(ICRNReaction reaction, IComposite compositeReagents, IComposite compositeProducts, ICRN crn){
+		crn.addReaction(reaction);
 		/*
 		addToIncomingReactionsOfProducts(1,compositeProducts, reaction,CRNReducerCommandLine.addReactionToComposites);
 		addToOutgoingReactionsOfReagents(1, compositeReagents, reaction,CRNReducerCommandLine.addReactionToComposites);

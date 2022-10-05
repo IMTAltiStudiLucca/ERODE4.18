@@ -50,6 +50,8 @@ import it.imt.erode.partitionrefinement.splittersbstandcounters.SplittersGenerat
 
 public class SMTBackwardBooleanEquivalence {
 	
+	
+	
 	private HashMap<String, String> cfg;
 	//private BoolExpr positivePopulationsAssertion;
 	//private BoolExpr allConstraintAssertion;
@@ -299,7 +301,7 @@ public class SMTBackwardBooleanEquivalence {
 			IUpdateFunction reducedUpdateFunction = updateFunctionOfRep.cloneReplacingWithRepresentative(partition,correspondenceBlock_ReducedSpecies,speciesNameToSpecies);
 			
 			if(simplify) {
-				Expr z3reducedUpdateFunction = reducedUpdateFunction.toZ3(ctx, speciesNameToSpecies, speciesToPopulation);
+				Expr z3reducedUpdateFunction = reducedUpdateFunction.toZ3(ctx, speciesNameToSpecies, speciesToPopulation,false);
 				Expr z3reducedUpdateFunctionSimpl=z3reducedUpdateFunction.simplify();
 				IUpdateFunction reducedUpdateFunctionSimpl=compiler.toUpdateFunction(z3reducedUpdateFunctionSimpl);
 				reducedUpdateFunction=reducedUpdateFunctionSimpl;
@@ -434,7 +436,7 @@ public class SMTBackwardBooleanEquivalence {
 		for (Entry<String, IUpdateFunction> entry : bn.getUpdateFunctions().entrySet()) {
 			ISpecies species = speciesNameToSpecies.get(entry.getKey());
 			IUpdateFunction updateFunction = entry.getValue();
-			Expr updateFunctionZ3 = updateFunction.toZ3(ctx, /*bn,*/ speciesNameToSpecies, speciesToPopulation);
+			Expr updateFunctionZ3 = updateFunction.toZ3(ctx, /*bn,*/ speciesNameToSpecies, speciesToPopulation,false);
 			updateFunctionZ3=updateFunctionZ3.simplify();
 			speciesToODEsDef.put(species, updateFunctionZ3);
 			allODEsDefArray[j]=ctx.mkEq(speciesToODENames.get(species), updateFunctionZ3);

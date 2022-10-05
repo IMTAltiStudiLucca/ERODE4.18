@@ -74,6 +74,10 @@ public class SBMLOperator implements IOperator<ASTNode> {
 			return ASTNode.Type.RELATIONAL_LEQ;
 		case LT:
 			return ASTNode.Type.RELATIONAL_LT;
+		case EQ:
+			return ASTNode.Type.RELATIONAL_EQ;
+		case NOTEQ:
+			return ASTNode.Type.RELATIONAL_NEQ;	
 		default:
 			return null;
 		}

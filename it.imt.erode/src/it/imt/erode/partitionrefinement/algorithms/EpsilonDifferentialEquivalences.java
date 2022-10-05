@@ -430,7 +430,7 @@ public class EpsilonDifferentialEquivalences {
 		
 
 		boolean ignoreI=false;
-		HashMap<ISpecies, StringBuilder> speciesToDriftSB = GUICRNImporter.computeDrifts(crn,false,ignoreI);
+		HashMap<ISpecies, StringBuilder> speciesToDriftSB = GUICRNImporter.computeDrifts(crn,false,ignoreI,false);
 		for (ISpecies speciesOfODE : crn.getSpecies()) {
 			StringBuilder drift = speciesToDriftSB.get(speciesOfODE);
 			String driftString = "0";

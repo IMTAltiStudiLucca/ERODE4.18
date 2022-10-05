@@ -46,6 +46,7 @@ import it.imt.erode.crn.chemicalReactionNetwork.SumReferenceToMVNodeOrValue;
 import it.imt.erode.crn.chemicalReactionNetwork.SymbolicParameter;
 import it.imt.erode.crn.chemicalReactionNetwork.caseMV;
 import it.imt.erode.booleannetwork.updatefunctions.ArithmeticConnector;
+import it.imt.erode.booleannetwork.updatefunctions.BasicModelElementsCollector;
 import it.imt.erode.booleannetwork.updatefunctions.BinaryExprIUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.BooleanUpdateFunctionExpr;
 import it.imt.erode.booleannetwork.updatefunctions.FalseUpdateFunction;
@@ -146,6 +147,9 @@ public class MyCRNProgramExecutor {
 
 		ModelElementsCollector mec = MyParserUtil.getModelElements(modelDef,/*projectPath*/absoluteParentPath,erodeFileAbsolutePath);
 		List<String> commands = MyParserUtil.parseCommands(mec,/*projectPath*/absoluteParentPath);
+		if(modelDef.getReal()!=null) {
+			mec.setRealSortMVNet(true);
+		}
 		
 		List<IConstraint> constraints = parseConstraints(mec.getConstraintsListXTEXT(),consoleOut,bwOut);
 		LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions = new LinkedHashMap<>(0);
@@ -338,7 +342,14 @@ public class MyCRNProgramExecutor {
 			return new ReferenceToNodeUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.ReferenceToMVNode) arithExprUpdFunc).getReference().getName());
 		}
 		else if(arithExprUpdFunc instanceof it.imt.erode.crn.chemicalReactionNetwork.Value) {
-			return new ValUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.Value) arithExprUpdFunc).getVal());
+			return new ValUpdateFunction(((it.imt.erode.crn.chemicalReactionNetwork.Value) arithExprUpdFunc).getVal().getValue());
+		}
+		else if(arithExprUpdFunc instanceof it.imt.erode.crn.chemicalReactionNetwork.MinusPrimaryExprRefNodeOrValue) {
+			IUpdateFunction inner = visitArithExprMVUpdateFunc_xtextToCore(((it.imt.erode.crn.chemicalReactionNetwork.MinusPrimaryExprRefNodeOrValue) arithExprUpdFunc).getLeft(),max);
+			return new BinaryExprIUpdateFunction(
+					new ValUpdateFunction(0),
+					inner,
+					ArithmeticConnector.SUB);
 		}
 		else if(arithExprUpdFunc instanceof MulReferenceToMVNodeOrValue) {
 			return new BinaryExprIUpdateFunction(
@@ -347,10 +358,14 @@ public class MyCRNProgramExecutor {
 					ArithmeticConnector.MUL);
 		}
 		else if(arithExprUpdFunc instanceof SumReferenceToMVNodeOrValue) {
+			ArithmeticConnector conn = ArithmeticConnector.SUM;
+			if(((SumReferenceToMVNodeOrValue)arithExprUpdFunc).getSign().equals("-")) {
+				conn = ArithmeticConnector.SUB;
+			}
 			return new BinaryExprIUpdateFunction(
 					visitArithExprMVUpdateFunc_xtextToCore(((SumReferenceToMVNodeOrValue)arithExprUpdFunc).getLeft(),max),
 					visitArithExprMVUpdateFunc_xtextToCore(((SumReferenceToMVNodeOrValue)arithExprUpdFunc).getRight(),max),
-					ArithmeticConnector.SUM);
+					conn);
 		}
 		else if(arithExprUpdFunc instanceof MinArithExprReferenceToMVNodeOrValue) {
 			return new BinaryExprIUpdateFunction(
@@ -589,16 +604,28 @@ public class MyCRNProgramExecutor {
 		ICommandLine cl=null;
 		boolean failed=false;
 		//I have to launch the new thread starting from here
-		if(mec.getModelDefKind().equals(ModelDefKind.BOOLEAN)||mec.getModelDefKind().equals(ModelDefKind.BOOLEANMV)){
+		if(mec.getModelDefKind().equals(ModelDefKind.BOOLEAN)||mec.getModelDefKind().equals(ModelDefKind.BOOLEANMV) || mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORT)){
 			boolean printBooleanNetwork=false;
-			GUIBooleanNetworkImporter bnImporter = new GUIBooleanNetworkImporter(mec.getModelDefKind().equals(ModelDefKind.BOOLEANMV),consoleOut,bwOut,msgVisualizer);
-			try {
-				bnImporter.importBooleanNetwork(true, printBooleanNetwork, true, mec.getModelName(), mec.getInitialConcentrations(), booleanUpdateFunctions, mec.getUserPartition(), consoleOut);
-			} catch (IOException e) {
-				CRNReducerCommandLine.println(consoleOut,bwOut, "Unhandled errors arised while executing the commands.");
-				CRNReducerCommandLine.printStackTrace(consoleOut,bwOut,e);
-				failed=true;
+			GUIBooleanNetworkImporter bnImporter = new GUIBooleanNetworkImporter(mec.getModelDefKind().equals(ModelDefKind.BOOLEANMV),consoleOut,bwOut,msgVisualizer,mec.getRealSortMVNet());
+			if(mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORT)) {
+				cl = new CRNReducerCommandLine(commandsReader,true);
+				//cl.setImporterOfSupportedNetworks(new ImporterOfSupportedNetworksWithCRNGUI());
+				cl.setDataOutputHandler(guidog);
+				cl.setMessageDialogShower(msgVisualizer);
+				cl.setTerminator(console.getTerminator());
+				BasicModelElementsCollector bMec = ((CRNReducerCommandLine)cl).importBooleanModel(mec.getImportString(), true,false,consoleOut,bwOut);
+				mec.setInitialConcentrations(bMec.getInitialConcentrations());
+				booleanUpdateFunctions=bMec.getBooleanUpdateFunctions();
+				mec.setUserPartition(bMec.getUserPartition());
+				//initializeUpdateFunctions(booleanNetwork,guessPrepartitionOnInputs,modelConverter.getErodeUpdateFunctions());
 			}
+			//try {
+				bnImporter.importBooleanNetwork(true, printBooleanNetwork, true, mec.getModelName(), mec.getInitialConcentrations(), booleanUpdateFunctions, mec.getUserPartition(), consoleOut);
+//			} catch (IOException e) {
+//				CRNReducerCommandLine.println(consoleOut,bwOut, "Unhandled errors arised while executing the commands.");
+//				CRNReducerCommandLine.printStackTrace(consoleOut,bwOut,e);
+//				failed=true;
+//			}
 			
 			cl = new BooleanNetworkCommandLine(commandsReader,bnImporter.getBooleanNetwork(),bnImporter.getInitialPartition(),true);
 			cl.setDataOutputHandler(guidog);
@@ -628,7 +655,7 @@ public class MyCRNProgramExecutor {
 			cl.setMessageDialogShower(msgVisualizer);
 			cl.setTerminator(console.getTerminator());
 		}
-		else if(mec.getModelDefKind().equals(ModelDefKind.IMPORT) || mec.getModelDefKind().equals(ModelDefKind.IMPORTFOLDER) || mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORTFOLDER)){
+		else if(mec.getModelDefKind().equals(ModelDefKind.IMPORT) || mec.getModelDefKind().equals(ModelDefKind.IMPORTFOLDER) || mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORTFOLDER)|| mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORT)){
 			//commandsReader.addToHead(importString);
 			cl = new CRNReducerCommandLine(commandsReader,true);
 			//cl.setImporterOfSupportedNetworks(new ImporterOfSupportedNetworksWithCRNGUI());
@@ -646,6 +673,9 @@ public class MyCRNProgramExecutor {
 				else if (mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORTFOLDER)){
 					((CRNReducerCommandLine)cl).importBooleanModelsFromFolder(mec.getImportFolderString(), true,ignoreCommands,consoleOut,bwOut);
 				}
+//				else if(mec.getModelDefKind().equals(ModelDefKind.BOOLEANIMPORT)) {
+//					((CRNReducerCommandLine)cl).importBooleanModel(mec.getImportString(), true,ignoreCommands,consoleOut,bwOut);
+//				}
 				/* ICRN crn = cl.getCRN();
 						if(canSynchEditor && mec.isSyncEditor()){
 							//replaceText(mec, crn);

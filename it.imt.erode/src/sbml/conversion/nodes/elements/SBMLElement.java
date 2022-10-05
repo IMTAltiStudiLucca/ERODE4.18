@@ -35,7 +35,12 @@ public class SBMLElement implements IElement<IUpdateFunction,ASTNode> {
     public ASTNode constant(IUpdateFunction node,boolean mv) {
         Class<?> classType = node.getClass();
         if(classType.equals(ValUpdateFunction.class)) {
-        	return builder.integer(((ValUpdateFunction)node).getVal());
+        	double v=((ValUpdateFunction)node).getVal();
+        	int v_int = (int)v;
+        	if(v!=v_int) {
+        		throw new UnsupportedOperationException("Currently supported only for integers");
+        	}
+        	return builder.integer(v_int);
         }
         else if(classType.equals(TrueUpdateFunction.class))
             return builder.integer(1);

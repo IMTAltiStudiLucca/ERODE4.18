@@ -66,7 +66,7 @@ public class ModelicaImporter extends AbstractImporter
 				
 				boolean ignoreOnes = false;
 				boolean ignoreI=false;
-				HashMap<ISpecies, StringBuilder> speciesToDrift = GUICRNImporter.computeDrifts(crn,ignoreOnes,ignoreI);
+				HashMap<ISpecies, StringBuilder> speciesToDrift = GUICRNImporter.computeDrifts(crn,ignoreOnes,ignoreI,false);
 				
 				for(ISpecies species : crn.getSpecies()){
 					if(!species.isAlgebraic()) {

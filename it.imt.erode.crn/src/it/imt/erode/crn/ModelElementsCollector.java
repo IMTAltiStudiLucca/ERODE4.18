@@ -10,6 +10,7 @@ import it.imt.erode.crn.chemicalReactionNetwork.BooleanCommand;
 import it.imt.erode.crn.chemicalReactionNetwork.BooleanImportFolder;
 import it.imt.erode.crn.chemicalReactionNetwork.Command;
 import it.imt.erode.crn.chemicalReactionNetwork.Import;
+import it.imt.erode.crn.chemicalReactionNetwork.ImportBoolean;
 import it.imt.erode.crn.chemicalReactionNetwork.ImportFolder;
 import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinition;
 import it.imt.erode.crn.chemicalReactionNetwork.NodeDefinition;
@@ -39,11 +40,13 @@ public class ModelElementsCollector {
 	private EList<BoolExpr> constraintsListXTEXT;
 	private EList<NodeDefinition> booleanUpdateFunctionsXTEXT;
 	private EList<MVNodeDefinition> mvBooleanUpdateFunctionsXTEXT;
+	private boolean realSortMVNet=false;
+	private ImportBoolean importBooleanCommand;
 	
 	public ModelElementsCollector(String modelName,ArrayList<String> symbolicParameters, EList<BoolExpr> constraintsListXTEXT, ArrayList<ArrayList<String>> parameters, 
 			ArrayList<LinkedHashMap<String,String>> reactions, ArrayList<LinkedHashMap<String,String>> algebraicConstraints,
 			ArrayList<ArrayList<String>> views, ArrayList<ArrayList<String>> initialConcentrations,ArrayList<ArrayList<String>> initialAlgConcentrations,ArrayList<ArrayList<String>> userPartition,
-			ArrayList<Command> commandsList, ArrayList<BooleanCommand> booleanCommandsList, String importString, Import importCommand, String importFolderString, ImportFolder importFolderCommand, BooleanImportFolder booleanImportFolderCommand, String importName,
+			ArrayList<Command> commandsList, ArrayList<BooleanCommand> booleanCommandsList, String importString, Import importCommand, ImportBoolean importBooleanCommand, String importFolderString, ImportFolder importFolderCommand, BooleanImportFolder booleanImportFolderCommand, String importName,
 			ModelDefKind modelDefKind, EList<NodeDefinition> booleanUpdateFunctionsXTEXT, EList<MVNodeDefinition> mvBooleanUpdateFunctionsXTEXT, boolean synchEditor, String absolutePath) {
 		super();
 		this.absolutePath=absolutePath;
@@ -61,6 +64,7 @@ public class ModelElementsCollector {
 		this.booleanCommandsList=booleanCommandsList;
 		this.importString = importString;
 		this.importCommand = importCommand;
+		this.importBooleanCommand = importBooleanCommand;
 		this.importName = importName;
 		this.importFolderString = importFolderString;
 		this.importFolderCommand = importFolderCommand;
@@ -99,6 +103,9 @@ public class ModelElementsCollector {
 	public ArrayList<ArrayList<String>> getInitialConcentrations() {
 		return initialConcentrations;
 	}
+	public void setInitialConcentrations(ArrayList<ArrayList<String>> initialConcentrations) {
+		this.initialConcentrations=initialConcentrations;
+	}
 	
 	public ArrayList<ArrayList<String>> getInitialAlgConcentrations() {
 		return initialAlgConcentrations;
@@ -106,6 +113,9 @@ public class ModelElementsCollector {
 	
 	public ArrayList<ArrayList<String>> getUserPartition() {
 		return userPartition;
+	}
+	public void setUserPartition(ArrayList<ArrayList<String>> userPartition) {
+		this.userPartition=userPartition;
 	}
 
 	public ArrayList<Command> getCommandsList() {
@@ -122,6 +132,9 @@ public class ModelElementsCollector {
 
 	public Import getImportCommand() {
 		return importCommand;
+	}
+	public ImportBoolean getImportBooleanCommand() {
+		return importBooleanCommand;
 	}
 	
 	public ImportFolder getImportFolderCommand() {
@@ -164,6 +177,13 @@ public class ModelElementsCollector {
 	
 	public EList<MVNodeDefinition> getMVBooleanUpdateFunctionsXTEXT() {
 		return mvBooleanUpdateFunctionsXTEXT;
+	}
+
+	public void setRealSortMVNet(boolean b) {
+		this.realSortMVNet=b;		
+	}
+	public boolean getRealSortMVNet() {
+		return realSortMVNet;
 	}
 	
 }

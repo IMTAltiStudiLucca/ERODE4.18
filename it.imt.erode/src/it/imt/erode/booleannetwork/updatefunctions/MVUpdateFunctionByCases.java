@@ -24,6 +24,47 @@ public class MVUpdateFunctionByCases implements IUpdateFunction {
 	private int otherwiseVal=-1; 
 	private int max=-1;
 	
+	
+//	/**
+//	 * A constructor that combines the cases bf first and second by making in or the conditions of the two
+//	 * @param first
+//	 * @param second
+//	 */
+//	public MVUpdateFunctionByCases(MVUpdateFunctionByCases first,MVUpdateFunctionByCases second) {
+//		this(combine(first,second),Math.max(first.max, second.max));
+//	}
+//
+//	private static LinkedHashMap<Integer, IUpdateFunction> combine(MVUpdateFunctionByCases first,
+//			MVUpdateFunctionByCases second) {
+//		if(first.otherwiseVal!=-1 && second.otherwiseVal!=-1 && first.otherwiseVal!=second.otherwiseVal) {
+//			throw new UnsupportedOperationException("I can't combine to function-by-cases with differnt 'otherwise' values");
+//		}
+//		int oVal=first.otherwiseVal;
+//		if(oVal==-1) {
+//			oVal=second.otherwiseVal;
+//		}
+//		HashSet<Integer> valuesNoOtherwiseSet = new HashSet<Integer>();
+//		valuesNoOtherwiseSet.addAll(first.valuesNoOtherwise);
+//		valuesNoOtherwiseSet.addAll(second.valuesNoOtherwise);
+//		LinkedHashMap<Integer, IUpdateFunction> casesNoOtherwise = new LinkedHashMap<>();
+//		for(Integer val : valuesNoOtherwiseSet) {
+//			if(val!=oVal) {
+//				IUpdateFunction f = first.casesNoOtherwise.get(val);
+//				IUpdateFunction s =second.casesNoOtherwise.get(val);
+//				if(f==null) {
+//					casesNoOtherwise.put(val, s);
+//				}
+//				else if(s==null) {
+//					casesNoOtherwise.put(val, f);
+//				} 
+//				else {
+//					casesNoOtherwise.put(val, new BooleanUpdateFunctionExpr(f, s, BooleanConnector.OR));
+//				}
+//			}
+//		}
+//		return casesNoOtherwise;
+//	}
+	
 	public MVUpdateFunctionByCases(LinkedHashMap<Integer, IUpdateFunction> cases, int mx) {
 		this.casesNoOtherwise= new LinkedHashMap<>();// cases;
 		if(mx!=-1) {
@@ -97,11 +138,11 @@ public class MVUpdateFunctionByCases implements IUpdateFunction {
 	
 	@Override
 	public Expr toZ3(Context ctx, HashMap<String, ISpecies> speciesNameToSpecies,
-			HashMap<ISpecies, Expr> speciesToSpeciesVariable) throws Z3Exception {
+			HashMap<ISpecies, Expr> speciesToSpeciesVariable,boolean realSort) throws Z3Exception {
 		BoolExpr[] cases_z3=new BoolExpr[casesNoOtherwise.size()];
 		int c=0;
 		for(Entry<Integer, IUpdateFunction> cur_case : casesNoOtherwise.entrySet()) {
-			cases_z3[c]=(BoolExpr)cur_case.getValue().toZ3(ctx, speciesNameToSpecies, speciesToSpeciesVariable);
+			cases_z3[c]=(BoolExpr)cur_case.getValue().toZ3(ctx, speciesNameToSpecies, speciesToSpeciesVariable,realSort);
 			c++;
 		}
 		return casesToITE(cases_z3, 0, ctx);
@@ -158,6 +199,13 @@ public class MVUpdateFunctionByCases implements IUpdateFunction {
 		for(IUpdateFunction cur_case:casesNoOtherwise.values()) {
 			cur_case.dropNonOutputSpecies(sp, guessedOutputs);
 		}
+	}
+	
+	public LinkedHashMap<Integer, IUpdateFunction> getCasesNoOtherwise() {
+		return casesNoOtherwise;
+	}
+	public int getOtherwiseVal() {
+		return otherwiseVal;
 	}
 
 }

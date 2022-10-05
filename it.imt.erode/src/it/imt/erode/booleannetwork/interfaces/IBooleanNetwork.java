@@ -51,6 +51,10 @@ public interface IBooleanNetwork extends IModel{
 	//public int cumulMax(Collection<ISpecies> species);
 	public LinkedHashMap<String, Integer> getNameToMax();
 	public int getNameToMax(String speciesName);
+
+	void setRealSortIfMV(boolean b);
+
+	boolean getRealSortIfMV();
 	
 
 }

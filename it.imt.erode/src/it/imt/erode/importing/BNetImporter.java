@@ -14,6 +14,7 @@ import org.eclipse.ui.console.MessageConsoleStream;
 
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.IMessageDialogShower;
+import it.imt.erode.importing.booleannetwork.GuessPrepartitionBN;
 
 
 /**
@@ -23,8 +24,14 @@ import it.imt.erode.commandline.IMessageDialogShower;
  */
 public class BNetImporter extends AbstractImporter{
 	
-	public BNetImporter(String fileName,MessageConsoleStream out,BufferedWriter bwOut,IMessageDialogShower msgDialogShower) {
+	private GuessPrepartitionBN guessPrep;
+	
+	public BNetImporter(String fileName,MessageConsoleStream out,BufferedWriter bwOut,IMessageDialogShower msgDialogShower, GuessPrepartitionBN guessPrep) {
 		super(fileName,out,bwOut,msgDialogShower);
+		this.guessPrep=guessPrep;
+		if(!(guessPrep.equals(GuessPrepartitionBN.INPUTS)||guessPrep.equals(GuessPrepartitionBN.INPUTSONEBLOCK))) {
+			throw new UnsupportedOperationException("GuessPrep "+guessPrep+" not supported for bnet models");
+		}
 	}
 
 	public InfoCRNImporting readAndExportBNet(boolean print, String fileOut) throws FileNotFoundException, IOException, UnsupportedFormatException{
@@ -137,15 +144,26 @@ public class BNetImporter extends AbstractImporter{
 			if(guessedInputs.size()>0) {
 				bw.write("//I identified "+guessedInputs+" as possible input species (they have 'dummy' update function).\n//I prepare an initial partition preserving them.\n");
 				bw.write(" begin partition\n");
+				if(guessPrep.equals(GuessPrepartitionBN.INPUTSONEBLOCK)) {
+					bw.write("  {");
+				}
 				for(int s=0;s<guessedInputs.size();s++) {
 					String species = guessedInputs.get(s);
-					bw.write("{"+species+"}");
-					if(s<guessedInputs.size()-1) {
-						bw.write(",\n");
+					if(guessPrep.equals(GuessPrepartitionBN.INPUTS)) {
+						bw.write("  {"+species+"}");
 					}
 					else {
+						bw.write(    species    );
+					}
+					if(s<guessedInputs.size()-1) {
+						bw.write(",");
+					}
+					if(guessPrep.equals(GuessPrepartitionBN.INPUTS)) {
 						bw.write("\n");
 					}
+				}
+				if(guessPrep.equals(GuessPrepartitionBN.INPUTSONEBLOCK)) {
+					bw.write("}\n");
 				}
 				bw.write(" end partition\n\n");
 			}
@@ -170,7 +188,7 @@ public class BNetImporter extends AbstractImporter{
 			}
 			bw.write("end update functions\n\n");
 			
-			bw.write("reduceBBE(fileWhereToStorePartition=\""+name+"BBE.txt\",csvFile=\"reductionsMaximal.csv\",reducedFile=\""+name+"BBE.ode\")\n");
+			//bw.write("reduceBBE(fileWhereToStorePartition=\""+name+"BBE.txt\",csvFile=\"reductionsMaximal.csv\",reducedFile=\""+name+"BBE.ode\")\n");
 			if(guessedInputs.size()>0) {
 				bw.write("reduceBBE(fileWhereToStorePartition=\""+name+"InputPreservingBBE.txt\",csvFile=\"reductionsIP.csv\",reducedFile=\""+name+"InputPreservingBBE.ode\",prePartition=USER)\n");
 			}

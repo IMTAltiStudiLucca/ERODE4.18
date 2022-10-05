@@ -13,7 +13,7 @@ public class TransitionManager {
         return new TransitionReader(transitions,multivalued);
     }
 
-    public static ITransitionConverter create(@NotNull LinkedHashMap<String, IUpdateFunction> updateFunctions) {
-        return new TransitionWriter(updateFunctions);
+    public static ITransitionConverter create(@NotNull LinkedHashMap<String, IUpdateFunction> updateFunctions,LinkedHashMap<String, Integer> nameToMax,boolean mv) {
+        return new TransitionWriter(updateFunctions,nameToMax,mv);
     }
 }

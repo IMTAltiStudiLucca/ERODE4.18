@@ -92,11 +92,11 @@ public abstract class AbstractCommandLine implements ICommandLine {
 		this.commandsReader=commandsReader;
 	}
 	
-	protected IPartition getPartition() {
+	public IPartition getPartition() {
 		return partition;
 	}
 
-	protected void setPartition(IPartition partition){
+	public void setPartition(IPartition partition){
 		this.partition=partition;
 	}
 	
@@ -277,7 +277,7 @@ public abstract class AbstractCommandLine implements ICommandLine {
 	}
 	
 	
-	protected void checkLibrariesZ3(MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
+	public void checkLibrariesZ3(MessageConsoleStream out, BufferedWriter bwOut) throws IOException {
 		String libExtension = ".dylib";
 		String p = System.getProperty("os.name");
 		boolean win=false;
@@ -303,6 +303,7 @@ public abstract class AbstractCommandLine implements ICommandLine {
 				System.out.println(fee.getCanonicalPath());*/
 				String fileName = "libz3"+libExtension;
 				File f = new File(fileName);
+				System.out.println(f.getAbsolutePath());
 				if(!f.exists()){
 					String localNesting ="necessaryNativeSources"+File.separator;
 					copyFile(localNesting,"libz3"+libExtension,getClass());
@@ -439,6 +440,7 @@ public abstract class AbstractCommandLine implements ICommandLine {
 		csvLabels.add("ReducedReactions");
 		//csvLabels.add("Parameters");
 		csvLabels.add("Parameters");
+		csvLabels.add("NonSingletonBlocks");
 		return csvLabels;
 	}
 	
@@ -464,6 +466,8 @@ public abstract class AbstractCommandLine implements ICommandLine {
 			csvValues.add(String.valueOf(infoReduction.getReducedReactions()));
 			
 			csvValues.add(String.valueOf(infoReduction.getParametersSize()));
+			
+			csvValues.add(String.valueOf(infoReduction.getNonSingletonBlocks()));
 													
 			
 			if(extraColumnsForCSV!=null) {

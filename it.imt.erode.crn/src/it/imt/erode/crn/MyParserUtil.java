@@ -463,6 +463,7 @@ public class MyParserUtil {
 		ArrayList<ArrayList<String>> initialPartition = new ArrayList<ArrayList<String>>(0);
 		String importString=null;
 		Import importCommand=null;
+		ImportBoolean importBooleanCommand=null;
 		ImportFolder importFolderCommand=null;
 		BooleanImportFolder booleanImportFolderCommand=null;
 		String importFolderString=null;
@@ -492,6 +493,15 @@ public class MyParserUtil {
 				importCommand =(Import)element;
 				importString = parseImport(importCommand,importName,absoluteParentPath);
 				modelDefKind=ModelDefKind.IMPORT;
+				synchEditor=false;//synchEditor=importCommand.getParams().isSynchEditor();
+			}
+			else if(element instanceof ImportBoolean){
+				importName = element.toString();
+				importName = importName.substring(importName.lastIndexOf(".impl.")+6);
+				importName = importName.substring(0,importName.lastIndexOf("Impl"));
+				importBooleanCommand =(ImportBoolean)element;
+				importString = parseImportBoolean(importBooleanCommand,importName,absoluteParentPath);
+				modelDefKind=ModelDefKind.BOOLEANIMPORT;
 				synchEditor=false;//synchEditor=importCommand.getParams().isSynchEditor();
 			}
 			else if (element instanceof ImportFolder) {
@@ -807,7 +817,7 @@ public class MyParserUtil {
 	
 		ModelElementsCollector mec = new ModelElementsCollector(modelName,symbolicParameters,constraintsList,parameters, reactions, algebraicConstraints,views, initialConcentrations, initialAlgConcentrations,
 				initialPartition, commandsList, booleanCommandsList, importString, 
-				importCommand, importFolderString, importFolderCommand,booleanImportFolderCommand,importName, modelDefKind,
+				importCommand, importBooleanCommand, importFolderString, importFolderCommand,booleanImportFolderCommand,importName, modelDefKind,
 				nodeDefinitions,mvNodeDefinitions,
 				synchEditor,absolutePath);
 		return mec;
@@ -919,6 +929,10 @@ public class MyParserUtil {
 				String imp = parseOnTheFlyBR((onTheFlyBR)command,commandName,absoluteParentPath,mec.getAbsolutePath());
 				commands.add(imp);
 			}
+			else if(command instanceof z3Metrics) {
+				String imp = parseZ3Metrics((z3Metrics)command,commandName,absoluteParentPath,mec.getAbsolutePath());
+				commands.add(imp);
+			}
 			else if(command instanceof onTheFlyFR) {
 				String imp = parseOnTheFlyFR((onTheFlyFR)command,commandName,absoluteParentPath,mec.getAbsolutePath());
 				commands.add(imp);
@@ -1000,14 +1014,17 @@ public class MyParserUtil {
 		//generateCommands(mec, absoluteParentPath, commands, new String[]{"SE"},false);
 		//generateCommands(mec, absoluteParentPath, commands, new String[]{"FE"},false);
 		//generateCommands(mec, absoluteParentPath, commands, new String[]{"SMB"},false);
+		
 		/*
 		boolean applyCurrying=false;
 		//String [] reductions= {"FE","BE", "SMB"};	//MRN
-		String [] reductions= {"FE","BE"};		//PRN
+		//String [] reductions= {"FE","BE"};		//PRN
 		//String [] reductions= {"BDE","FDE"};		//NRN
 		//String [] reductions= {"BDE"};		//NRN
 		//String [] reductions= {"FDE"};		//NRN
 		
+		
+		String [] reductions= {"FE"};
 		//String [] reductions= {"BE"};
 		//String [] reductions= {"FE","BE","SE"};
 		//String [] reductions= {"BDE"};
@@ -1036,15 +1053,16 @@ public class MyParserUtil {
 		commands.add(com);
 		*/
 		
-		
-		
-		
+		/*
+		String n=computeFileName("euler"+File.separator+mec.getModelName()+"_euler.ode",absoluteParentPath);
+		commands.add("write({fileOut=>"+n+",format=>EULER})");
+		*/
+	
 		//commands.add("exportZ3({question=>EFL,fileOut=>/Users/andrea/Desktop/pippo.z3})");
 		
 		return commands;
 	}
 
-	
 	@SuppressWarnings("unused")
 	private static void generateCommands(final ModelElementsCollector mec, final String absoluteParentPath, final List<String> commands,
 			final String[] reductions,final boolean applyCurrying) {
@@ -1141,9 +1159,31 @@ public class MyParserUtil {
 			sb.append(((importSBMLQualFolder)imp).getGuessPrep());
 			sb.append(',');
 		}
+		else if(imp instanceof importBNetFolder) {
+			sb.append("guessPrep=>");
+			sb.append(((importBNetFolder)imp).getGuessPrep());
+			sb.append(',');
+		}
 		//END To be moved outside if when we will have more 'ImportFolder'
 		//}
 
+		sb.deleteCharAt(sb.length()-1);
+		sb.append("})");
+		return sb.toString();
+	}
+	
+	private static String parseImportBoolean(ImportBoolean imp, String commandName, String absoluteParentPath) { 
+		StringBuilder sb = new StringBuilder(commandName);
+		sb.append("({");
+		sb.append("fileIn=>");
+		sb.append(computeFileName(((importBNet)imp).getParams().getFileIn(), absoluteParentPath,false));
+		//sb.append(imp.getParams().getFileIn());
+		sb.append(',');
+		
+		sb.append("guessPrep=>");
+		sb.append(((importBNet)imp).getGuessPrep());
+		sb.append(',');
+		
 		sb.deleteCharAt(sb.length()-1);
 		sb.append("})");
 		return sb.toString();
@@ -1161,6 +1201,10 @@ public class MyParserUtil {
 			if(labellingFile!=null){
 				sb.append("labellingFile=>");
 				sb.append(computeFileName(labellingFile, absoluteParentPath,false));
+				sb.append(',');
+			}
+			if(((importMRMC)imp).isAsMatrix()) {
+				sb.append("asMatrix=>true");
 				sb.append(',');
 			}
 		}
@@ -1217,6 +1261,9 @@ public class MyParserUtil {
 			String icFile = ((importAffineSystem)imp).getIcFile();
 			sb.append("icFile=>");
 			sb.append(computeFileName(icFile, absoluteParentPath,false));
+			sb.append(',');
+			
+			sb.append("addReverseEdges=>"+((importAffineSystem)imp).isAddReverseEdges());
 			sb.append(',');
 			
 			sb.append("createParams=>"+((importAffineSystem)imp).isCreateParams());
@@ -1353,6 +1400,34 @@ public class MyParserUtil {
 		return sb.toString();
 	}
 	
+	
+	private static String parseZ3Metrics(z3Metrics command, String commandName, String absoluteParentPath,
+			String absolutePath) {
+		StringBuilder sb = new StringBuilder(commandName);
+		sb.append("({");
+		
+		sb.append("C=>");
+		sb.append(visitExpr(command.getC()));
+		sb.append(",");
+		
+		sb.append("lambda=>");
+		sb.append(visitExpr(command.getLambda()));
+		sb.append(",");
+		
+
+		sb.append("csvFile=>");
+		String fileName = computeFileName(command.getCsvFile().getCsv(),absoluteParentPath);
+		String p = fileName;
+		sb.append(p);
+		sb.append(',');
+
+		
+		sb.deleteCharAt(sb.length()-1);
+		
+		sb.append("})");
+		return sb.toString();
+	}
+	
 	private static String parseOnTheFlyParams(ParametersOnTheFly parameters, String commandName, String absoluteParentPath, String absolutePath) {
 		StringBuilder sb = new StringBuilder(commandName);
 		sb.append("({");
@@ -1409,6 +1484,8 @@ public class MyParserUtil {
 		sb.append("})");
 		return sb.toString();
 	}
+	
+	
 	
 	private static String parseOnTheFlyBR(onTheFlyBR exp, String commandName, String absoluteParentPath, String absolutePath) {
 		return parseOnTheFlyParams(exp.getParameters(), commandName, absoluteParentPath, absolutePath);
@@ -2634,6 +2711,21 @@ public class MyParserUtil {
 //			sb.append("simplify=>"+simplify);
 //			sb.append(',');
 		}
+		else if(red instanceof reduceRndFME) {
+			String aggrFunc=((reduceRndFME) red).getAggregationFunction();
+			sb.append("aggregationFunction=>");
+			sb.append(aggrFunc);
+			sb.append(',');
+			
+			boolean attempt=((reduceRndFME) red).isAttemptDropTauN();
+			sb.append("attemptDropTauN=>");
+			sb.append(attempt);
+			sb.append(',');
+			
+//			boolean simplify=((reduceFME) red).isSimplify();
+//			sb.append("simplify=>"+simplify);
+//			sb.append(',');
+		}
 		
 		if(sb.charAt(sb.length()-1)==','){
 			sb.deleteCharAt(sb.length()-1);
@@ -2785,6 +2877,25 @@ public class MyParserUtil {
 				String delta = visitExpr(((reduceUCTMCFE) red).getDelta()); 
 				sb.append("delta=>"+delta+",");
 			}
+		}
+		if(red instanceof reduceUSE){
+			reduceUSE redUSE = (reduceUSE)red;
+			String modelWithBigM = redUSE.getModelWithBigM();
+			if(modelWithBigM!=null){
+				sb.append("modelWithBigM=>");
+				sb.append(computeFileName(modelWithBigM, absoluteParentPath,false));
+				sb.append(',');
+			}
+			else if(redUSE.getDelta()!=null){
+				String delta = visitExpr(redUSE.getDelta()); 
+				sb.append("delta=>"+delta+",");
+			}
+			else {
+				String delta = visitExpr(redUSE.getDeltaPercentage()); 
+				sb.append("deltaPercentage=>"+delta+",");
+			}
+			boolean doNotAddDeltaToRawConstants = ((reduceUSE) red).isDoNotAddDeltaToRawConstants(); 
+			sb.append("doNotAddDeltaToRawConstants=>"+doNotAddDeltaToRawConstants+",");
 		}
 		/*if(red instanceof MassActionEpsilonReduction){
 			sb.append("epsilon=>");

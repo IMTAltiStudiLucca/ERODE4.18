@@ -467,7 +467,8 @@ public class CRNBisimulationsNAry {
 	 * @param reactionsToConsiderForEachSpecies 
 	 * @param reactionToRateToConsider 
 	 */
-	private static void split(Reduction red, ICRN crn, IPartition partition, SplittersGenerator splittersGenerator, HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction,Integer> consideredAtIteration, ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM,ArrayListOfReactions[] reactionsToConsiderForEachSpecies, BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
+	private static void split(Reduction red, ICRN crn, IPartition partition, SplittersGenerator splittersGenerator, HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction,Integer> consideredAtIteration, ISpeciesCounterHandler[] speciesCounters,
+			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM,ArrayListOfReactions[] reactionsToConsiderForEachSpecies, BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
 		
 		IBlock blockSPL = splittersGenerator.getBlockSpl();
 		//ILabel labelSPL = splittersGenerator.getLabelSpl();
@@ -482,7 +483,8 @@ public class CRNBisimulationsNAry {
 
 		//If FB compute pr[X,partnerLabel,blockSPL] for all species X having at least a reaction with at least a partner partnerLabel (for all partnerLabels) towards blockSPL (and build the list of such species. Only their blocks can get split)
 		//If BB compute fr[X,blockLabel,blockSPL] for all species X and all blocks blockLabel  (and build the list of species having it positive. Only their blocks can get split)
-		anyReactionFound = computeMeasuresUsedToSplitWithRespectToTheSplitter(red,crn,  blockSPL,splitterGenerators,partition,multisetCoefficients,iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider);
+		anyReactionFound = computeMeasuresUsedToSplitWithRespectToTheSplitter(red,crn,  blockSPL,splitterGenerators,partition,multisetCoefficients,
+				iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider);
 		
 		if(!anyReactionFound){
 			//CRNReducerCommandLine.println(out,bwOut,"No reactions considered at this iteration. I can skip this split iteration");
@@ -951,7 +953,11 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 	}
 
 	private static boolean computeMeasuresUsedToSplitWithRespectToTheSplitter(
-			Reduction red, ICRN crn, IBlock blockSPL, HashSet<ISpecies> splitterGenerators,IPartition partition, HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction, Integer> consideredAtIteration, ISpeciesCounterHandler[] speciesCounters,HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, ArrayListOfReactions[] reactionsToConsiderForEachSpecies, BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
+			Reduction red, ICRN crn, IBlock blockSPL, HashSet<ISpecies> splitterGenerators,IPartition partition, 
+			HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction, Integer> consideredAtIteration, 
+			ISpeciesCounterHandler[] speciesCounters,HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, 
+			ArrayListOfReactions[] reactionsToConsiderForEachSpecies, BigDecimal deltaHalf, 
+			HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
 		
 		boolean hasOneLabelOnly = crn.getMaxArity()==1;
 		boolean anyReactionConsidered = false;
@@ -974,7 +980,10 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 		return anyReactionConsidered;
 	}
 	
-	private static void updateNROfReagents(ICRNReaction reaction, HashSet<ISpecies> splitterGenerators, ISpecies splitterSpecies,boolean onlyOneLabel, HashMap<IComposite, BigDecimal> multisetCoefficients, int scale, RoundingMode rm, ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, BigDecimal deltaHalf,BigDecimal rateToConsider) {
+	private static void updateNROfReagents(ICRNReaction reaction, HashSet<ISpecies> splitterGenerators, ISpecies splitterSpecies,
+			boolean onlyOneLabel, HashMap<IComposite, BigDecimal> multisetCoefficients, int scale, RoundingMode rm, 
+			ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, 
+			BigDecimal deltaHalf,BigDecimal rateToConsider) {
 
 		IComposite reagents = reaction.getReagents();
 		IComposite products = reaction.getProducts();
@@ -1068,7 +1077,11 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 	}
 	
 
-	private static boolean computeNetProductionRateForGivenReactions(HashSet<ISpecies> splitterGenerators,Collection<ICRNReaction> consideredReactions,ISpecies aSpeciesOfSplitter, boolean hasOneLabelOnly, HashMap<IComposite, BigDecimal> multisetCoefficients, ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
+	private static boolean computeNetProductionRateForGivenReactions(HashSet<ISpecies> splitterGenerators,
+			Collection<ICRNReaction> consideredReactions,ISpecies aSpeciesOfSplitter, boolean hasOneLabelOnly, 
+			HashMap<IComposite, BigDecimal> multisetCoefficients, ISpeciesCounterHandler[] speciesCounters, 
+			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, BigDecimal deltaHalf, 
+			HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
 		boolean anyReactionConsidered=false;
 		BigDecimal minusDeltaHalf=null;
 		if(deltaHalf!=null) {

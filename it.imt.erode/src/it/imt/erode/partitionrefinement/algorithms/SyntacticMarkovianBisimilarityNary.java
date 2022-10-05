@@ -76,6 +76,16 @@ public class SyntacticMarkovianBisimilarityNary {
 		return computeMSB(crn, labels, partition, compositesPartition, verbose,out, terminator);
 	}*/
 	
+	public static IPartitionAndBoolean computeSE(ICRN crn, /*List<ILabel> labels,*/ IPartition partition, 
+			/*ICompositePartition compositePartition,*/ boolean verbose,MessageConsoleStream out, 
+			BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower, /*boolean addSelfLoops,*/ 
+			boolean halveRatesOfHomeoReactions) throws IOException{
+		return computeSE(crn, partition, 
+				verbose,out, 
+				bwOut, terminator, msgDialogShower,  
+				halveRatesOfHomeoReactions,null,false,false);
+	}
+	
 	/**
 	 * 
 	 * @param crn
@@ -89,7 +99,10 @@ public class SyntacticMarkovianBisimilarityNary {
 	 * @return
 	 * @throws IOException 
 	 */
-	public static IPartitionAndBoolean computeSE(ICRN crn, /*List<ILabel> labels,*/ IPartition partition, /*ICompositePartition compositePartition,*/ boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower, /*boolean addSelfLoops,*/ boolean halveRatesOfHomeoReactions) throws IOException{
+	public static IPartitionAndBoolean computeSE(ICRN crn, /*List<ILabel> labels,*/ IPartition partition, 
+			/*ICompositePartition compositePartition,*/ boolean verbose,MessageConsoleStream out, 
+			BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower, /*boolean addSelfLoops,*/ 
+			boolean halveRatesOfHomeoReactions,BigDecimal deltaHalf,boolean absoluteDelta,boolean doNotAddDeltaToRawConstants) throws IOException{
 		
 		List<ILabel> fakeLabels=new ArrayList<>();
 		fakeLabels.add(EmptySetLabel.EMPTYSETLABEL);
@@ -148,10 +161,13 @@ public class SyntacticMarkovianBisimilarityNary {
 		if(halveRatesOfHomeoReactions) {
 			crnNew = CRN.halveRatesOfHomeoReactions(crnNew, out, bwOut);
 		}
-		CRNReducerCommandLine.print(out,bwOut," (creating initial partition of products) ");
+		if(verbose) {
+			CRNReducerCommandLine.print(out,bwOut," (creating initial partition of products) ");
+		}
 		ICompositePartition compositesPartition = new CompositePartition(crnNew.computeSetOfProducts(),partition);
 		//CRNReducerCommandLine.print(out,bwOut," (refining up to SMB) ");
-		refineSE(crnNew,obtainedPartition,compositesPartition,fakeLabels,speciesCounters,speciesCountersHM,terminator,out,bwOut);
+		refineSE(crnNew,obtainedPartition,compositesPartition,fakeLabels,speciesCounters,speciesCountersHM,terminator,out,bwOut,
+				deltaHalf,absoluteDelta,doNotAddDeltaToRawConstants,verbose);
 		
 		/*
 		ICRN crnNew = new CRN(crn.getName(),crn.getMath(),out);
@@ -219,7 +235,11 @@ public class SyntacticMarkovianBisimilarityNary {
 		refineCRRM(crn, partition, compositesPartition, labels, speciesCounters, terminator);
 	}*/
 	
-	private static void refineSE(ICRN crn, IPartition partition, ICompositePartition compositesPartition, List<ILabel> fakeLabels, SpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut) {
+	private static void refineSE(ICRN crn, IPartition partition, ICompositePartition compositesPartition, 
+			List<ILabel> fakeLabels, SpeciesCounterHandler[] speciesCounters, 
+			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, 
+			MessageConsoleStream out, BufferedWriter bwOut,BigDecimal deltaHalf,boolean absoluteDelta, boolean doNotAddDeltaToRawConstants,
+			boolean verbose) {
 		
 		//generate candidate splitters
 		SplittersGeneratorSMB splittersGenerator = compositesPartition.getSplitterGeneratorAndCreateItIfFirstInvocation(fakeLabels);
@@ -229,13 +249,16 @@ public class SyntacticMarkovianBisimilarityNary {
 			CRNBisimulationsNAry.initializeAllCounters(crn.getSpecies(),speciesCounters);
 		}
 		partition.initializeAllBST();
-
-		CRNReducerCommandLine.print(out,bwOut,"\n\tScanning the reactions once to pre-compute informations necessary to the partitioning ... ");
+		if(verbose) {
+			CRNReducerCommandLine.print(out,bwOut,"\n\tScanning the reactions once to pre-compute informations necessary to the partitioning ... ");
+		}
 		long begin = System.currentTimeMillis();
 		HashMap<IComposite, ArrayList<ICRNReaction>> reactionsToConsiderForEachComposite=new HashMap<>(); 
 		SyntacticMarkovianBisimilarityOLD.addToIncomingReactionsOfProducts(crn,reactionsToConsiderForEachComposite);
 		long end = System.currentTimeMillis();
-		CRNReducerCommandLine.print(out,bwOut,"completed in "+ String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0))+" (s)");
+		if(verbose) {
+			CRNReducerCommandLine.print(out,bwOut,"completed in "+ String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0))+" (s)");
+		}
 		
 		int prevSize = -1;
 		int iteration=0;
@@ -249,7 +272,7 @@ public class SyntacticMarkovianBisimilarityNary {
 				if(Terminator.hasToTerminate(terminator)){
 					break;
 				}
-				splitSE(crn,partition,splittersGenerator,compositesPartition,true,iteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachComposite);
+				splitSE(crn,partition,splittersGenerator,compositesPartition,true,iteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachComposite,deltaHalf,absoluteDelta, doNotAddDeltaToRawConstants);
 				if(speciesCountersHM!=null) {
 					speciesCountersHM=new HashMap<>();
 				}
@@ -259,7 +282,10 @@ public class SyntacticMarkovianBisimilarityNary {
 		}
 	}
 	
-	private static void splitSE(ICRN crn, IPartition partition, SplittersGeneratorSMB splittersGenerator, ICompositePartition compositesPartition, boolean refineUpBlocksAfterAnySplit, int iteration, SpeciesCounterHandler[] speciesCounters, HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, HashMap<IComposite,ArrayList<ICRNReaction>> reactionsToConsiderForEachComposite) {
+	private static void splitSE(ICRN crn, IPartition partition, SplittersGeneratorSMB splittersGenerator, ICompositePartition compositesPartition,
+			boolean refineUpBlocksAfterAnySplit, int iteration, SpeciesCounterHandler[] speciesCounters, 
+			HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, HashMap<IComposite,ArrayList<ICRNReaction>> reactionsToConsiderForEachComposite
+			,BigDecimal deltaHalf,boolean absoluteDelta, boolean doNotAddDeltaToRawConstants) {
 		
 		ICompositeBlock blockSPL = splittersGenerator.getBlockSpl();
 		
@@ -272,7 +298,8 @@ public class SyntacticMarkovianBisimilarityNary {
 		//Set of species with at least a reaction towards the species of the splitter
 		HashSet<ISpecies> splitterGenerators = new HashSet<ISpecies>();
 		//compute pr[X,label,blockSPL] for all species X having at least a reaction with partners label towards blockSPL (and build the list of such species. Only their blocks can get split)
-		boolean anyReactionFound = computeConditionalRatesTowardsTheSplitterBlock(crn, /*labelSPL,*/ blockSPL,splitterGenerators,speciesCounters,speciesCountersHM,hasOnlyUnaryReactions,reactionsToConsiderForEachComposite,partition);
+		boolean anyReactionFound = computeConditionalRatesTowardsTheSplitterBlock(crn, /*labelSPL,*/ blockSPL,splitterGenerators,speciesCounters,speciesCountersHM,hasOnlyUnaryReactions,reactionsToConsiderForEachComposite,partition,
+				deltaHalf,absoluteDelta, doNotAddDeltaToRawConstants);
 		
 		if(!anyReactionFound){
 			//CRNReducerCommandLine.println(out,bwOut,"No reactions considered at this iteration. I can skip this split iteration");
@@ -502,8 +529,31 @@ public class SyntacticMarkovianBisimilarityNary {
 		}
 	}
 	
-	private static boolean computeConditionalRatesTowardsTheSplitterBlock(ICRN crn, /*ILabel labelSPL,*/ ICompositeBlock blockSPL, HashSet<ISpecies> splitterGenerators, SpeciesCounterHandler[] speciesCounters, HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, boolean hasOneLabelOnly, HashMap<IComposite,ArrayList<ICRNReaction>> reactionsToConsiderForEachComposite,IPartition partition) {
+	/**
+	 * 
+	 * @param value the base value
+	 * @param delta either an absolute value to be added, or a percentage value (from 0 to 1)
+	 * @param absoluteDelta
+	 * @return
+	 */
+	private static BigDecimal sum(BigDecimal value,BigDecimal delta,boolean absoluteDelta) {
+		if(absoluteDelta) {
+			return value.add(delta);
+		}
+		else {
+			BigDecimal toAdd = value.multiply(delta);
+			return value.add(toAdd);
+		}
+	}
 	
+	private static boolean computeConditionalRatesTowardsTheSplitterBlock(ICRN crn, /*ILabel labelSPL,*/ ICompositeBlock blockSPL, HashSet<ISpecies> splitterGenerators, SpeciesCounterHandler[] speciesCounters, HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, boolean hasOneLabelOnly, HashMap<IComposite,ArrayList<ICRNReaction>> reactionsToConsiderForEachComposite,IPartition partition, 
+			BigDecimal deltaHalf, boolean absoluteDelta, boolean doNotAddDeltaToRawConstants) {
+		
+//		BigDecimal minusDeltaHalf=null;
+//		if(deltaHalf!=null) {
+//			minusDeltaHalf=BigDecimal.ZERO.subtract(deltaHalf);
+//		}
+		
 		boolean anyReactionConsidered=false;
 		for (IComposite aCompositeOfSplitter : blockSPL.getComposites()) {
 			Collection<ICRNReaction> consideredReactions = reactionsToConsiderForEachComposite.get(aCompositeOfSplitter);
@@ -513,8 +563,20 @@ public class SyntacticMarkovianBisimilarityNary {
 				for (ICRNReaction incomingReaction : consideredReactions) {
 					//I added this if. By adding it we get SE. Otherwise we get SMB
 					if(!multisetEquivalent(incomingReaction.getReagents(), incomingReaction.getProducts(), partition)) {
-						if(incomingReaction.getRate().compareTo(BigDecimal.ZERO)!=0){
-							increaseSMBCounterOfReagents(incomingReaction,/*labelSPL,*/ splitterGenerators,speciesCounters,speciesCountersHM,hasOneLabelOnly);
+						if(deltaHalf==null || deltaHalf.compareTo(BigDecimal.ZERO)==0 || 
+								(doNotAddDeltaToRawConstants && isNumeric(incomingReaction.getRateExpression()))) {
+							//classic SE, or internal SE on a reaction whose rate I should not change
+							if(incomingReaction.getRate().compareTo(BigDecimal.ZERO)!=0){
+								increaseSMBCounterOfReagents(incomingReaction,/*labelSPL,*/ splitterGenerators,speciesCounters,speciesCountersHM,hasOneLabelOnly,incomingReaction.getRate());
+							}
+						}
+						else {
+							//SE used as internal step for uncertain SE
+							BigDecimal ratePlusDelta=sum(incomingReaction.getRate(),deltaHalf,absoluteDelta);
+							if(ratePlusDelta.compareTo(BigDecimal.ZERO)!=0) {
+							//if(incomingReaction.getRate().compareTo(minusDeltaHalf)!=0){
+								increaseSMBCounterOfReagents(incomingReaction,/*labelSPL,*/ splitterGenerators,speciesCounters,speciesCountersHM,hasOneLabelOnly,ratePlusDelta);
+							}
 						}
 					}
 				}
@@ -522,10 +584,28 @@ public class SyntacticMarkovianBisimilarityNary {
 		}
 		return anyReactionConsidered;
 	}
+		
+	public static boolean isNumeric(String expr) {
+		try {
+			double val=Double.parseDouble(expr);
+			val=val+1;
+		}catch(NumberFormatException e) {
+			return false;
+		}
+		return true;
+	}
 	
-	private static void increaseSMBCounterOfReagents(ICRNReaction reaction, /*ILabel labelSPL,*/HashSet<ISpecies> splitterGenerators, SpeciesCounterHandler[] speciesCounters, HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, boolean onlyOneLabel) {
+	private static void increaseSMBCounterOfReagents(ICRNReaction reaction, /*ILabel labelSPL,*/HashSet<ISpecies> splitterGenerators, 
+			SpeciesCounterHandler[] speciesCounters, HashMap<ISpecies,ISpeciesCounterHandler> speciesCountersHM, 
+			boolean onlyOneLabel, 
+			//BigDecimal deltaHalf
+			BigDecimal rate
+			) {
 		IComposite reagents = reaction.getReagents();
-		BigDecimal rate = reaction.getRate();
+//		BigDecimal rate = reaction.getRate();
+//		if(deltaHalf!=null) {
+//			rate = rate.add(deltaHalf);
+//		}
 		
 		if(reagents.isUnary()){
 			ISpecies reagent = reagents.getFirstReagent();

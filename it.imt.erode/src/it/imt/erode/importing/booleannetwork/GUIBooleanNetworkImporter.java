@@ -23,6 +23,7 @@ import it.imt.erode.booleannetwork.implementations.BooleanNetwork;
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
 import it.imt.erode.commandline.CRNReducerCommandLine;
+import it.imt.erode.commandline.EULER;
 import it.imt.erode.commandline.IMessageDialogShower;
 import it.imt.erode.crn.implementations.Species;
 import it.imt.erode.crn.interfaces.ISpecies;
@@ -45,12 +46,15 @@ public class GUIBooleanNetworkImporter {
 	private InfoBooleanNetworkImporting infoImporting;
 	private BooleanNetwork booleanNetwork;
 	private boolean mv=false;
+	private boolean realSortMV=false;
 	
 	private IPartition initialPartition;
 
 	public GUIBooleanNetworkImporter(boolean mv,MessageConsoleStream out, BufferedWriter bwOut,
-			IMessageDialogShower msgDialogShower) {
+			IMessageDialogShower msgDialogShower, boolean b) {
 		this.mv=mv;
+		this.realSortMV=b;
+
 		this.out=out;
 		this.bwOut=bwOut;
 		//furtherCommands=new ArrayList<String>();
@@ -65,7 +69,7 @@ public class GUIBooleanNetworkImporter {
 			String modelName, 
 			ArrayList<ArrayList<String>> initialConcentrations, 
 			LinkedHashMap<String, IUpdateFunction> booleanUpdateFunctions, 
-			ArrayList<ArrayList<String>> initialPartition, MessageConsoleStream consoleOut) throws IOException{
+			ArrayList<ArrayList<String>> initialPartition, MessageConsoleStream consoleOut) {
 		if(print){
 			//CRNReducerCommandLine.println(out,"\nImporting the model "+ modelName +" from the editor");
 			CRNReducerCommandLine.println(out,bwOut,"\nReading "+ modelName +"...");
@@ -75,6 +79,10 @@ public class GUIBooleanNetworkImporter {
 
 		initBooleanNetwork(modelName);
 		getInfoImporting().setLoadedBooleanNetwork(true);
+		
+		if(mv) {
+			getBooleanNetwork().setRealSortIfMV(realSortMV);
+		}
 		
 		HashMap<String, ISpecies> nodesStoredInHashMap = new HashMap<>();
 		for (ArrayList<String> initialConcentration : initialConcentrations) {
@@ -331,8 +339,8 @@ public class GUIBooleanNetworkImporter {
 				bw.write("unnamed\n");
 			}
 			
-			GUICRNImporter.writeInitBlock(bw, bn.getSpecies(), originalNames, null, false,bn.getNameToMax());
-			GUICRNImporter.writeInitPartition(bw, bn.getUserDefinedPartition(), null, false);
+			GUICRNImporter.writeInitBlock(bw, bn.getSpecies(), originalNames, null, false,bn.getNameToMax(),EULER.NO);
+			GUICRNImporter.writeInitPartition(bw, bn.getUserDefinedPartition(), null, false,bn.getSpecies());
 			
 			bw.write("begin update functions\n");
 			for(Entry<String, IUpdateFunction> entry:bn.getUpdateFunctions().entrySet()) {

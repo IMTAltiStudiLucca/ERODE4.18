@@ -16,13 +16,13 @@ import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregatio
 
 public class ValUpdateFunction implements IUpdateFunction/*_ArithExprRefToNode_Value*/ {
 
-	private int val;
+	private double val;
 	
-	public ValUpdateFunction(int val) {
+	public ValUpdateFunction(double val) {
 		this.val=val;
 	}
 	
-	public int getVal() {
+	public double getVal() {
 		return val;
 	}
 
@@ -34,8 +34,15 @@ public class ValUpdateFunction implements IUpdateFunction/*_ArithExprRefToNode_V
 	
 	@Override
 	public Expr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
-		return ctx.mkInt(val);
+			HashMap<ISpecies, Expr> nodeToTruthValue,boolean realSort) throws Z3Exception {
+		if(realSort) {
+			return ctx.mkReal(val+"");
+		}
+		else {
+			return ctx.mkInt((int)val);
+		}
+		//
+		
 		//return ctx.mkNumeral(val,ctx.getIntSort());
 	}
 	

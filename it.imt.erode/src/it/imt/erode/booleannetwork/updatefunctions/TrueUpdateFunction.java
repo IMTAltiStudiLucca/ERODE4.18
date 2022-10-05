@@ -25,7 +25,7 @@ public class TrueUpdateFunction implements IUpdateFunction {
 	
 	@Override
 	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
+			HashMap<ISpecies, Expr> nodeToTruthValue,boolean realSort) throws Z3Exception {
 		return ctx.mkTrue();
 	}
 	

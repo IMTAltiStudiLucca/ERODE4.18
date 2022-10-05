@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="lib/or_tools/ortools-darwin-x86-64-9.3.10497.jar"/>
+	<classpathentry kind="lib" path="lib/or_tools/ortools-java-9.3.10497.jar"/>
+	<classpathentry kind="lib" path="lib/or_tools/jna/jna-5.12.1.jar"/>
+	<classpathentry kind="lib" path="lib/or_tools/jna/jna-platform-5.12.1.jar"/>
+	<classpathentry kind="lib" path="lib/or_tools/protobuf/protobuf-java-4.0.0-rc-2.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

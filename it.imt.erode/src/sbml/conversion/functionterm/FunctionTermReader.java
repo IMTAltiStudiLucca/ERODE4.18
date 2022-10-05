@@ -7,9 +7,12 @@ import org.sbml.jsbml.ASTNode;
 import org.sbml.jsbml.ListOf;
 import org.sbml.jsbml.ext.qual.FunctionTerm;
 
+import it.imt.erode.booleannetwork.updatefunctions.FalseUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.MVUpdateFunctionByCases;
+import it.imt.erode.booleannetwork.updatefunctions.NotBooleanUpdateFunction;
 import it.imt.erode.booleannetwork.updatefunctions.Otherwise;
+import it.imt.erode.booleannetwork.updatefunctions.TrueUpdateFunction;
 import sbml.conversion.nodes.INodeConverter;
 import sbml.conversion.nodes.NodeManager;
 
@@ -60,18 +63,48 @@ public class FunctionTermReader {
 			return upFuncCases;
 		}
 		else {
-			FunctionTerm functionTerm = getResultLevel(functionTerms,1);
+			FunctionTerm functionTerm = getResultLevel(functionTerms,1,false);
+			if(functionTerm==null) {
+				//I need to check for 0
+				functionTerm = getResultLevel(functionTerms,0,true);
+				IUpdateFunction toBeNegated = extracted(functionTerm);
+				if(toBeNegated instanceof TrueUpdateFunction) {
+					return new FalseUpdateFunction();
+				}
+				else {
+					return new NotBooleanUpdateFunction(toBeNegated);
+				}
+			}
+			else {
+				return extracted(functionTerm);
+			}
+			
+			
+		}
+	}
+
+	private IUpdateFunction extracted(FunctionTerm functionTerm) {
+		if(functionTerm.isDefaultTerm()) {
+			return new TrueUpdateFunction();
+		}
+		else {
 			ASTNode node = functionTerm.getMath();
 			INodeConverter converter = NodeManager.create(node,multivalued);
 			return converter.getUpdateFunction();
 		}
 	}
 	
-	private FunctionTerm getResultLevel(ListOf<FunctionTerm> functionTerms, int level) {
+	private FunctionTerm getResultLevel(ListOf<FunctionTerm> functionTerms, int level,boolean throwException) {
 		for(FunctionTerm f : functionTerms) {
 			if(f.isSetResultLevel() && f.getResultLevel() == level)
 				return f;
 		}
-		throw new IllegalArgumentException("No function term with result level " + level + " found");
+		if(throwException) {
+			throw new IllegalArgumentException("No function term with result level " + level + " found");
+		}
+		else {
+			return null;
+		}
+		
 	}
 }

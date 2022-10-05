@@ -4,6 +4,7 @@ import org.sbml.jsbml.ASTNode;
 
 import it.imt.erode.booleannetwork.updatefunctions.BooleanUpdateFunctionExpr;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.MVComparison;
 import sbml.conversion.nodes.INodeConverter;
 import sbml.conversion.nodes.NodeConverter;
 
@@ -14,6 +15,9 @@ public abstract class BinaryASTConverter extends NodeConverter {
     }
 
     public static BinaryASTConverter create(BooleanUpdateFunctionExpr updateFunction) {
+        return new BinaryWriter(updateFunction);
+    }
+    public static BinaryASTConverter create(MVComparison updateFunction) {
         return new BinaryWriter(updateFunction);
     }
 

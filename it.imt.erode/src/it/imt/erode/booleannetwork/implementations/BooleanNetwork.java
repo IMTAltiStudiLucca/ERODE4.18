@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.eclipse.ui.console.MessageConsoleStream;
 
@@ -29,6 +30,7 @@ public class BooleanNetwork implements IBooleanNetwork {
 	
 	private List<ICommand> commands;
 	private boolean multivalued=false;
+	private boolean realSortIfMV=false;
 	
 	public BooleanNetwork(String name, MessageConsoleStream out,BufferedWriter bwOut, boolean multivalued) {
 		super();
@@ -107,6 +109,14 @@ public class BooleanNetwork implements IBooleanNetwork {
 		}
 		sb.append("Species:\n");
 		sb.append(getSpecies().toString());
+		
+		
+		for(Entry<String, IUpdateFunction> entry:updateFunctions.entrySet()) {
+			sb.append("\n\t");
+			sb.append(entry.getKey());
+			sb.append(":\t");
+			sb.append(entry.getValue());
+		}
 		return sb.toString();
 	}
 
@@ -184,6 +194,12 @@ public class BooleanNetwork implements IBooleanNetwork {
 	}
 	@Override
 	public int getNameToMax(String speciesName){
+		return getNameToMax(speciesName, nameToMax);
+	}
+	public static int getNameToMax(String speciesName,LinkedHashMap<String, Integer> nameToMax){
+		if(nameToMax==null) {
+			return 1;
+		}
 		Integer ret = nameToMax.get(speciesName);
 		if(ret==null) {
 			return 1;
@@ -196,6 +212,16 @@ public class BooleanNetwork implements IBooleanNetwork {
 	@Override
 	public List<String> getParameters() {
 		return fakeParams;
+	}
+
+	@Override
+	public void setRealSortIfMV(boolean b) {
+		this.realSortIfMV=b;
+	}
+
+	@Override
+	public boolean getRealSortIfMV() {
+		return realSortIfMV;
 	}
 
 }

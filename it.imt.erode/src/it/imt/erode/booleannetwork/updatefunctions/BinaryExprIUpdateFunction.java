@@ -39,7 +39,7 @@ public class BinaryExprIUpdateFunction implements IUpdateFunction/*_ArithExprRef
 	
 	@Override
 	public String toString() {
-		if(op.equals(ArithmeticConnector.SUM)||op.equals(ArithmeticConnector.MUL)) {
+		if(op.equals(ArithmeticConnector.SUM)||op.equals(ArithmeticConnector.MUL)||op.equals(ArithmeticConnector.SUB)) {
 			return "("+first.toString()+getSymbol(op)+second.toString()+")";
 		}
 		else {
@@ -52,6 +52,8 @@ public class BinaryExprIUpdateFunction implements IUpdateFunction/*_ArithExprRef
 		switch (op) {
 		case SUM:
 			return " + ";
+		case SUB:
+			return " - ";	
 		case MUL:
 			return " * ";
 		case MIN:
@@ -65,12 +67,14 @@ public class BinaryExprIUpdateFunction implements IUpdateFunction/*_ArithExprRef
 
 	@Override
 	public ArithExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
-		ArithExpr f=(ArithExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue);
-		ArithExpr s=(ArithExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue);
+			HashMap<ISpecies, Expr> nodeToTruthValue,boolean realSort) throws Z3Exception {
+		ArithExpr f=(ArithExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort);
+		ArithExpr s=(ArithExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort);
 		switch (op) {
 		case SUM:
 			return ctx.mkAdd(new ArithExpr[] {f,s});
+		case SUB:
+			return ctx.mkSub(new ArithExpr[] {f,s});	
 		case MUL:
 			return ctx.mkMul(new ArithExpr[] {f,s});
 		case MIN:

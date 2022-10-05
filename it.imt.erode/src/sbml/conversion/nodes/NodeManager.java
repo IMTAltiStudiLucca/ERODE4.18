@@ -6,6 +6,7 @@ import org.sbml.jsbml.ASTNode;
 
 import it.imt.erode.booleannetwork.updatefunctions.BooleanUpdateFunctionExpr;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.MVComparison;
 import it.imt.erode.booleannetwork.updatefunctions.NotBooleanUpdateFunction;
 import sbml.configurations.Strings;
 import sbml.conversion.nodes.binary.BinaryASTConverter;
@@ -44,11 +45,14 @@ public class NodeManager {
         switch (className) {
             case Strings.BINARY_EXPRESSION:
                 return BinaryASTConverter.create((BooleanUpdateFunctionExpr)updateFunction);
+            case Strings.MV_COMPARISON:
+                return BinaryASTConverter.create((MVComparison)updateFunction);    
             case Strings.NEGATION:
                 return UnaryASTConverter.create((NotBooleanUpdateFunction)updateFunction);
             case Strings.REFERENCE:
             case Strings.TRUE:
             case Strings.FALSE:
+            case Strings.VALUE:	
                 return ValueASTConverter.create(updateFunction);
             default:
                 throw new IllegalArgumentException("Unknown update function type");

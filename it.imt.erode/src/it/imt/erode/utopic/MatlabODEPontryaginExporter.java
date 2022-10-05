@@ -539,7 +539,7 @@ public class MatlabODEPontryaginExporter {
 		}
 		else{
 			boolean ignoreI=false;
-			speciesToDrift = GUICRNImporter.computeDrifts(crn,false,ignoreI);
+			speciesToDrift = GUICRNImporter.computeDrifts(crn,false,ignoreI,false);
 			speciesToDrift = replaceParameterWithControlOrConstant(speciesToDrift,parameterToPerturbToItsPosition,controlName,speciesNameToSpecies,crn);
 			int idIncrement=1;
 			MatlabODEsImporter.writeDriftsOfArbitraryODEReplacingSpeciesNamesWithY(idIncrement,varName,derivName,speciesToDrift, crn, bw, speciesNameToSpecies,prefixSpace);

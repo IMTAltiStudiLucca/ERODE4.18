@@ -191,7 +191,7 @@ public class EntryPointForPython {
 	
 	public int[] computeBB(int[] initialPartitionArray, boolean numbersAreIDOfRepresentativeSpecies) throws UnsupportedFormatException, Z3Exception, IOException{
 
-		IPartition initialPartition = importPartition(initialPartitionArray,numbersAreIDOfRepresentativeSpecies);
+		IPartition initialPartition = importPartition(idToSpecies, initialPartitionArray,numbersAreIDOfRepresentativeSpecies);
 		crnreducer.setPartition(initialPartition);
 		if(printPartitions){
 			CRNReducerCommandLine.println(out,bwOut,"Initial partition:\n"+initialPartition);
@@ -250,11 +250,11 @@ public class EntryPointForPython {
 	}
 	
 	public void printPartition(int[] partitionArray, boolean numbersAreIDOfRepresentativeSpecies){
-		IPartition partition = importPartition(partitionArray,numbersAreIDOfRepresentativeSpecies);
+		IPartition partition = importPartition(idToSpecies, partitionArray,numbersAreIDOfRepresentativeSpecies);
 		CRNReducerCommandLine.println(out,bwOut,partition);
 	}
 	
-	private IPartition importPartition(int[] initialPartitionArray, boolean numbersAreIDOfRepresentativeSpecies){
+	public static IPartition importPartition(ISpecies[] idToSpecies,int[] initialPartitionArray, boolean numbersAreIDOfRepresentativeSpecies){
 		IPartition initialPartition = new Partition(initialPartitionArray.length);
 		HashMap<Integer,IBlock> initialPartitionHM=new HashMap<>();
 		if(numbersAreIDOfRepresentativeSpecies){
@@ -287,10 +287,13 @@ public class EntryPointForPython {
 	}
 	
 	private IPartition importPartition(int[] initialPartitionArray){
-		return importPartition(initialPartitionArray, true);
+		return importPartition(idToSpecies,initialPartitionArray, true);
 	}
 
 	private int[] exportPartition(IPartition partition){
+		return exportPartition(idToSpecies, partition);
+	}
+	public static int[] exportPartition(ISpecies[] idToSpecies, IPartition partition){
 		int[] partitionArray = new int[idToSpecies.length];
 
 		for(int i=0;i<partitionArray.length;i++){

@@ -3,6 +3,8 @@ package sbml.conversion.functionterm;
 import org.sbml.jsbml.ASTNode;
 import org.sbml.jsbml.ext.qual.FunctionTerm;
 
+import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
+import it.imt.erode.booleannetwork.updatefunctions.MVUpdateFunctionByCases;
 import sbml.configurations.SBMLConfiguration;
 
 public class FunctionTermBuilder {
@@ -15,10 +17,23 @@ public class FunctionTermBuilder {
         return f;
     }
 
-    public FunctionTerm createDefaultTerm() {
-        FunctionTerm defaultTerm = new FunctionTerm();
-        defaultTerm.setDefaultTerm(true);
-        defaultTerm.setResultLevel(0);
+    public FunctionTerm createDefaultTerm(IUpdateFunction updateFunction) {
+    	FunctionTerm defaultTerm = new FunctionTerm();
+    	if(updateFunction instanceof MVUpdateFunctionByCases) {
+    		int oVal = ((MVUpdateFunctionByCases) updateFunction).getOtherwiseVal();
+    		if(oVal!=-1) {
+                defaultTerm.setDefaultTerm(true);
+                defaultTerm.setResultLevel(oVal);
+    		}
+    		else {
+    			 defaultTerm.setDefaultTerm(false);
+    		}
+    	}
+    	else {
+            defaultTerm.setDefaultTerm(true);
+            defaultTerm.setResultLevel(0);
+    	}
+        
         return defaultTerm;
     }
 }

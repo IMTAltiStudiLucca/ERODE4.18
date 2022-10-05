@@ -1,5 +1,6 @@
 package sbml.conversion.species;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import org.jetbrains.annotations.NotNull;
@@ -13,7 +14,7 @@ public class SpeciesManager {
         return new SpeciesReader(qualitativeSpecies);
     }
 
-    public static ISpeciesConverter create(@NotNull List<ISpecies> species) {
-        return new SpeciesWriter(species);
+    public static ISpeciesConverter create(@NotNull List<ISpecies> species, LinkedHashMap<String, Integer> nameToMax) {
+        return new SpeciesWriter(species,nameToMax);
     }
 }

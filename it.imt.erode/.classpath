@@ -12,7 +12,12 @@
 	<classpathentry kind="lib" path="lib/stochasticSimulators/fern/fern.jar"/>
 	<classpathentry kind="lib" path="lib/stochasticSimulators/fern/jdom.jar"/>
 	<classpathentry kind="lib" path="lib/plot/jmathplot.jar"/>
-	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry exported="true" kind="lib" path="lib/or_tools/jna/jna-5.12.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/or_tools/jna/jna-platform-5.12.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/or_tools/protobuf/protobuf-java-4.0.0-rc-2.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/or_tools/ortools-darwin-x86-64-9.3.10497.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/or_tools/ortools-java-9.3.10497.jar"/>
+	<classpathentry exported="true" kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
 	<classpathentry kind="lib" path="lib/stochasticSimulators/ssj/lib/Blas.jar"/>
 	<classpathentry kind="lib" path="lib/stochasticSimulators/ssj/lib/event-1.6.5.jar"/>
 	<classpathentry kind="lib" path="lib/stochasticSimulators/ssj/lib/interpreter-1.6.8.jar"/>

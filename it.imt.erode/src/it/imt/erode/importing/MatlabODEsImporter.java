@@ -739,7 +739,7 @@ public class MatlabODEsImporter  extends AbstractImporter {
 		}
 		else{
 			boolean ignoreI=false;
-			speciesToDrift = GUICRNImporter.computeDrifts(crn,false,ignoreI);
+			speciesToDrift = GUICRNImporter.computeDrifts(crn,false,ignoreI,false);
 			writeDriftsOfArbitraryODEReplacingSpeciesNamesWithY(idIncrement,varName,derivName,speciesToDrift, crn, bw, speciesNameToSpecies,prefixSpace);
 		}
 

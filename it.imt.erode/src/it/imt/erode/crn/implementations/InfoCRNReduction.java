@@ -2,6 +2,8 @@ package it.imt.erode.crn.implementations;
 
 import java.util.Collection;
 
+import it.imt.erode.partition.interfaces.IPartition;
+
 public class InfoCRNReduction extends InfoReduction{
 	
 	private int originalReactions;
@@ -9,11 +11,11 @@ public class InfoCRNReduction extends InfoReduction{
 	
 	
 	
-	public InfoCRNReduction(String originalCRN, int originalSpecies, int originalReactions, int parameters, double redSizeOverOrigSize, int initPartitionSize, int partitionSize, long timeInMS, String reduction) {
-		super(originalCRN,reduction,originalSpecies,parameters,redSizeOverOrigSize,partitionSize,timeInMS,initPartitionSize,partitionSize);
+	public InfoCRNReduction(String originalCRN, int originalSpecies, int originalReactions, int parameters, double redSizeOverOrigSize, int initPartitionSize, IPartition obtainedPartition, /*int partitionSize,*/ long timeInMS, String reduction) {
+		super(originalCRN,reduction,originalSpecies,parameters,redSizeOverOrigSize,obtainedPartition.size(),timeInMS,initPartitionSize,obtainedPartition);
 		this.originalReactions=originalReactions;
 	}
-
+	
 	public int getOriginalReactions() {
 		return originalReactions;
 	}

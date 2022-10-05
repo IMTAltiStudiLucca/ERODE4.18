@@ -42,8 +42,8 @@ public class NotBooleanUpdateFunction implements IUpdateFunction {
 
 	@Override
 	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
-		return ctx.mkNot((BoolExpr)innerUpdateFunction.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
+			HashMap<ISpecies, Expr> nodeToTruthValue,boolean realSort) throws Z3Exception {
+		return ctx.mkNot((BoolExpr)innerUpdateFunction.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort));
 	}
 	
 	@Override

@@ -21,6 +21,7 @@ import org.sbml.jsbml.ASTNode.Type;
 import org.sbml.jsbml.text.parser.ParseException;
 
 import it.imt.erode.commandline.CRNReducerCommandLine;
+import it.imt.erode.commandline.EULER;
 import it.imt.erode.commandline.IMessageDialogShower;
 import it.imt.erode.crn.implementations.CRN;
 import it.imt.erode.crn.implementations.CRNReactionArbitraryAbstract;
@@ -57,6 +58,8 @@ import it.imt.erode.partitionrefinement.algorithms.EpsilonDifferentialEquivalenc
 public class GUICRNImporter  extends AbstractImporter {
 
 	public static final String GUICRNNetworksFolder = "."+File.separator+"GUICRNNetworks"+File.separator;
+	//private static final boolean ADDEULERTAU=false;
+	private static final boolean ADDIDENTITY_IN_EULER=true;
 	
 	
 	public GUICRNImporter(String fileName,MessageConsoleStream out,BufferedWriter bwOut,IMessageDialogShower msgDialogShower){
@@ -354,8 +357,24 @@ public class GUICRNImporter  extends AbstractImporter {
 	
 	public static void printToERODEFIle(ICRN crn,IPartition partition, String name, boolean assignPopulationOfRepresentative, 
 			boolean groupAccordingToCurrentPartition, Collection<String> preambleCommentLines, boolean verbose, 
-			String icComment,MessageConsoleStream out,BufferedWriter bwOut, ODEorNET type, boolean rnEncoding,boolean originalNames){
+			String icComment,MessageConsoleStream out,BufferedWriter bwOut, ODEorNET type, boolean rnEncoding,boolean originalNames, 
+			EULER euler) {
+		printToERODEFIle(crn,partition, name, assignPopulationOfRepresentative, 
+				groupAccordingToCurrentPartition, preambleCommentLines, verbose, 
+				icComment,out,bwOut, type, rnEncoding,originalNames,null,euler);
+	}
+	
+	public static void printToERODEFIle(ICRN crn,IPartition partition, String name, boolean assignPopulationOfRepresentative, 
+			boolean groupAccordingToCurrentPartition, Collection<String> preambleCommentLines, boolean verbose, 
+			String icComment,MessageConsoleStream out,BufferedWriter bwOut, ODEorNET type, boolean rnEncoding,boolean originalNames
+			,ArrayList<String> commands,EULER euler){
 		String fileName = name;
+		String nam;
+		
+		String str_model="model";
+		if(euler.equals(EULER.EULER_WITH_TAU)||euler.equals(EULER.EULER_NO_TAU)) {
+			str_model="Multivalued Boolean Network";
+		}
 		
 		fileName=overwriteExtensionIfEnabled(fileName,".ode");
 		if(verbose){
@@ -381,10 +400,10 @@ public class GUICRNImporter  extends AbstractImporter {
 				
 			}
 			//bw.write("\n\n");
+			bw.write("begin "+str_model+" ");
 			
-			bw.write("begin model ");
 			if(crn.getName()!=null&&crn.getName()!=""){
-				String nam = getModelName(name);
+				nam = getModelName(name);
 				bw.write(nam+"\n");
 			}
 			else{
@@ -401,25 +420,27 @@ public class GUICRNImporter  extends AbstractImporter {
 				writeOldCRNAndXtextImport(bw,crn,type,false,out,bwOut,rnEncoding,fileName,partition);
 			}
 			else{
-				writeXtextCRN(bw,crn,type,false,out,bwOut,rnEncoding,originalNames);
-				if(groupAccordingToCurrentPartition){
-					bw.write(" begin views\n");
-					IBlock currentBlock = partition.getFirstBlock();
-					while(currentBlock!=null){
-						bw.write("  " + currentBlock.getRepresentative(CRNReducerCommandLine.COMPUTEREPRESENTATIVEBYMINOUTSIDEPARTITIONREFINEMENT).getName());
-						bw.write(" = " + currentBlock.toStringSeparatedSpeciesNames(" + ")+"\n");
-						currentBlock=currentBlock.getNext();
-					}
-					bw.write(" end views\n");
-				}
-				else{
-					if(crn.getViewNames()!=null && crn.getViewNames().length>0){
+				writeXtextCRN(bw,crn,type,false,out,bwOut,rnEncoding,originalNames,euler);
+				if(euler.equals(EULER.NO)) {
+					if(groupAccordingToCurrentPartition){
 						bw.write(" begin views\n");
-						for(int i=0;i<crn.getViewNames().length;i++){
-							bw.write("  "+crn.getViewNames()[i]);
-							bw.write(" = "+crn.getViewExpressions()[i]+"\n");
+						IBlock currentBlock = partition.getFirstBlock();
+						while(currentBlock!=null){
+							bw.write("  " + currentBlock.getRepresentative(CRNReducerCommandLine.COMPUTEREPRESENTATIVEBYMINOUTSIDEPARTITIONREFINEMENT).getName());
+							bw.write(" = " + currentBlock.toStringSeparatedSpeciesNames(" + ")+"\n");
+							currentBlock=currentBlock.getNext();
 						}
 						bw.write(" end views\n");
+					}
+					else{
+						if(crn.getViewNames()!=null && crn.getViewNames().length>0){
+							bw.write(" begin views\n");
+							for(int i=0;i<crn.getViewNames().length;i++){
+								bw.write("  "+crn.getViewNames()[i]);
+								bw.write(" = "+crn.getViewExpressions()[i]+"\n");
+							}
+							bw.write(" end views\n");
+						}
 					}
 				}
 			}
@@ -509,8 +530,28 @@ public class GUICRNImporter  extends AbstractImporter {
 				}
 			}
 
+			
+			if(euler.equals(EULER.EULER_NO_TAU)||euler.equals(EULER.EULER_WITH_TAU)) {
+				String lastName=name;
+				if(name.contains(File.separator)) {
+					lastName=lastName.substring(name.lastIndexOf(File.separator)+1);
+				}
+				//String nam
+				bw.write("//reduceFME(aggregationFunction=PLUS,reducedFile=\"red"+File.separator+lastName.replace(".ode", "")+"FME_PLUS.ode\",csvFile=\"PLUS.csv\")\n");
+				bw.write("//reduceFME(aggregationFunction=TIMES,reducedFile=\"red"+File.separator+lastName.replace(".ode", "")+"FME_TIMES.ode\",csvFile=\"TIMES.csv\")\n");
+				bw.write("//reduceRndFME(aggregationFunction=TIMES,reducedFile=\"red"+File.separator+lastName.replace(".ode", "")+"RndFME_TIMES.ode\",csvFile=\"RndTIMES.csv\")\n");
+				bw.write("reduceRndFME(aggregationFunction=TIMES,reducedFile=\"red_user"+File.separator+lastName.replace(".ode", "")+"RndFME_TIMES_USER.ode\",csvFile=\"RndTIMES_USER.csv\",prePartition=USER)\n");
+				
+				//bw.write("reduceRndFME(aggregationFunction=TIMES,attemptDropTauN=true,reducedFile=\"red_dropTau"+File.separator+lastName.replace(".ode", "")+"RndFME_TIMES.ode\",csvFile=\"RndTIMES_dropTau.csv\")\n");
+				//bw.write("reduceRndFME(aggregationFunction=TIMES,attemptDropTauN=true,reducedFile=\"red_user_dropTau"+File.separator+lastName.replace(".ode", "")+"RndFME_TIMES_USER.ode\",csvFile=\"RndTIMES_USER_dropTau.csv\",prePartition=USER)\n");
+				
+				//reduceFME(aggregationFunction=TIMES,reducedFile="lotkaEulerFME.ode")
+				//reduceFME(aggregationFunction=TIMES,reducedFile="lotkaEulerFME.ode",prePartition=USER)
+			}
+			
+			
 			//CRNReducerCommandLine.print(out, "end model\n\n");
-			bw.write("\n"+"end model\n\n");
+			bw.write("\n"+"end "+str_model+"\n\n");
 			//CRNReducerCommandLine.print(out, "end model\n\n");
 
 			
@@ -922,7 +963,19 @@ public class GUICRNImporter  extends AbstractImporter {
 	
 	
 	private static void writeXtextCRN(BufferedWriter bw,ICRN crn, ODEorNET type, boolean printView,MessageConsoleStream out,
-			BufferedWriter bwOut,boolean rnEncoding,boolean originalNames) throws IOException {		
+			BufferedWriter bwOut,boolean rnEncoding,boolean originalNames,EULER euler) throws IOException {		
+		
+		String str_d="d(";
+		String str_dend=")";
+		String str_odeFunc="ODE";
+		boolean dropParameters=false;
+		if(euler.equals(EULER.EULER_WITH_TAU)||euler.equals(EULER.EULER_NO_TAU)) {
+			str_d="";
+			str_dend="";
+			str_odeFunc="update functions";
+			dropParameters=true;
+		}
+		
 		if(crn!=null){
 			//Begin compute RN encoding
 			boolean computeRNEncoding=rnEncoding && !crn.isMassAction() && !type.equals(ODEorNET.ODE);
@@ -996,22 +1049,34 @@ public class GUICRNImporter  extends AbstractImporter {
 				}
 				bw.write(" end symbolic parameters\n");
 			}
-			if(crn.getParameters()!=null && crn.getParameters().size()>0){
-				bw.write(" begin parameters\n");
-				for (String param : crn.getParameters()) {
-					int space = param.indexOf(' ');
-					String parName=param.substring(0,space);
-					String parExpr = param.substring(space+1);
-					bw.write("  ");
-					bw.write(parName.trim());
-					bw.write(" = ");
-					bw.write(parExpr.trim());
-					bw.write("\n");
+			if(!dropParameters) {
+				if(crn.getParameters()!=null && crn.getParameters().size()>0){
+					bw.write(" begin parameters\n");
+					for (String param : crn.getParameters()) {
+						int space = param.indexOf(' ');
+						String parName=param.substring(0,space);
+						String parExpr = param.substring(space+1);
+						bw.write("  ");
+						bw.write(parName.trim());
+						bw.write(" = ");
+						bw.write(parExpr.trim());
+						bw.write("\n");
+					}
+					//				if(euler) {
+					//					bw.write("t");
+					//					bw.write(" = ");
+					//					bw.write("1");
+					//					bw.write("\n");
+					//				}
+					bw.write(" end parameters\n");
 				}
-				bw.write(" end parameters\n");
 			}
 			
-			writeInitBlock(bw, crn.getSpecies(), originalNames, I, shouldAddI);
+			if(euler.equals(EULER.EULER_WITH_TAU)||euler.equals(EULER.EULER_NO_TAU)) {
+				bw.write(" REAL_SORT\n");
+			}
+			
+			writeInitBlock(bw, crn.getSpecies(), originalNames, I, shouldAddI,euler);
 			
 			if(crn.algebraicSpecies()>0) {
 				bw.write(" begin alginit\n");
@@ -1035,15 +1100,20 @@ public class GUICRNImporter  extends AbstractImporter {
 				bw.write(" end alginit\n");
 			}
 			
-			writeInitPartition(bw, crn.getUserDefinedPartition(), I, shouldAddI);
+			writeInitPartition(bw, crn.getUserDefinedPartition(), I, shouldAddI,crn.getSpecies());
 			
 
+			
+			
 			if(type.equals(ODEorNET.ODE)){
 				boolean ignoreOnes = false;
 				boolean ignoreI=false;
-				HashMap<ISpecies, StringBuilder> speciesToDrift = computeDrifts(crn,ignoreOnes,ignoreI);
+				HashMap<ISpecies, StringBuilder> speciesToDrift = computeDrifts(crn,ignoreOnes,ignoreI,dropParameters);
 				
-				bw.write(" begin ODE\n");
+				bw.write(" begin "+str_odeFunc+"\n");
+				if(euler.equals(EULER.EULER_WITH_TAU)) {
+					bw.write("  tau_euler = tau_euler\n");
+				}
 				for(ISpecies species : crn.getSpecies()){
 					if(!species.isAlgebraic()) {
 						String speciesDrift="0";
@@ -1051,14 +1121,28 @@ public class GUICRNImporter  extends AbstractImporter {
 						if(speciesDriftSB!=null){
 							speciesDrift=speciesDriftSB.toString();
 						}
-						bw.write("  d(");
+						//bw.write("  d(");
+						bw.write("  "+str_d);
 						bw.write(species.getName());
-						bw.write(") = ");
+						bw.write(str_dend+" = ");
+						if(euler.equals(EULER.EULER_WITH_TAU)||euler.equals(EULER.EULER_NO_TAU)) {
+							String s=" (";
+							if(euler.equals(EULER.EULER_WITH_TAU)) {
+								s=" tau_euler*(";
+							}
+							if(ADDIDENTITY_IN_EULER) {
+								bw.write(species.getName()+" + ");
+							}
+							bw.write(s);
+						}
 						bw.write(speciesDrift);
+						if(euler.equals(EULER.EULER_WITH_TAU)||euler.equals(EULER.EULER_NO_TAU)) {
+							bw.write(")");
+						}
 						bw.write("\n");
 					}
 				}
-				bw.write(" end ODE\n");
+				bw.write(" end "+str_odeFunc+"\n");
 				
 				
 				if(crn.algebraicSpecies()>0) {
@@ -1116,13 +1200,16 @@ public class GUICRNImporter  extends AbstractImporter {
 	}
 	
 	public static void writeInitBlock(BufferedWriter bw, List<ISpecies> allSpecies, boolean originalNames, ISpecies I,
-			final boolean shouldAddI) throws IOException {
-		writeInitBlock(bw, allSpecies, originalNames, I, shouldAddI, null);
+			final boolean shouldAddI,EULER euler) throws IOException {
+		writeInitBlock(bw, allSpecies, originalNames, I, shouldAddI, null,euler);
 	}
 	
 	public static void writeInitBlock(BufferedWriter bw, List<ISpecies> allSpecies, boolean originalNames, ISpecies I,
-			final boolean shouldAddI, LinkedHashMap<String, Integer> nameToMax) throws IOException {
+			final boolean shouldAddI, LinkedHashMap<String, Integer> nameToMax,EULER euler) throws IOException {
 		bw.write(" begin init\n");
+		if(euler.equals(EULER.EULER_WITH_TAU)) {
+			bw.write("  tau_euler\n");
+		}
 		for (ISpecies species : allSpecies) {
 			if(!species.isAlgebraic()) {
 				bw.write("  ");
@@ -1142,9 +1229,11 @@ public class GUICRNImporter  extends AbstractImporter {
 					}
 				}
 				
-				if(species.getInitialConcentration().compareTo(BigDecimal.ZERO)!=0){
-					bw.write(" = ");
-					bw.write(species.getInitialConcentrationExpr());
+				if(euler.equals(EULER.NO)) {
+					if(species.getInitialConcentration().compareTo(BigDecimal.ZERO)!=0){
+						bw.write(" = ");
+						bw.write(species.getInitialConcentrationExpr());
+					}
 				}
 				
 				if(!shouldUseOriginalName(species, originalNames)) {
@@ -1168,10 +1257,10 @@ public class GUICRNImporter  extends AbstractImporter {
 		
 		bw.write(" end init\n");
 	}
-	public static void writeInitPartition(BufferedWriter bw, ArrayList<HashSet<ISpecies>> userDefinedPartition, ISpecies I, final boolean shouldAddI)
+	public static void writeInitPartition(BufferedWriter bw, ArrayList<HashSet<ISpecies>> userDefinedPartition, ISpecies I, final boolean shouldAddI,List<ISpecies> allSpecies)
 			throws IOException {
+		bw.write(" begin partition\n");
 		if(userDefinedPartition.size()>0 || shouldAddI){
-			bw.write(" begin partition\n");
 			if(shouldAddI){
 				bw.write("  {");
 				bw.write(I.getName());
@@ -1201,10 +1290,16 @@ public class GUICRNImporter  extends AbstractImporter {
 				else{
 					bw.write("}");
 				}
-				bw.write("\n");
 			}
-			bw.write(" end partition\n");
 		}
+		else {
+			ISpecies first = allSpecies.get(0);
+			bw.write("  {");
+			bw.write(first.getName());
+			bw.write("}");
+		}
+		bw.write("\n");
+		bw.write(" end partition\n");
 	}
 	
 	private static boolean shouldUseOriginalName(ISpecies species, boolean originalNames) {
@@ -1299,6 +1394,14 @@ public class GUICRNImporter  extends AbstractImporter {
 	public static ArrayList<IMonomial> parseGUIPolynomialArbitraryRateExpression(ASTNode node, HashMap<String, ISpecies> speciesNameToSpecies, MathEval math) throws UnsupportedReactionNetworkEncodingException {
 		return parseGUIPolynomialODE(node, speciesNameToSpecies, math,null,null);
 	}
+	
+//	public void dropParameters(ASTNode node, HashMap<String, ISpecies> speciesNameToSpecies, MathEval math) {
+//		if(node.isOperator()){
+//			node.ch
+//			dropParameters(node.getLeftChild(), speciesNameToSpecies, math);
+//			dropParameters(node.getRightChild(), speciesNameToSpecies, math);
+//		}
+//	}
 	
 	public static ArrayList<IMonomial> parseGUIPolynomialODE(ASTNode node, HashMap<String, ISpecies> speciesNameToSpecies, MathEval math, String varsName/*, ISpecies[] speciesIdToSpecies*/, ICRN crn) throws UnsupportedReactionNetworkEncodingException {
 		//A variable is actually a parameter, while a function (e.g., varsName(1)) is an ODE variable (with id 0).
@@ -1654,13 +1757,17 @@ public class GUICRNImporter  extends AbstractImporter {
 		}
 	}
 	
-	public static LinkedHashMap<ISpecies, StringBuilder> computeDrifts(ICRN crn,boolean ignoreOnes,boolean ignoreIIfMassAction) {
+	public static LinkedHashMap<ISpecies, StringBuilder> computeDrifts(ICRN crn,boolean ignoreOnes,boolean ignoreIIfMassAction,boolean dropParams) {
 		LinkedHashMap<ISpecies, StringBuilder> speciesToDrift = new LinkedHashMap<ISpecies, StringBuilder>(crn.getSpecies().size());
+		boolean keepExpression=true;
+		if(dropParams) {
+			keepExpression=false;
+		}
 		for (ICRNReaction reaction : crn.getReactions()) {
 			String firingRate=reaction.getRateExpression();
 			if(!reaction.hasArbitraryKinetics()){
 				//firingRate =  reaction.getRateExpression()+"*"+reaction.getReagents().getMassActionExpression(false);
-				firingRate=computeMassActionFiringRate(reaction,ignoreOnes,ignoreIIfMassAction,true);
+				firingRate=computeMassActionFiringRate(reaction,ignoreOnes,ignoreIIfMassAction,keepExpression);
 			}
 			addFiringRateToInvolvedODEs(speciesToDrift, reaction, firingRate);
 		}

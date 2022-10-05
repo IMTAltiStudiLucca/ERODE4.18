@@ -17,7 +17,7 @@ import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregatio
 public interface IUpdateFunction {
 
 	/*Bool*/Expr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/
-			HashMap<String, ISpecies> speciesNameToSpecies, HashMap<ISpecies, Expr> speciesToSpeciesVariable)
+			HashMap<String, ISpecies> speciesNameToSpecies, HashMap<ISpecies, Expr> speciesToSpeciesVariable,boolean realSort)
 			throws Z3Exception;
 
 	IUpdateFunction cloneReplacingWithRepresentative(

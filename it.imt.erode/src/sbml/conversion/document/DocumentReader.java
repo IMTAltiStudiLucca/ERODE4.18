@@ -14,6 +14,7 @@ import org.eclipse.ui.console.MessageConsoleStream;
 import org.jetbrains.annotations.NotNull;
 import org.sbml.jsbml.SBMLDocument;
 
+import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.booleannetwork.updatefunctions.IUpdateFunction;
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.crn.interfaces.ISpecies;
@@ -28,7 +29,7 @@ class DocumentReader extends SBMLConverter {
         super(sbmlDocument,guessPrep);
         long begin = System.currentTimeMillis();
         this.modelConverter = ModelManager.create(sbmlDocument.getModel(),nameFromFile);
-        this.guiBnImporter = new GUIBooleanNetworkImporter(modelConverter.isMV(),out, bwOut, null);
+        this.guiBnImporter = new GUIBooleanNetworkImporter(modelConverter.isMV(),out, bwOut, null,false);
         this.infoImporting = createErodeModel();
         this.booleanNetwork = guiBnImporter.getBooleanNetwork();
         buildErodeModel();
@@ -51,7 +52,7 @@ class DocumentReader extends SBMLConverter {
 
     private void buildErodeModel() {
         this.initializeSpecies(modelConverter.getErodeSpecies(),modelConverter.getMaxValues());
-        this.initializeUpdateFunctions(modelConverter.getErodeUpdateFunctions());
+        initializeUpdateFunctions(booleanNetwork,guessPrepartitionOnInputs,modelConverter.getErodeUpdateFunctions());
     }
 
     private void initializeSpecies(List<ISpecies> erodeSpecies,HashMap<String, Integer> maxValues) {
@@ -64,56 +65,85 @@ class DocumentReader extends SBMLConverter {
         infoImporting.setReadNodes(booleanNetwork.getSpecies().size());
     }
 
-    private void initializeUpdateFunctions(LinkedHashMap<String, IUpdateFunction> updateFunctions) {
-        this.booleanNetwork.setAllUpdateFunctions(updateFunctions);
-        if(this.guessPrepartitionOnInputs.equals(GuessPrepartitionBN.INPUTS)) {
-        	guessInputs(updateFunctions);
+    public static void initializeUpdateFunctions(IBooleanNetwork booleanNetwork, GuessPrepartitionBN guessPrepartitionOnInputs, LinkedHashMap<String, IUpdateFunction> updateFunctions) {
+        booleanNetwork.setAllUpdateFunctions(updateFunctions);
+        if(guessPrepartitionOnInputs.equals(GuessPrepartitionBN.INPUTS)) {
+        	guessInputs(booleanNetwork,updateFunctions,false);
         }
-        else if(this.guessPrepartitionOnInputs.equals(GuessPrepartitionBN.OUTPUTS)) {
-        	guessOutputs(updateFunctions);
+        else if(guessPrepartitionOnInputs.equals(GuessPrepartitionBN.OUTPUTS)) {
+        	guessOutputs(booleanNetwork,updateFunctions,false);
+        }
+        else if(guessPrepartitionOnInputs.equals(GuessPrepartitionBN.INPUTSONEBLOCK)) {
+        	guessInputs(booleanNetwork,updateFunctions,true);
+        }
+        else if(guessPrepartitionOnInputs.equals(GuessPrepartitionBN.OUTPUTSONEBLOCK)) {
+        	guessOutputs(booleanNetwork,updateFunctions,true);
         }
     }
 
-	private void guessInputs(LinkedHashMap<String, IUpdateFunction> updateFunctions) {
-		ArrayList<String> guessedInputs = new ArrayList<String>();
+    public static ArrayList<String> guessInputs(LinkedHashMap<String, IUpdateFunction> updateFunctions){
+    	ArrayList<String> guessedInputs = new ArrayList<String>();
 		for(Entry<String, IUpdateFunction> pair:updateFunctions.entrySet()) {
 			boolean guessedInput=pair.getValue().seemsInputSpecies(pair.getKey());
 			if(guessedInput) {
 				guessedInputs.add(pair.getKey());
 			}
 		}
-
-		setUserPrep(guessedInputs);
+		return guessedInputs;
+    }
+    
+	public static void guessInputs(IBooleanNetwork booleanNetwork, LinkedHashMap<String, IUpdateFunction> updateFunctions,boolean oneBlock) {
+		ArrayList<String> guessedInputs=guessInputs(updateFunctions);
+		setUserPrep(booleanNetwork,guessedInputs,oneBlock);
 	}
 
-	private void setUserPrep(Collection<String> singletonSpecies) {
+	public static void setUserPrep(IBooleanNetwork booleanNetwork, Collection<String> singletonSpecies,boolean oneBlock) {
 		if(singletonSpecies.size()>0) {
 			LinkedHashMap<String, ISpecies> nameToSpecies=new LinkedHashMap<String, ISpecies>(booleanNetwork.getSpecies().size());
 			for(ISpecies sp : booleanNetwork.getSpecies()) {
 				nameToSpecies.put(sp.getName(), sp);
 			}
 			ArrayList<HashSet<ISpecies>> inputDistinguishing=new ArrayList<>(singletonSpecies.size());
-			for(String name : singletonSpecies) {
-				HashSet<ISpecies> block = new HashSet<ISpecies>(1);
-				block.add(nameToSpecies.get(name));
+			if(oneBlock) {
+				inputDistinguishing=new ArrayList<>(1);
+				HashSet<ISpecies> block = new HashSet<ISpecies>(singletonSpecies.size());
 				inputDistinguishing.add(block);
+				for(String name : singletonSpecies) {
+					block.add(nameToSpecies.get(name));
+				}
 			}
-
+			else {
+				inputDistinguishing=new ArrayList<>(singletonSpecies.size());
+				for(String name : singletonSpecies) {
+					HashSet<ISpecies> block = new HashSet<ISpecies>(1);
+					block.add(nameToSpecies.get(name));
+					inputDistinguishing.add(block);
+				}
+			}
+			
 			booleanNetwork.setUserDefinedPartition(inputDistinguishing);
 		}
 	}
 	
-	private void guessOutputs(LinkedHashMap<String, IUpdateFunction> updateFunctions) {
-		HashSet<String> guessedOutputs = new HashSet<String>(booleanNetwork.getSpecies().size());
-		for(ISpecies sp:booleanNetwork.getSpecies()) {
-			guessedOutputs.add(sp.getName());
+    public static HashSet<String> guessOutputs(LinkedHashMap<String, IUpdateFunction> updateFunctions){
+    	//HashSet<String> guessedOutputs = new HashSet<String>(booleanNetwork.getSpecies().size());
+//		for(ISpecies sp:booleanNetwork.getSpecies()) {
+//			guessedOutputs.add(sp.getName());
+//		}
+    	HashSet<String> guessedOutputs = new HashSet<String>(updateFunctions.keySet().size());
+    	for(String sp:updateFunctions.keySet()) {
+			guessedOutputs.add(sp);
 		}
 		
 		//ArrayList<String> guessedInputs = new ArrayList<String>();
 		for(Entry<String, IUpdateFunction> pair:updateFunctions.entrySet()) {
 			pair.getValue().dropNonOutputSpecies(pair.getKey(),guessedOutputs);
 		}
-		
-		setUserPrep(guessedOutputs);
+		return guessedOutputs;
+    }	
+	
+	public static void guessOutputs(IBooleanNetwork booleanNetwork, LinkedHashMap<String, IUpdateFunction> updateFunctions,boolean oneBlock) {
+		HashSet<String> guessedOutputs=guessOutputs(updateFunctions);
+		setUserPrep(booleanNetwork,guessedOutputs,oneBlock);
 	}
 }

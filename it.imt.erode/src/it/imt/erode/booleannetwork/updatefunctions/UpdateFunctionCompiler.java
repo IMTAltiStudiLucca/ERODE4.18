@@ -12,6 +12,7 @@ import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.crn.symbolic.constraints.BasicConstraintComparator;
 import it.imt.erode.crn.symbolic.constraints.BooleanConnector;
+import it.imt.erode.expression.evaluator.MathEval;
 
 public class UpdateFunctionCompiler {
 
@@ -53,6 +54,45 @@ public class UpdateFunctionCompiler {
 		}
 	}
 	
+//	/**
+//	 * To be invoked first on expressions satisfying z3Expr.isITE()
+//	 * I DON'T assume we have: 
+//	 *	either 'if guard then val else eitherValOrNestedIf'
+//	 *	or	   'if guard then val else valOtherwise'
+//	 * In particular, we can have:
+//	 * 	if guard then eitherValOrNestedIf else eitherValOrNestedIf
+//	 * @param z3Expr
+//	 * @return
+//	 */
+//	public IUpdateFunction unrolITEGeneral(Expr z3Expr,LinkedHashMap<Integer, IUpdateFunction> collectedCases) {
+//		Expr guard = z3Expr.getArgs()[0];
+//		Expr thenBranch = z3Expr.getArgs()[1];
+//		Expr elseBranch = z3Expr.getArgs()[2];
+//		if(thenBranch.isNumeral()) {
+//			//Same as unrlITE
+//			int caseVal=Integer.valueOf(thenBranch.toString());
+//			IUpdateFunction caseCondition=toUpdateFunction(guard);
+//			collectedCases.put(caseVal, caseCondition);
+//			
+//			if(elseBranch.isNumeral()) {
+//				// 'if guard then val else valOtherwise'
+//				int caseOtherwiseVal=Integer.valueOf(elseBranch.toString());
+//				collectedCases.put(caseOtherwiseVal, new Otherwise());
+//				return new MVUpdateFunctionByCases(collectedCases, -1);
+//			}
+//			else {
+//				// 'if guard then val else eitherValOrNestedIf'
+//				return unrolITEGeneral(elseBranch,collectedCases);
+//			}
+//
+//			
+//		}else {
+//			MVUpdateFunctionByCases unrolThen = (MVUpdateFunctionByCases)unrolITEGeneral(thenBranch,new LinkedHashMap<>());
+//			MVUpdateFunctionByCases unrolElse = (MVUpdateFunctionByCases)unrolITEGeneral(elseBranch,collectedCases);
+//			return new MVUpdateFunctionByCases(unrolThen, unrolElse);
+//		}
+//	}
+	
 	
 	public IUpdateFunction toUpdateFunction(Expr z3Expr) {
 		BasicConstraintComparator cmp=null;
@@ -73,15 +113,20 @@ public class UpdateFunctionCompiler {
 			return new MVComparison(left, right, cmp);
 		}
 		else if(z3Expr.isNumeral()) {
+			double v=0;
+			String vs=z3Expr.toString();
+			try {
+				v = Double.valueOf(vs);
+			}catch (NumberFormatException e) {
+				v=new MathEval().evaluate(vs);
+			}
 			//MV
-			return new ValUpdateFunction(Integer.valueOf(z3Expr.toString()));
+			return new ValUpdateFunction(v);
 		}
 		else if(z3Expr.isITE()) {
 			//MV update function by cases
-//			for(Expr arg:z3Expr.getArgs()) {
-//				System.out.println(arg);
-//			}
 			return unrolITE(z3Expr, new LinkedHashMap<>());
+			//return unrolITEGeneral(z3Expr, new LinkedHashMap<>());
 		}
 		else if(z3Expr.isConst()) {
 			ISpecies sp = populationToSpecies.get(z3Expr);
@@ -107,6 +152,9 @@ public class UpdateFunctionCompiler {
 			}
 			else if(z3Expr.isAdd()) {
 				opArith=ArithmeticConnector.SUM;
+			}
+			else if(z3Expr.isSub()) {
+				opArith=ArithmeticConnector.SUB;
 			}
 			else if(z3Expr.isMul()) {
 				opArith=ArithmeticConnector.MUL;

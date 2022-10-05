@@ -18,7 +18,7 @@ public class Otherwise implements IUpdateFunction {
 
 	@Override
 	public Expr toZ3(Context ctx, HashMap<String, ISpecies> speciesNameToSpecies,
-			HashMap<ISpecies, Expr> speciesToSpeciesVariable) throws Z3Exception {
+			HashMap<ISpecies, Expr> speciesToSpeciesVariable,boolean realSort) throws Z3Exception {
 		throw new UnsupportedOperationException("No z3 for 'otherwise'");
 	}
 

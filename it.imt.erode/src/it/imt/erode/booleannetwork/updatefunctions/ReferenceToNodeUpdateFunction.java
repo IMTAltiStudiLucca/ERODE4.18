@@ -32,7 +32,7 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction/*_ArithExp
 	
 	@Override
 	public Expr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
+			HashMap<ISpecies, Expr> nodeToTruthValue,boolean realSort) throws Z3Exception {
 		//return ctx.mkTrue();
 		ISpecies referredNode = nodeNameToNode.get(name);
 		return nodeToTruthValue.get(referredNode);

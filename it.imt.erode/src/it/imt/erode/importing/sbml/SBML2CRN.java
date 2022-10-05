@@ -201,7 +201,7 @@ public class SBML2CRN {
 
 			//------ Case 2. The reaction has no reactant but has modifiers and products
 
-			if(!r.getListOfProducts().isEmpty()&&r.getListOfReactants().isEmpty()&&!r.getListOfModifiers().isEmpty()){
+			if((!r.getListOfProducts().isEmpty())&&r.getListOfReactants().isEmpty()&&!r.getListOfModifiers().isEmpty()){
 				//System.out.println(" Case 2. The reaction has no reactant, but has modifiers and products");
 				ArrayList<String> modifiers = new ArrayList<>(numberOfConstantSpecies+r.getListOfModifiers().size());
 				ArrayList<String> products = new ArrayList<>(numberOfConstantSpecies+r.getListOfProducts().size());   
@@ -226,7 +226,7 @@ public class SBML2CRN {
 
 			//------ Case 3. The reaction has no products but has reactants and modifiers
 
-			if(r.getListOfProducts().isEmpty()&&!r.getListOfReactants().isEmpty()&&!r.getListOfModifiers().isEmpty()){
+			if(r.getListOfProducts().isEmpty()&&(!r.getListOfReactants().isEmpty())&&!r.getListOfModifiers().isEmpty()){
 				//System.out.println(" Case 3. The reaction has no products, but has reactants and modifiers");
 				ArrayList<String> modifiers = new ArrayList<>(numberOfConstantSpecies+r.getListOfModifiers().size());
 				ArrayList<String> reactants = new ArrayList<>(numberOfConstantSpecies+r.getListOfReactants().size());
@@ -253,7 +253,7 @@ public class SBML2CRN {
 
 				//------ Case 4. The reaction has no reactant, no modifiers but has product. Type: null -> Species
 
-				if(!r.getListOfProducts().isEmpty()&&r.getListOfReactants().isEmpty()){
+				if((!r.getListOfProducts().isEmpty())&&r.getListOfReactants().isEmpty()){
 					isNullToSpecies.setValue(true);
 					//I have to say that I have added the Species 'source'. It has to be added to the rate
 					ArrayList<String> sourceSpecies = new ArrayList<>(); 
@@ -484,7 +484,8 @@ public class SBML2CRN {
 				for(int i = 1; i< pair.getValue().size(); i++)
 					Sink = Sink.concat(" + "+ pair.getValue().get(i));
 
-				sentence = sentence.concat(Sink +" ->"+rc);
+				//sentence = sentence.concat(Sink +" ->"+rc);
+				sentence = sentence.concat(rc +" ->"+Sink);//ANDREA
 			}
 		}
 
@@ -518,7 +519,8 @@ public class SBML2CRN {
 				Sink = Sink.concat(" + "+ pair.getValue().get(i));
 
 			Sink = Sink.replaceFirst(SOURCESPECIES, "SINK"); //***touched this
-			sentence = sentence.concat(rc+" ->"+Sink);
+			//sentence = sentence.concat(rc+" ->"+Sink);
+			sentence = sentence.concat(Sink+" ->"+rc);//ANDREA
 		}
 
 		return sentence;}
@@ -532,7 +534,7 @@ public class SBML2CRN {
 		Pair<ArrayList<String>, ArrayList<String>> pair = handleConstantSpecies(reaction,isNullToSpecies);
 		String equation = "";
 
-		if (!reaction.getListOfReactants().isEmpty()&&!reaction.getListOfProducts().isEmpty()){
+		if ((!reaction.getListOfReactants().isEmpty())&&!reaction.getListOfProducts().isEmpty()){
 			equation = writeCompleteReaction(reaction, pair);
 		}
 		if(reaction.getListOfReactants().isEmpty()){

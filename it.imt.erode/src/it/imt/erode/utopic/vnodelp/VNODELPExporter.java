@@ -279,7 +279,7 @@ public class VNODELPExporter {
 		}
 		else{
 			boolean ignoreI=false;
-			speciesToDrift = GUICRNImporter.computeDrifts(crn,false,ignoreI);
+			speciesToDrift = GUICRNImporter.computeDrifts(crn,false,ignoreI,false);
 			MatlabODEsImporter.writeDriftsOfArbitraryODEReplacingSpeciesNamesWithY(0,varName,derivName,speciesToDrift, crn, bw, speciesNameToSpecies,prefixSpace,true,true);
 		}	
 	}

@@ -75,6 +75,7 @@ public class ChemicalReactionNetworkProposalProvider extends AbstractChemicalRea
 	    acceptor.accept(this.createCompletionProposal("ODE", "ODE system", null, context));
 	    acceptor.accept(this.createCompletionProposal("RN", "(possibly) arbitrary reaction network", null, context));
 	    acceptor.accept(this.createCompletionProposal("MA-RN", "mass action reaction network", null, context));
+	    acceptor.accept(this.createCompletionProposal("EULER", "Euler discretization", null, context));
 	    super.completeWrite_Format(model, assignment, context, acceptor);
 	  }
 	  

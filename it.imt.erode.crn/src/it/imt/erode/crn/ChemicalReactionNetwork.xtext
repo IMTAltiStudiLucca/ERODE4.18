@@ -57,9 +57,15 @@ ModelDefinition :
 	'begin' 'Boolean' ('Network'|'network') name = ID ('[' 'logger' '=' log=BooleanValue ']')?
 		(
 			(
-				elements += NodeDeclarations
-				(elements += InitPartition)?
-				elements += NodeDefinitions
+				(
+					(
+						elements += NodeDeclarations
+						(elements += InitPartition)?
+						elements += NodeDefinitions
+					)
+					| 	elements+= ImportBoolean
+						
+				)
 				(elements += BooleanCommand)*
 			)
 			|  elements+=BooleanImportFolder
@@ -69,6 +75,7 @@ ModelDefinition :
 |
 (	
 	'begin' 'Multivalued' 'Boolean' ('Network'|'network') name = ID ('[' 'logger' '=' log=BooleanValue ']')?
+		(real='REAL_SORT')?
 		(
 			(
 				elements += MVNodeDeclarations
@@ -91,11 +98,11 @@ BooleanImportFolder:
 	importBNetFolder|importSBMLQualFolder|importCNFFolder
 ;
 importBNetFolder:
-	'importBNetFolder' '(' params = ParametersImportFolder  ')'
+	'importBNetFolder' '(' params = ParametersImportFolder  ',' 'guessPrepartition' '=' guessPrep = ('inputs'|'outputs'|'inputsOneBlock'|'outputsOneBlock') ')'
 	//'importSBMLFolder' '(' 'folderIn' '=' folderIn = STRING ',' 'folderOut' '=' folderOut = STRING (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
 ;
 importSBMLQualFolder:
-	'importSBMLQualFolder' '(' params = ParametersImportFolder ',' 'guessPrepartition' '=' guessPrep = ('inputs'|'outputs') ')'
+	'importSBMLQualFolder' '(' params = ParametersImportFolder ',' 'guessPrepartition' '=' guessPrep = ('inputs'|'outputs'|'inputsOneBlock'|'outputsOneBlock') ')'
 ;
 importCNFFolder:
 	'importCNFFolder' '(' params = ParametersImportFolder ')'
@@ -405,6 +412,7 @@ Command :
 	//| print
 	| onTheFlyBR | onTheFlyBRRecursive
 	| onTheFlyFR
+	| z3Metrics
 ;
 
 onTheFlyBR : {onTheFlyBR}
@@ -452,6 +460,14 @@ onTheFlyFR : {onTheFlyFR}
 	 ')'
 ;
 
+z3Metrics: {z3Metrics}
+	'z3Metrics' '('
+		'C' '=' C = ArithmeticExpression ','
+		'lambda' '=' lambda = ArithmeticExpression ','
+		csvFile=CSVFile
+	')'
+;
+
 pairsOrMeta:{pairsOrMeta}
 	( (pairs=setOfPairs      )|
 	  (metaPairs=('ALL'|'NONE'))|
@@ -486,6 +502,12 @@ RefToSpeciesOrID:
 //	man
 //;
 
+ImportBoolean:
+	importBNet
+;
+importBNet:
+	'importBNet' '(' params = ParametersImport ',' 'guessPrepartition' '=' guessPrep = ('inputs'|'outputs'|'inputsOneBlock'|'outputsOneBlock') ')'
+;
 Import:
 	load |
 	importBNG |
@@ -521,7 +543,10 @@ importBoolCubeSBML:
 ;
 
 importMRMC:
-	'importMRMC' '(' params = ParametersImport ((',' 'labellingFile' '=' labellingFile = STRING ')')?) //If provided, it contains the name of the file containing the labelling function of the Markov chain. If the value \"same\" is provided, then fileIn is used (after replacing .tra with .label). Such information will be encoded as views, which can in turn be used to prepartition the initial partition	
+	'importMRMC' '(' params = ParametersImport 
+		((',' 'labellingFile' '=' labellingFile = STRING)?) //If provided, it contains the name of the file containing the labelling function of the Markov chain. If the value \"same\" is provided, then fileIn is used (after replacing .tra with .label). Such information will be encoded as views, which can in turn be used to prepartition the initial partition 
+		((',' 'asMatrix' '=' asMatrix = BooleanValue )? )
+		')' 	
 ;
 
 importLBS:
@@ -539,7 +564,7 @@ importOSU:
 ;
 
 importAffineSystem:
-	'importAffineSystem' '(' params = ParametersImport ',' 'BFile' '=' bFile = STRING ',' 'ICFile' '=' icFile = STRING (',' 'parameters' '=' createParams=BooleanValue )?  ')'	
+	'importAffineSystem' '(' params = ParametersImport ',' 'BFile' '=' bFile = STRING ',' 'ICFile' '=' icFile = STRING  (',' 'addReverseEdges' '=' addReverseEdges=BooleanValue )? (',' 'parameters' '=' createParams=BooleanValue )?  ')'	
 ;
 
 importLinearSystemWithInputs:
@@ -612,7 +637,8 @@ MassActionReduction:
 	reduceDSB | //binary FB, sufficient condition only, less efficient (CONCUR15)
 	reduceEFL |	//binary BB, less efficient (CONCUR15)
 	reduceUncertainFE | // Uncertain Forward Equivalence: FE for linear systems with uncertain parameters. Old rejected at CONCUR2019
-	reduceUCTMCFE| // UCTMC Lumping: FE for CTMCs where transitions are i -[mij,Mij]-> j. Rates are uncertain and non-deterministically variate in the interval [mij,Mij]. Submitted at FOSSACS2020
+	reduceUCTMCFE| // UCTMC Lumping: FE for CTMCs where transitions are i -[mij,Mij]-> j. Rates are uncertain and non-deterministically variate in the interval [mij,Mij]. QEST2021
+	reduceUSE|
 	reduceBE_AAt |
 	reduceCoRNFE
 ;
@@ -746,6 +772,16 @@ reduceUncertainFE : {reduceUncertainFE}
 
 reduceUCTMCFE : {reduceUCTMCFE}
 	('reduceUCTMCFE') '(' (('delta' '=' delta = ArithmeticExpression)|('modelWithBigM' '=' modelWithBigM =STRING)) (',' optionalParametersFormatted=FormattedOptionalParametersReductions)? ')'
+;
+reduceUSE : {reduceUSE}
+	('reduceUSE') '(' 
+		(
+			('delta' '=' delta = ArithmeticExpression)|
+			('deltaPercentage' '=' deltaPercentage = ArithmeticExpression)|
+			('modelWithBigM' '=' modelWithBigM =STRING)
+	) 
+	',' 'doNotAddDeltaToRawConstants' '=' doNotAddDeltaToRawConstants=BooleanValue
+	 (',' optionalParametersFormatted=FormattedOptionalParametersReductions)? ')'
 ;
 
 //reduceEMSB : {reduceEMSB}
@@ -1267,7 +1303,8 @@ computeDifferentialHull:
 
 ODEorNET:
 //'ODE' | 'NET' | 'MA-NET'	
-  'ODE' | 'RN' |  'MA-RN'
+  'ODE' | 'RN' |  'MA-RN' |
+  'EULER'|'EULER-NO-TAU'
 ;
 
 SMTQuestion:
@@ -1558,7 +1595,7 @@ Abs returns Expression:
 //Log returns Expression:
 //	//'|' Addition {Abs.left=current} '|'
 //	'log' '(' Addition {Abs.left=current} ')'
-//; 
+//;
 
 NumberLiteral:
  //value=REAL
@@ -1851,12 +1888,23 @@ ArithExprReferenceToMVNodeOrValue returns ExprReferenceToMVNodeOrValue:
 ;
 
 SumReferenceToMVNodeOrValue returns ExprReferenceToMVNodeOrValue:
-	MulReferenceToMVNodeOrValue ({SumReferenceToMVNodeOrValue.left=current}  ('+') right=MulReferenceToMVNodeOrValue)* 
+	MulReferenceToMVNodeOrValue ({SumReferenceToMVNodeOrValue.left=current}  (sign=('+'|'-')) right=MulReferenceToMVNodeOrValue)* 
 ;
 MulReferenceToMVNodeOrValue returns ExprReferenceToMVNodeOrValue:
 	//ReferenceToMVNodeOrValue ({MulReferenceToMVNodeOrValue.left=current}  ('*') right=ReferenceToMVNodeOrValue)* 
-	PrimaryExprRefNodeOrValue ({MulReferenceToMVNodeOrValue.left=current}  ('*') right=PrimaryExprRefNodeOrValue)*
+	//PrimaryExprRefNodeOrValue ({MulReferenceToMVNodeOrValue.left=current}  ('*') right=PrimaryExprRefNodeOrValue)*
+	PrimaryOrMinusPrimaryExprRefNodeOrValue ({MulReferenceToMVNodeOrValue.left=current}  ('*') right=PrimaryOrMinusPrimaryExprRefNodeOrValue)*
 ;
+
+PrimaryOrMinusPrimaryExprRefNodeOrValue returns ExprReferenceToMVNodeOrValue:
+	PrimaryExprRefNodeOrValue | MinusPrimaryExprRefNodeOrValue
+;
+
+MinusPrimaryExprRefNodeOrValue returns ExprReferenceToMVNodeOrValue:
+	'-' PrimaryExprRefNodeOrValue {MinusPrimaryExprRefNodeOrValue.left=current}
+;  
+
+
 PrimaryExprRefNodeOrValue  returns ExprReferenceToMVNodeOrValue:
 	ReferenceToMVNodeOrValue 
 	| MVUpdateFunctionByCases
@@ -1983,7 +2031,7 @@ ReferenceToMVNode: {ReferenceToMVNode}
 	reference=[MVNode]
 ;
 ReferenceToMVNodeOrValue:
-	ReferenceToMVNode|	{Value} val=(ZERO|NAT)
+	ReferenceToMVNode|	{Value} val=NumberLiteral//(ZERO|NAT)
 ;
 //END Multi-Valued REGULATORY NETWORK
 
@@ -2133,7 +2181,7 @@ BooleanReduction:
 	reduceBBE | 
 	reduceFBE |
 	//reduceBME |
-	reduceFME 	
+	reduceFME | reduceRndFME	
 ;
 //SMTBooleanReduction:
 //	reduceBBE | 
@@ -2145,7 +2193,7 @@ reduceBBE : {reduceBBE}
 ;
 
 reduceFBE : {reduceFBE}
-	'reduceFBE' '(' 'aggregationFunction' '=' aggregationFunction=('OR'|'AND') (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
+	'reduceFBE' '(' 'aggregationFunction' '=' aggregationFunction=('OR'|'AND'|'XOR') (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
 ;
 
 //reduceBME : {reduceBME}
@@ -2154,6 +2202,11 @@ reduceFBE : {reduceFBE}
 
 reduceFME : {reduceFME}
 	'reduceFME' '(' 'aggregationFunction' '=' aggregationFunction=('PLUS'|'TIMES'|'MIN'|'MAX'/* 'OR'|'AND'*/)  (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
+;
+
+reduceRndFME : {reduceRndFME}
+	'reduceRndFME' '(' 'aggregationFunction' '=' aggregationFunction=('PLUS'|'TIMES'|'MIN'|'MAX'/* 'OR'|'AND'*/) 
+	(',' 'attemptDropTauN' '=' attemptDropTauN=BooleanValue)? (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
 ;
 
 FormattedOptionalParametersBooleanReductions: {FormattedOptionalParametersBooleanReductions}

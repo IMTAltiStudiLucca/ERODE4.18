@@ -68,20 +68,20 @@ public class BooleanUpdateFunctionExpr implements IUpdateFunction {
 
 	@Override
 	public BoolExpr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
-			HashMap<ISpecies, Expr> nodeToTruthValue) throws Z3Exception {
+			HashMap<ISpecies, Expr> nodeToTruthValue,boolean realSort) throws Z3Exception {
 		switch (op) {
 		case AND:
-			return ctx.mkAnd(new BoolExpr[] {(BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
+			return ctx.mkAnd(new BoolExpr[] {(BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort)});
 		case IMPLIES:
-			return ctx.mkImplies((BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
+			return ctx.mkImplies((BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort));
 		case OR:
-			return ctx.mkOr(new BoolExpr[] {(BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)});
+			return ctx.mkOr(new BoolExpr[] {(BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort)});
 		case XOR:
-			return ctx.mkXor((BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
+			return ctx.mkXor((BoolExpr)first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort),(BoolExpr)second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort));
 		case EQ:
-			return ctx.mkEq(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue));
+			return ctx.mkEq(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort));
 		case NEQ:
-			return ctx.mkNot(ctx.mkEq(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue)));						
+			return ctx.mkNot(ctx.mkEq(first.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort),second.toZ3(ctx,/*booleanNetwork,*/nodeNameToNode,nodeToTruthValue,realSort)));						
 		default:
 			throw new UnsupportedOperationException(op.toString());
 		}

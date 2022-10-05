@@ -11,6 +11,7 @@ import javax.xml.stream.XMLStreamException;
 import org.eclipse.ui.console.MessageConsoleStream;
 
 import it.imt.erode.auxiliarydatastructures.ArrayListOfReactions;
+import it.imt.erode.auxiliarydatastructures.IPartitionAndBoolean;
 import it.imt.erode.auxiliarydatastructures.Reduction;
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.DialogType;
@@ -29,15 +30,15 @@ import it.imt.erode.partitionrefinement.splittersbstandcounters.ISpeciesCounterH
 
 public class UCTMCLumping {
 
-	public static IPartition computeCoarsestUCTMCLumping(Reduction red, ICRN crn, IPartition partition,
-			BigDecimal delta, String modelWithBigM, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator,
+	public static IPartition computeCoarsestUCTMCLumpingOrUncertainSE(Reduction red, ICRN crn, IPartition partition,
+			BigDecimal delta,BigDecimal deltaPerc,boolean doNotAddDeltaToRawConstants, String modelWithBigM, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator,
 			IMessageDialogShower msgDialogShower) {
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,red.toString()+" Reducing: "+crn.getName());
 		}
 		IPartition obtainedPartition = partition.copy();
 
-		if(!(crn.isMassAction() && crn.getMaxArity() <=1)){
+		if(red.equals(Reduction.UCTMCFE) && !(crn.isMassAction() && crn.getMaxArity() <=1)){
 			CRNReducerCommandLine.printWarning(out,bwOut,"The model is not supported because it is not a unary mass action RN (i.e., has reactions with more than one reagent, or has reactions with arbitrary rates). I terminate.");
 			return obtainedPartition;
 		}
@@ -65,21 +66,40 @@ public class UCTMCLumping {
 			return obtainedPartition;
 		}
 
-		if(!(red.equals(Reduction.UCTMCFE))){
-			CRNReducerCommandLine.printWarning(out,bwOut,"Please invoke this method using UCTMCFE. I terminate.");
+		if(!(red.equals(Reduction.UCTMCFE)||red.equals(Reduction.USE))){
+			CRNReducerCommandLine.printWarning(out,bwOut,"Please invoke this method using UCTMCFE or USE. I terminate.");
 			return obtainedPartition;
 		}
 
-		if(modelWithBigM!=null && modelWithBigM.length()>0 && delta.compareTo(BigDecimal.ZERO)!=0) {
-			CRNReducerCommandLine.printWarning(out,bwOut,"You should either provide a delta to implicitly build an interval of this size around each transition rate, or provide the path to another model containing parameters to build the M matrix. I terminate.");
-			return obtainedPartition;
-		}
-
+		int uncertainties=0;
 		//boolean useExplicitModelWithBigM=false;
-		boolean useDelta=true;
+		boolean useDelta=false;
+		boolean useDeltaPerc=false;
 		if(modelWithBigM!=null && modelWithBigM.length()>0) {
+			uncertainties++;
 			//useExplicitModelWithBigM=true;
-			useDelta=false;
+		}
+		if(delta.compareTo(BigDecimal.ZERO)!=0) {
+			uncertainties++;
+			useDelta=true;
+		}
+		if(deltaPerc.compareTo(BigDecimal.ZERO)!=0) {
+			uncertainties++;
+			useDeltaPerc=true;
+		}
+		if(uncertainties!=1) {
+			CRNReducerCommandLine.printWarning(out,bwOut,"You should either provide a delta (absolute value) or a delta percentage (from 0 to 1) to implicitly build an interval of this size around each transition rate, or provide the path to another model containing parameters to build the M matrix. I terminate.");
+			return obtainedPartition;
+		}
+
+		if(red.equals(Reduction.UCTMCFE) && !useDelta) {
+			CRNReducerCommandLine.printWarning(out,bwOut,Reduction.UCTMCFE+" can be computed only with explicit absolute delta. I terminate.");
+			return obtainedPartition;
+		}
+		
+		if(red.equals(Reduction.USE) && !(useDelta||useDeltaPerc)) {
+			CRNReducerCommandLine.printWarning(out,bwOut,"Uncertain SE can be computed only with explicit delta (absolute or perc). I terminate.");
+			return obtainedPartition;
 		}
 
 
@@ -95,8 +115,10 @@ public class UCTMCLumping {
 		//int iteration =1;
 
 		
-		// USE THIS TO COMPUTE MEASURES FOR THE BOUNDS
-		computeOnlyMeasuresForBound(crn, delta, out, bwOut, terminator);
+		if(red.equals(Reduction.UCTMCFE)){
+			// USE THIS TO COMPUTE MEASURES FOR THE BOUNDS
+			computeOnlyMeasuresForBound(crn, delta, out, bwOut, terminator);
+		}
 		/*
 		boolean onlyMeasures=true;
 		if(onlyMeasures) {
@@ -106,8 +128,13 @@ public class UCTMCLumping {
 		*/
 		
 				
-		if(useDelta) {
-			useExplicitDelta(crn, delta, out, bwOut, terminator, obtainedPartition);
+		if(useDelta||useDeltaPerc) {
+			try {
+				obtainedPartition=useExplicitDelta(crn, red,useDelta?delta:deltaPerc,useDelta,doNotAddDeltaToRawConstants,out, bwOut, terminator, obtainedPartition);
+			} catch (IOException e) {
+				CRNReducerCommandLine.printWarning(out,bwOut,"Problems in performing the internal exact reductions. The model is not supported. I terminate.");
+				return obtainedPartition;
+			}
 		}
 		else {
 			CRNReducerCommandLine.print(out,bwOut,"\n\tLoading the model with 'M' transition rates from "+modelWithBigM+" ...");
@@ -168,18 +195,25 @@ public class UCTMCLumping {
 		computeMeasuresForBound(crn,deltaHalf,reactionsToConsiderForEachSpecies,out,bwOut);
 	}
 	
-	private static void useExplicitDelta(ICRN crn, BigDecimal delta, MessageConsoleStream out, BufferedWriter bwOut,
-			Terminator terminator, IPartition obtainedPartition) {
+	private static IPartition useExplicitDelta(ICRN crn, Reduction red,BigDecimal deltaAbsOrPerc, boolean absoluteDelta, boolean doNotAddDeltaToRawConstants,MessageConsoleStream out, BufferedWriter bwOut,
+			Terminator terminator, IPartition obtainedPartition) throws IOException  {
 		int iteration =1;
 		int sizeOfPrevPartition=0;
 		int sizeOfPartitionAfterLowerBound=0;
-		BigDecimal deltaHalf = delta.divide(BigDecimal.valueOf(2));
-		BigDecimal minusDeltaHalf = BigDecimal.ZERO.subtract(deltaHalf);
+		BigDecimal deltaAbsOrPercHalf = deltaAbsOrPerc.divide(BigDecimal.valueOf(2));
+		BigDecimal minusDeltaAbsOrPercHalf = BigDecimal.ZERO.subtract(deltaAbsOrPercHalf);
 
-		CRNReducerCommandLine.print(out,bwOut," (delta "+delta+")... ");
+		if(absoluteDelta) {
+			CRNReducerCommandLine.print(out,bwOut," (delta "+deltaAbsOrPerc+")... ");
+		}
+		else {
+			CRNReducerCommandLine.print(out,bwOut," (percentage delta [0;1] "+deltaAbsOrPerc+")... ");
+		}
+		
 		//CRNReducerCommandLine.print(out,bwOut,"\n\tInitially: "+obtainedPartition.size()+" blocks of species.");
 		boolean completed = false;
 		//
+		
 		
 		long begin = System.currentTimeMillis();
 		CRNReducerCommandLine.print(out,bwOut,"\n\tScanning the reactions once to pre-compute informations necessary to the partitioning ... ");
@@ -193,21 +227,35 @@ public class UCTMCLumping {
 			sizeOfPrevPartition = obtainedPartition.size();
 
 			CRNReducerCommandLine.print(out,bwOut,"\n\tIteration "+iteration);
-			CRNReducerCommandLine.print(out,bwOut,"\n\tComputing FE for lower bounds...");
+			CRNReducerCommandLine.print(out,bwOut,"\n\tComputing exact reduction for lower bounds...");
 			long beginfe=System.currentTimeMillis();
 			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM=new HashMap<>();
 			
-			
-			CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,minusDeltaHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients);
+			if(red.equals(Reduction.USE)) {
+				//minusdeltaHalf
+				IPartitionAndBoolean obtainedPartitionAndBool = SyntacticMarkovianBisimilarityNary.computeSE(crn, /*labels,*/ obtainedPartition, false,out,bwOut,terminator, null,/*addSelfLoops,*/false,minusDeltaAbsOrPercHalf,absoluteDelta, doNotAddDeltaToRawConstants);
+				obtainedPartition=obtainedPartitionAndBool.getPartition();
+			}
+			else {
+				//Here I know that delta is absolute
+				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,minusDeltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients);
+			}
 			long endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
 
 			sizeOfPartitionAfterLowerBound = obtainedPartition.size();
 
-			CRNReducerCommandLine.print(out,bwOut,"\tComputing FE for upper bounds...");
+			CRNReducerCommandLine.print(out,bwOut,"\tComputing exact reduction for upper bounds...");
 			beginfe=System.currentTimeMillis();
 			speciesCountersHM=new HashMap<>();
-			CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,deltaHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients);
+			if(red.equals(Reduction.USE)) {
+				//deltaHalf
+				IPartitionAndBoolean obtainedPartitionAndBool = SyntacticMarkovianBisimilarityNary.computeSE(crn, /*labels,*/ obtainedPartition, false,out,bwOut,terminator, null,/*addSelfLoops,*/false,deltaAbsOrPercHalf,absoluteDelta, doNotAddDeltaToRawConstants);
+				obtainedPartition=obtainedPartitionAndBool.getPartition();
+			}
+			else {
+				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,deltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients);
+			}
 			endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
 
@@ -222,6 +270,8 @@ public class UCTMCLumping {
 				completed=true;
 			}
 		}while(!completed);
+		
+		return obtainedPartition;
 	}
 
 	private static boolean computeMeasuresForBound(ICRN crn, BigDecimal deltaHalf, ArrayListOfReactions[] reactionsToConsiderForEachSpecies, MessageConsoleStream out, BufferedWriter bwOut) {

@@ -407,8 +407,10 @@ public class Partition implements IPartition {
 			sb.append("Block "+b+", ");
 			b++;
 			sb.append(currentBlock.toString());
-			sb.append("\n");
 			currentBlock=currentBlock.getNext();
+			if(currentBlock!=null) {
+				sb.append("\n");
+			}
 		}
 		return sb.toString();
 	}

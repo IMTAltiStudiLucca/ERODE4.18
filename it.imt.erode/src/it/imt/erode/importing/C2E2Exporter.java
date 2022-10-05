@@ -126,7 +126,7 @@ public class C2E2Exporter {
 			br.write(tab+tab+"<mode initial=\"True\" id=\"0\" name=\""+modelId+"\">\n");
 			
 			
-			HashMap<ISpecies, StringBuilder> speciesToDrift = GUICRNImporter.computeDrifts(crnExpanded, false,ignoreI);
+			HashMap<ISpecies, StringBuilder> speciesToDrift = GUICRNImporter.computeDrifts(crnExpanded, false,ignoreI,false);
 			for (ISpecies species : crnExpanded.getSpecies()) {
 				if(ignoreI&& species.getName().equals(Species.I_SPECIESNAME)){
 					continue;
