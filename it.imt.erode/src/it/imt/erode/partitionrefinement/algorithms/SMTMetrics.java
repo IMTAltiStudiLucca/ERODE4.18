@@ -106,7 +106,8 @@ public class SMTMetrics {
 	private ArithExpr[] populations;
 	private RealSort[] populationsSorts;
 	private Symbol[] declPopulations;
-	public static final String METRICSFORMAT = "%.5f";
+	public static final String METRICSFORMAT = "%.15f";
+	ArithExpr zero,two;
 	
 	protected static boolean partitionBlocksAccordingToz3Model(IPartition partition, ICRN crn, Model model, Collection<IBlock> splittedBlocks, IBlock blockSPL, HashMap<ISpecies, ArithExpr> speciesToSpliitingExpression, MathEval math) throws Z3Exception {
  
@@ -458,7 +459,8 @@ public class SMTMetrics {
 		//declNames = new Symbol[crn.getSpecies().size() * 2];
 		//decls = new FuncDecl[crn.getSpecies().size() * 2];
 		//int i=0;
-		ArithExpr zero = ctx.mkReal("0.0");
+		zero = ctx.mkReal("0.0");
+		two = ctx.mkReal("2.0");
 		ArithExpr Cz3= ctx.mkReal(C+"");
 		ArithExpr lambdaz3= ctx.mkReal(lambda+"");
 		//HashMap<ISpecies,StringBuilder> odeBodies = new HashMap<ISpecies, StringBuilder>(crn.getSpecies().size());
@@ -480,11 +482,13 @@ public class SMTMetrics {
 			populationsSorts[s]=(RealSort)realSort;
 			declPopulations[s]=declPopulation;
 			
-			ArithExpr abs_population= (ArithExpr)ctx.mkITE(ctx.mkGe(population, zero), population, ctx.mkSub(new ArithExpr[]{zero,population}));
-			BoolExpr positivePop = ctx.mkGe(abs_population, zero);
-			BoolExpr smallerLambda = ctx.mkLe(abs_population, lambdaz3);
+			BoolExpr absPopSmallerLambda = absLHSSmallerAbsRHS(population,lambdaz3);
+			//ArithExpr abs_population= (ArithExpr)ctx.mkITE(ctx.mkGe(population, zero), population, ctx.mkSub(new ArithExpr[]{zero,population}));
+			//BoolExpr positivePop = ctx.mkGe(abs_population, zero);
+			//BoolExpr smallerLambda = ctx.mkLe(abs_population, lambdaz3);
 			//positivePopulationsAssertion = ctx.mkAnd(new BoolExpr[] { positivePop, positivePopulationsAssertion });
-			positivePopulationAssertions[s] = ctx.mkAnd(positivePop,smallerLambda);
+			//positivePopulationAssertions[s] = ctx.mkAnd(positivePop,smallerLambda);
+			positivePopulationAssertions[s]=absPopSmallerLambda;
 			s++;
 			//i++;
 			//Create the z3 constants for the ode vars
@@ -530,14 +534,17 @@ public class SMTMetrics {
 				ArithExpr popj = speciesToPopulation.get(spj);
 				ArithExpr odeNamej = speciesToODENames.get(spj);
 				ArithExpr iminusj = ctx.mkSub(new ArithExpr[]{popi,popj});
-				ArithExpr abs_iminusj =(ArithExpr)ctx.mkITE(ctx.mkGe(iminusj, zero), iminusj, ctx.mkSub(new ArithExpr[]{zero,iminusj}));
-				BoolExpr abs_ij_leLambda_ij = ctx.mkLe(abs_iminusj, dij);
-				absij_le_dij[k]=abs_ij_leLambda_ij;
+//				ArithExpr abs_iminusj =(ArithExpr)ctx.mkITE(ctx.mkGe(iminusj, zero), iminusj, ctx.mkSub(new ArithExpr[]{zero,iminusj}));
+//				BoolExpr abs_ij_led_ij = ctx.mkLe(abs_iminusj, dij);
+				BoolExpr abs_ij_led_ij = absLHSSmallerAbsRHS(iminusj,dij);
+				
+				absij_le_dij[k]=abs_ij_led_ij;
 				
 				
-				iminusj = ctx.mkSub(new ArithExpr[]{odeNamei,odeNamej});
-				abs_iminusj =(ArithExpr)ctx.mkITE(ctx.mkGe(iminusj, zero), iminusj, ctx.mkSub(new ArithExpr[]{zero,iminusj}));
-				BoolExpr abs_didj_leLambda_ij = ctx.mkLe(abs_iminusj, dij);
+				ArithExpr diminusdj = ctx.mkSub(new ArithExpr[]{odeNamei,odeNamej});
+				//ArithExpr abs_diminusdj =(ArithExpr)ctx.mkITE(ctx.mkGe(diminusdj, zero), diminusdj, ctx.mkSub(new ArithExpr[]{zero,diminusdj}));
+				//BoolExpr abs_didj_leLambda_ij = ctx.mkLe(abs_diminusdj, dij);
+				BoolExpr abs_didj_leLambda_ij = absLHSSmallerAbsRHS(diminusdj,dij);
 				absdidj_le_dij[k]=abs_didj_leLambda_ij;
 				
 				k++;
@@ -559,6 +566,34 @@ public class SMTMetrics {
 			String formattedTime = String.format(CRNReducerCommandLine.MSFORMAT,time);
 			CRNReducerCommandLine.println(out,bwOut,"\nIterating the reactions to build the update functions required: "+formattedTime+" (s)");
 		}
+		
+		k=0;
+		for (int i=0;i<crn.getSpeciesSize();i++) {
+			ISpecies spi = crn.getSpecies().get(i);
+			//ArithExpr popi = speciesToPopulation.get(spi);
+			//ArithExpr odeNamei = speciesToODENames.get(spi); 
+			ArithExpr odeDefi = speciesToODEsDef.get(spi);
+			for (int j=0;j<crn.getSpeciesSize();j++) {
+				ISpecies spj = crn.getSpecies().get(j);
+				//ArithExpr popj = speciesToPopulation.get(spj);
+				//ArithExpr odeNamej = speciesToODENames.get(spj);
+				ArithExpr odeDefj = speciesToODEsDef.get(spj);
+				
+				ArithExpr dij=dMetrics[i][j];
+				
+				ArithExpr diminusdj = ctx.mkSub(new ArithExpr[]{odeDefi,odeDefj});
+				//ArithExpr diminusdj = ctx.mkSub(new ArithExpr[]{odeNamei,odeNamej});
+				//ArithExpr abs_diminusdj =(ArithExpr)ctx.mkITE(ctx.mkGe(diminusdj, zero), diminusdj, ctx.mkSub(new ArithExpr[]{zero,diminusdj}));
+				//BoolExpr abs_didj_leLambda_ij = ctx.mkLe(abs_diminusdj, dij);
+				BoolExpr abs_didj_leLambda_ij = absLHSSmallerAbsRHS(diminusdj,dij);
+				absdidj_le_dij[k]=abs_didj_leLambda_ij;
+				
+				k++;
+			}
+		}
+		absdi_djLeDij=ctx.mkAnd(absdidj_le_dij);
+		
+		
 			
 		long beginODEDefAssertions = System.currentTimeMillis();
 		BoolExpr[] allODEsDefArray = new BoolExpr[crn.getSpecies().size()];
@@ -606,6 +641,11 @@ public class SMTMetrics {
 		initialized=true;
 	}
 	
+
+	private BoolExpr absLHSSmallerAbsRHS(ArithExpr lhs, ArithExpr rhs) {
+		BoolExpr ret=ctx.mkLe(ctx.mkPower(lhs, two), ctx.mkPower(rhs, two));
+		return ret;
+	}
 
 	public static String computez3RateExpressionString(ICRN crn, ICRNReaction reaction, String suffix, ISpecies[] speciesIdToSpecies, HashMap<String, ISpecies> speciesNameToSpecies, HashSet<String> symbolicParameters){
 		String rateExpr = "";
@@ -1181,24 +1221,35 @@ public class SMTMetrics {
 		//Solver solver = ctx.mkSolver();
 		solver.reset();
 		
-		
 		//First we add: d(x) = x
-		solver.add(allODEsDef);
+		//solver.add(allODEsDef);
 		//now we add 0 <= d(i,j) <= C
-		solver.add(dMetricsDomainAssertion);
+		//solver.add(dMetricsDomainAssertion);
 		
 		//Now we create psi
 		BoolExpr psi=ctx.mkImplies(absi_jLeDij, absdi_djLeDij);
 		//We make 0 <= abs(x0) <= lambda ... 0 <= abs(xn) <= lambda  -> psi
 		BoolExpr absPopDomain_psi=ctx.mkImplies(absPopulationDomainAssertion, psi);
 		
+		//Now we add the definition of the update functions inside the scope of the quantifier
+		//BoolExpr odesDef_and_absPopDomain_psi=ctx.mkAnd(allODEsDef,absPopDomain_psi);
+		
 		//Finally, we create the big formula with the forall quantifier
+		//BoolExpr bigFormula = ctx.mkForall(populations, odesDef_and_absPopDomain_psi, 1, null, null, null, null);
 		BoolExpr bigFormula = ctx.mkForall(populations, absPopDomain_psi, 1, null, null, null, null);
 		//Quantifier bigFormula = ctx.mkForall(populationsSorts, declPopulations, 1, null, null, null, null);
+		
+		
 		
 		//as a last step, we check the sat of  the formula
 		//solver.add(absPopDomain_psi);
 		solver.add(bigFormula);
+		
+		String solverStr=solver.toString();
+		CRNReducerCommandLine.println(out, bwOut,"The solver before checking the formula");
+		CRNReducerCommandLine.println(out, bwOut,"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		CRNReducerCommandLine.println(out, bwOut,solverStr);
+		CRNReducerCommandLine.println(out, bwOut,"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 		
 		
 		DoubleAndStatus timeAndStatus = check(solver,verbose,SHOWTIMEATEACHSTEP,out,bwOut);
@@ -1209,40 +1260,7 @@ public class SMTMetrics {
 			
 	}
 	
-	private void computAssertionToCheckEFLOnCurrentWholePartition(ICRN crn,
-			IPartition partition, Solver solver) throws Z3Exception {
-				
-		IBlock currentBlock = partition.getFirstBlock();
-		BoolExpr[] conditionsOfblocks = new BoolExpr[partition.size()];
-		int b=0;
-		BoolExpr z3True = ctx.mkTrue();
-		while(currentBlock!=null){
-			if(currentBlock.getSpecies().size()!=1){
-				BoolExpr[] equalODEs = new BoolExpr[currentBlock.getSpecies().size()-1];
-				int s=0;
-				ISpecies rep = currentBlock.getRepresentative();
-				ArithExpr popRep = speciesToPopulation.get(rep);
-				ArithExpr odeNameRep = speciesToODENames.get(rep);
-				for (ISpecies species : currentBlock.getSpecies()) {
-					if(!species.equals(rep)){
-						BoolExpr ic = ctx.mkEq(popRep, speciesToPopulation.get(species));
-						solver.add(ic);
-						equalODEs[s]= ctx.mkEq(odeNameRep, speciesToODENames.get(species));
-						s++;
-					}
-				} 
-				conditionsOfblocks[b]= ctx.mkAnd(equalODEs);
-			}
-			else{
-				conditionsOfblocks[b] = z3True;
-			}
-			currentBlock=currentBlock.getNext();
-			b++;
-		}
 
-		solver.add(ctx.mkNot(ctx.mkAnd(conditionsOfblocks)));
-	}
-	
 	//EREFL
 	/*private void computAssertionToCheckExistsRateSuchThatEFLOnCurrentWholePartition(ICRN crn,
 			IPartition partition, Solver solver) throws Z3Exception {
