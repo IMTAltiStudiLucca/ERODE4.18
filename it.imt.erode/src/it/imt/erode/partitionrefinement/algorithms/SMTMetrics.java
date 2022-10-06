@@ -1224,7 +1224,7 @@ public class SMTMetrics {
 		//First we add: d(x) = x
 		//solver.add(allODEsDef);
 		//now we add 0 <= d(i,j) <= C
-		//solver.add(dMetricsDomainAssertion);
+		solver.add(dMetricsDomainAssertion);
 		
 		//Now we create psi
 		BoolExpr psi=ctx.mkImplies(absi_jLeDij, absdi_djLeDij);
