@@ -171,7 +171,7 @@ SOFTWARE.
    </configurations>
 
    <repositories>
-      <repository location="http://alumnisssup-my.sharepoint.com/:f:/g/personal/andrea_vandin_santannapisa_it/EvDKExwluJRBlppYuQ9EOegBBc3w6RKa07BMdnjAbBS8hw?e=J81O4g" enabled="true" />
+      <repository location="http://https://github.com/IMTAltiStudiLucca/ERODE-updatesites/blob/master/repository-linux" enabled="true" />
    </repositories>
 
    <preferencesInfo>
