@@ -831,7 +831,8 @@ public class SMTExactFluidBisimilarity {
 			if(Terminator.hasToTerminate(terminator)){
 				break;
 			}
-			ArithExpr rateExpr = computez3RateExpression(ctx, speciesToPopulation, symbParNameToSymbParZ3, crn, massActionExpressions, reaction,speciesIdToSpecies,speciesNameToSpecies);
+			ArithExpr rateExpr = computez3RateExpression(ctx, speciesToPopulation, symbParNameToSymbParZ3, crn, massActionExpressions, reaction,
+					speciesIdToSpecies,speciesNameToSpecies);
 			IComposite netStochimetry = reaction.computeProductsMinusReagents();
 			for(int i=0;i<netStochimetry.getNumberOfDifferentSpecies();i++){
 				ISpecies species = netStochimetry.getAllSpecies(i);
@@ -1069,7 +1070,10 @@ public class SMTExactFluidBisimilarity {
 	 * @return
 	 * @throws Z3Exception
 	 */
-	public static ArithExpr computeArbitraryz3RateExpression(Context ctx, HashMap<ISpecies, ArithExpr> speciesToPopulation,HashMap<String, ArithExpr> symbParNameToSymbParZ3, ASTNode node,  String varsName, HashMap<String, ISpecies> speciesNameToSpecies, MathEval math, ISpecies[] speciesIdToSpecies) throws Z3Exception {
+	public static ArithExpr computeArbitraryz3RateExpression(Context ctx, HashMap<ISpecies, ArithExpr> speciesToPopulation,
+			HashMap<String, ArithExpr> symbParNameToSymbParZ3, ASTNode node,  
+			String varsName, HashMap<String, ISpecies> speciesNameToSpecies, MathEval math, 
+			ISpecies[] speciesIdToSpecies) throws Z3Exception {
 		//A variable is actually a parameter, while a function (e.g., varsName(1)) is an ODE variable (with id 0).
 		if(node.isOperator() && node.getChildCount()>=2){
 			Type type = node.getType();
@@ -1129,7 +1133,9 @@ public class SMTExactFluidBisimilarity {
 			ArithExpr speciesPop = speciesToPopulation.get(species);
 			return speciesPop;
 		}
-		else if(node.isFunction() && node.getName().equalsIgnoreCase("min")){
+		else if(node.isFunction() && 
+					((node.getName()!=null && node.getName().equalsIgnoreCase("min"))||
+							node.getType().name().equals("FUNCTION_MIN"))){
 			ArithExpr[] childs = new ArithExpr[node.getChildCount()];
 			for(int i=0;i<node.getChildCount();i++){
 				childs[i]=computeArbitraryz3RateExpression(ctx, speciesToPopulation, symbParNameToSymbParZ3,node.getChild(i), varsName,speciesNameToSpecies,math,speciesIdToSpecies);
