@@ -1024,7 +1024,8 @@ public class MyParserUtil {
 		//String [] reductions= {"FDE"};		//NRN
 		
 		
-		String [] reductions= {"FE"};
+		//String [] reductions= {"FE"};
+		String [] reductions= {"FE","BE"};
 		//String [] reductions= {"BE"};
 		//String [] reductions= {"FE","BE","SE"};
 		//String [] reductions= {"BDE"};
@@ -1033,7 +1034,13 @@ public class MyParserUtil {
 		//reduceSMB(reducedFile= "./reductionThesisExtra/MODEL8262229752.SMB.ode", addSelfLoops = true) why true? With true it becomes as SE
 		//String [] reductions= {"FDE"};
 		generateCommands(mec, absoluteParentPath, commands, reductions,applyCurrying);
+		
+		String folder = "ODEs";
+		String outFile = computeFileName(folder+File.separator+mec.getModelName()+"_ode._ode",absoluteParentPath);
+		String com ="write({fileOut=>"+outFile+",format=>ODE})";
+		commands.add(com);
 		*/
+		
 		
 		/*
 		//String folder = "curated_erode_mass_action";
@@ -1081,7 +1088,7 @@ public class MyParserUtil {
 	private static void generateCommands(ModelElementsCollector mec, String absoluteParentPath, List<String> commands,
 			String[] reductions,boolean applyCurrying,String suffix) {
 		for(String red : reductions ) {
-			String redFile = computeFileName(red+suffix+File.separator+mec.getModelName()+".ode",absoluteParentPath);
+			String redFile = computeFileName(red+suffix+File.separator+mec.getModelName()+"._ode",absoluteParentPath);
 			String com ="reduce"+red+"({reducedFile=>"+redFile;
 			// reduceFE(reducedFile="fe/aaa.ode",csvFile="fe.csv")
 			String csvFile = computeFileName("reductionsInfo"+File.separator+red+suffix+".csv",absoluteParentPath);
@@ -1900,6 +1907,61 @@ public class MyParserUtil {
 			sb.append("defaultIC=>"+String.valueOf(defaultIC));
 			sb.append(',');*/
 		}
+		else if(exp instanceof exportScriptSolveUCTMC) {
+			exportScriptSolveUCTMC script = (exportScriptSolveUCTMC)exp;
+			if(script.getModelWithSmallM()!=null) {
+				sb.append("modelWithSmallM=>");
+				sb.append(computeFileName(script.getModelWithSmallM(),absoluteParentPath));
+				sb.append(',');
+			}
+			else {
+				sb.append("delta=>");
+				sb.append(script.getDelta());
+				sb.append(',');
+			}
+			
+			sb.append("tHoriz=>");
+			sb.append(MyParserUtil.visitExpr(script.getTHoriz()));
+			sb.append(',');
+			
+			sb.append("minimize=>");
+			sb.append(script.isMinimize());
+			sb.append(',');
+			
+			if(script.getRRewards()!=null) {
+				sb.append("stateRewards=>[");
+				parseSpeciesWithCoefficients(sb, script.getRRewards().getCoefficients(),false);
+				sb.append("]");
+			}
+			else {
+				sb.append("stateRewardsFile=>");
+				sb.append(computeFileName(script.getRRewardsFile(),absoluteParentPath));
+			}
+			sb.append(',');
+			
+			sb.append("phi=>[");
+			if(script.getPhiRewards()==null) {
+				sb.append("NONE");
+			}
+			else {
+				parseSpeciesWithCoefficients(sb, script.getPhiRewards().getCoefficients(),false);
+			}
+			sb.append("]");
+			sb.append(',');
+			
+			if(script.getInitStates()!=null && script.getInitStates().size()>0) {
+				sb.append("inits=>[");
+				parseListOfSpecies(sb,script.getInitStates());
+			}
+			else {
+				sb.append("initsIDs=>[");
+				parseListOfSpeciesIds(sb,script.getInitStatesIds());
+			}
+			sb.append("]");
+			sb.append(',');
+			
+			
+		}
 		else if(exp instanceof exportScriptEpsCLump){
 			sb.append("epsilon=>");
 			sb.append(MyParserUtil.visitExpr(((exportScriptEpsCLump) exp).getEpsilon()));
@@ -2102,31 +2164,67 @@ public class MyParserUtil {
 		return sb.toString();
 	}
 
+	
+
+	private static void parseListOfSpeciesIds(StringBuilder sb, EList<Integer> initStates) {
+		int n = initStates.size();
+		double prob=1.0/n;
+		String probStr=String.valueOf(prob);
+		for(int si=0; si< initStates.size();si++) {
+			int id = initStates.get(si);
+			sb.append(id);
+			sb.append(":");
+			sb.append(probStr);
+			if(si<initStates.size()-1) {
+				sb.append(";");
+			}
+		}
+	}
+
 	private static void parseM0(EList<ListOfCoefficientsSpNat> M0rows, StringBuilder sb) {
 		sb.append("M0=>");
 		 //EList<ListOfCoefficientsSpNat> M0rows = ((exportScriptsEpsCLump) exp).getM0Rows();
 		for(ListOfCoefficientsSpNat row : M0rows) {
 			 EList<SpeciesOrNatAndExpression> coefficients = row.getCoefficients();
-			if(coefficients!=null && coefficients.size()>0){
-				//sb.append("[");
-				int i=0;
-				for(SpeciesOrNatAndExpression coeff : coefficients){
-					if(coeff.getSpecies()!=null) {
-						sb.append(coeff.getSpecies().getName());
-					}
-					else {
-						sb.append(coeff.getId());
-					}
-					sb.append(":");
-					sb.append(visitExpr(coeff.getCoeff()));
-					if(i<coefficients.size()-1){
-						sb.append(';');
-					}
-					i++;
-				}
-				//sb.append("]");
-				sb.append("---");
+			parseSpeciesWithCoefficients(sb, coefficients,true);
+		}
+	}
+
+	private static void parseListOfSpecies(StringBuilder sb, EList<Species> initStates) {
+		int n = initStates.size();
+		double prob=1.0/n;
+		String probStr=String.valueOf(prob);
+		for(int si=0; si< initStates.size();si++) {
+			Species sp = initStates.get(si);
+			sb.append(sp.getName());
+			sb.append(":");
+			sb.append(probStr);
+			if(si<initStates.size()-1) {
+				sb.append(";");
 			}
+		}
+	}
+	public static void parseSpeciesWithCoefficients(StringBuilder sb, EList<SpeciesOrNatAndExpression> coefficients,boolean printDash) {
+		if(coefficients!=null && coefficients.size()>0){
+			//sb.append("[");
+			int i=0;
+			for(SpeciesOrNatAndExpression coeff : coefficients){
+				if(coeff.getSpecies()!=null) {
+					sb.append(coeff.getSpecies().getName());
+				}
+				else {
+					sb.append(coeff.getId());
+				}
+				sb.append(":");
+				sb.append(visitExpr(coeff.getCoeff()));
+				if(i<coefficients.size()-1){
+					sb.append(';');
+				}
+				i++;
+			}
+			//sb.append("]");
+			if(printDash)
+				sb.append("---");
 		}
 	}
 

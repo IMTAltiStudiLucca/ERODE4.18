@@ -467,8 +467,11 @@ public class CRNBisimulationsNAry {
 	 * @param reactionsToConsiderForEachSpecies 
 	 * @param reactionToRateToConsider 
 	 */
-	private static void split(Reduction red, ICRN crn, IPartition partition, SplittersGenerator splittersGenerator, HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction,Integer> consideredAtIteration, ISpeciesCounterHandler[] speciesCounters,
-			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM,ArrayListOfReactions[] reactionsToConsiderForEachSpecies, BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
+	private static void split(Reduction red, ICRN crn, IPartition partition, SplittersGenerator splittersGenerator, 
+			HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction,Integer> consideredAtIteration, 
+			ISpeciesCounterHandler[] speciesCounters,
+			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM,ArrayListOfReactions[] reactionsToConsiderForEachSpecies, 
+			BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
 		
 		IBlock blockSPL = splittersGenerator.getBlockSpl();
 		//ILabel labelSPL = splittersGenerator.getLabelSpl();
@@ -1143,7 +1146,7 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 
 
 	public static CRNandPartition computeReducedCRNOrdinary(ICRN crn,String name, IPartition partition, List<String> symbolicParameters, List<IConstraint> constraints,List<String> parameters,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws IOException {
-		return computeReducedCRNOrdinary(crn,name,partition,symbolicParameters,constraints,parameters,"#",out,bwOut,terminator);
+		return computeReducedCRNOrdinary(crn,name,partition,symbolicParameters,constraints,parameters,"#",out,bwOut,terminator,BigDecimal.ZERO);
 	}
 	/**
 	 * This method reduces the model, assuming the partition regards OFL or ordinary CTMC lumpability
@@ -1153,7 +1156,7 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 	 * @return
 	 * @throws IOException 
 	 */
-	public static CRNandPartition computeReducedCRNOrdinary(ICRN crn,String name, IPartition partition, List<String> symbolicParameters, List<IConstraint> constraints,List<String> parameters,String commSymbol,MessageConsoleStream out, BufferedWriter bwOut,Terminator terminator) throws IOException {
+	public static CRNandPartition computeReducedCRNOrdinary(ICRN crn,String name, IPartition partition, List<String> symbolicParameters, List<IConstraint> constraints,List<String> parameters,String commSymbol,MessageConsoleStream out, BufferedWriter bwOut,Terminator terminator,BigDecimal delta) throws IOException {
 		ICRN reducedCRN = new CRN(name,symbolicParameters,constraints,parameters,crn.getMath(),out,bwOut);
 //		ISpecies[] speciesIdToSpecies= new ISpecies[crn.getSpeciesSize()];
 //		crn.getSpecies().toArray(speciesIdToSpecies);
@@ -1214,6 +1217,11 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 		}
 		//trivialPartition.changeNumberOfSpecies(reducedCRN.getSpeciesSize());
 		
+		BigDecimal deltaHalf=null;
+		if(delta.compareTo(BigDecimal.ZERO)!=0) {
+			deltaHalf=delta.divide(BigDecimal.valueOf(2));
+		}
+		
 		List<ICRNReaction> reducedReactions = new ArrayList<ICRNReaction>();
 		//Store only reactions where all reagents are block representatives (and canonize the products)
 		for (ICRNReaction reaction : crn.getReactions()) {
@@ -1223,6 +1231,9 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 			if(allReagentsAreBlockRepresentatives(reaction.getReagents(),partition)){
 				BigDecimal reactionRate=null;
 				String rateExpression = reaction.getRateExpression();
+				if(deltaHalf!=null) {
+					rateExpression += " + " + deltaHalf;
+				}
 				try{
 				 reactionRate = BigDecimal.valueOf(crn.getMath().evaluate(rateExpression));
 				}catch(java.lang.ArithmeticException e){
@@ -1233,7 +1244,7 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 					IComposite reducedProducts = getNewCompositeReplaceSpeciesWithReducedOneOfBlock(reaction.getProducts(),partition,correspondenceBlock_ReducedSpecies);
 					//ExactFluidBisimilarity.addToListOfReducedReactions(partition, reducedCRN, speciesIdToSpecies, speciesNameToSpecies, correspondenceBlock_ReducedSpecies, reducedReactions, reaction, reducedReagents, reducedProducts);
 					
-					ICRNReaction reducedReaction = new CRNReaction(reactionRate, reducedReagents, reducedProducts, reaction.getRateExpression(),reaction.getID());
+					ICRNReaction reducedReaction = new CRNReaction(reactionRate, reducedReagents, reducedProducts, rateExpression,reaction.getID());
 					reducedReactions.add(reducedReaction);
 				}
 			}

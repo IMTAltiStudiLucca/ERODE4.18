@@ -30,6 +30,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.StringTokenizer;
 import java.util.Map.Entry;
+import java.util.Set;
+
+import javax.xml.stream.XMLStreamException;
 
 import org.eclipse.ui.console.MessageConsoleStream;
 import org.sbml.jsbml.ASTNode;
@@ -42,6 +45,7 @@ import cern.jet.random.engine.MersenneTwister;
 import cern.jet.random.engine.RandomEngine;
 import it.imt.erode.auxiliarydatastructures.CRNandPartition;
 import it.imt.erode.auxiliarydatastructures.IPartitionAndBoolean;
+import it.imt.erode.auxiliarydatastructures.Matrix;
 import it.imt.erode.auxiliarydatastructures.Reduction;
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.DialogType;
@@ -65,6 +69,7 @@ import it.imt.erode.expression.parser.ParameterMonomial;
 import it.imt.erode.expression.parser.ProductMonomial;
 import it.imt.erode.expression.parser.SpeciesMonomial;
 import it.imt.erode.importing.automaticallygeneratedmodels.RandomBNG;
+import it.imt.erode.onthefly.Pair;
 import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
@@ -1548,6 +1553,267 @@ public class MatlabODEsImporter  extends AbstractImporter {
 		}	
 	}
 
+	public void printSolveUCTMC(ICRN crn, boolean verbose, double tHoriz, boolean minimize,String modelWithSmallM,BigDecimal deltaHalf,
+			LinkedHashMap<String,Double> inits, LinkedHashMap<String,Double> rRewards, LinkedHashMap<String,Double> phiRewards, MessageConsoleStream out, BufferedWriter bwOut, IMessageDialogShower msgDialogShower, Terminator terminator) {
+		//String fileName = name;
+		String fileName = getFileName();
+		fileName=overwriteExtensionIfEnabled(fileName,".m");
+		if(verbose){
+			CRNReducerCommandLine.print(out,bwOut,"Writing the epsilon-bound script in file "+fileName);
+		}
+
+		createParentDirectories(fileName);
+		BufferedWriter bw;
+		try {
+			bw = new BufferedWriter(new FileWriter(fileName));
+		} catch (IOException e) {
+			CRNReducerCommandLine.println(out,bwOut,"Problems in printSolveUCTMC, exception raised while creating the filewriter for file: "+fileName);
+			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			return;
+		}
+		
+		
+		HashMap<String,ISpecies> speciesNameToSpecies = new HashMap<String, ISpecies>(crn.getSpecies().size());
+		for(ISpecies species : crn.getSpecies()){
+			speciesNameToSpecies.put(species.getName(), species);
+		}
+
+		try {
+			//bw.write("\n\n");
+			bw.write("% Automatically generated from "+crn.getName()+".\n");
+			if(modelWithSmallM!=null && modelWithSmallM.length()>0) {
+				bw.write("%   Reading small m from  "+modelWithSmallM+"\n");
+			}
+			else {
+				bw.write("%   Computing small m and big M removing/adding "+deltaHalf+"\n");
+			}
+			bw.write("% Number of states: "+crn.getSpecies().size()+".\n");
+			bw.write("% Number of transitions: "+crn.getReactions().size()+".\n");			
+			bw.write("\n% Correspondence with original names:\n");
+			int incr=1;
+			for (ISpecies species : crn.getSpecies()) {
+				bw.write("%     " +(species.getID()+incr)+" = " + ((species.getOriginalName()==null)?species.getName():species.getOriginalName())+"\n");
+			}
+			bw.write("\n\n");
+			//bw.write("\n\n");
+			
+			String fName = fileName.replace(".m", "");
+			fName=fName.substring(fName.lastIndexOf(File.separator)+1);
+			bw.write("function "+fName+"()\n");
+			bw.write("\n");
+			bw.write("fprintf('Analysis started at time %s\\n', datetime)");
+
+			bw.write("    % Model name\n");
+			bw.write("    mname = '"+fName+"';\n");
+			bw.write("    fprintf('We have "+ crn.getSpeciesSize()+" states\\n');");
+			bw.write("\n");
+			//bw.write("\n");
+			//bw.write("\n\n");
+			
+			HashMap<ICRNReaction, BigDecimal> reactionToRateInModelSmallm=new HashMap<>(crn.getReactions().size());
+			HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM=new HashMap<>(crn.getReactions().size());
+			if(modelWithSmallM!=null && modelWithSmallM.length()>0)
+			{
+				CRNReducerCommandLine.print(out,bwOut,"\n\tLoading the model with small 'm' transition rates from "+modelWithSmallM+" ...");
+				ImporterOfSupportedNetworks importerOfSupportedNetworks=new ImporterOfSupportedNetworks();
+				AbstractImporter importer=null;
+				try {
+					if(modelWithSmallM.endsWith(".tra")) {
+						importer = importerOfSupportedNetworks.importSupportedNetwork(modelWithSmallM, false, false,SupportedFormats.MRMC,false,new String[]{"same"},out,bwOut,msgDialogShower, false,false);
+					}
+					else  if(modelWithSmallM.endsWith(".ode")||modelWithSmallM.endsWith("._ode")) {
+						importer = importerOfSupportedNetworks.importSupportedNetwork(modelWithSmallM, false, false,SupportedFormats.CRN,false,null,out,bwOut,msgDialogShower, false,false);
+					}
+				} catch (UnsupportedFormatException | IOException | XMLStreamException e) {
+					
+					CRNReducerCommandLine.printWarning(out,bwOut,"\n\tProblems in loading the model with small m transition rates. I terminate.");
+					msgDialogShower.openSimpleDialog("Problems in loading the model with small m transition rates. I terminate.\n"+modelWithSmallM, DialogType.Error);
+					return;
+				}
+				ICRN crnSmallM = importer.getCRN();
+				//partition = importer.getInitialPartition();
+				for(int i=0;i<crn.getReactions().size();i++) {
+					reactionToRateInModelSmallm.put(crn.getReactions().get(i), crnSmallM.getReactions().get(i).getRate());
+					reactionToRateInModelBigM.put(  crn.getReactions().get(i), crn.getReactions().get(i).getRate());
+				}
+				CRNReducerCommandLine.print(out,bwOut," completed.");
+				//TODO: here we assume that the model has same structure in file for m and M: they contain same species in order, and same reactions in same order 
+			}
+			else {
+				CRNReducerCommandLine.print(out,bwOut,"\n\tExplictly computing m and M subtracting/adding "+deltaHalf+" ...");
+				for(int i=0;i<crn.getReactions().size();i++) {
+					reactionToRateInModelSmallm.put(crn.getReactions().get(i), crn.getReactions().get(i).getRate().subtract(deltaHalf));
+					reactionToRateInModelBigM.put(crn.getReactions().get(i), crn.getReactions().get(i).getRate().add(deltaHalf));
+				}
+				CRNReducerCommandLine.print(out,bwOut," completed.");
+			}
+			
+			CRNReducerCommandLine.print(out,bwOut,"\n\tCreating m.");
+			Matrix matrix_smallm = new Matrix(0, crn.getSpecies());
+			for(ICRNReaction reaction : crn.getReactions()) {
+				//source=row, target=column: a_{r,c} is the prob of r going to c 
+				ISpecies rs = reaction.getReagents().getFirstReagent();
+				ISpecies ct = reaction.getProducts().getFirstReagent();
+				matrix_smallm.setValue(rs, ct, reactionToRateInModelSmallm.get(reaction).doubleValue());
+			}
+			CRNReducerCommandLine.print(out,bwOut,"\n\tWriting m.");
+			bw.write("    m = zeros("+crn.getSpeciesSize()+");\n");
+			Set<Entry<Pair, Double>> data = matrix_smallm.getNonDefaultData();
+			for(Entry<Pair, Double> entry : data) {
+				int r=entry.getKey().getFirst().getFirstReagent().getID()+1;
+				int c=entry.getKey().getSecond().getFirstReagent().getID()+1;
+				bw.write("    m("+r+","+c+")="+entry.getValue()+";\n");
+			}
+//			bw.write("    m = [");
+//			for(int r=0;r<crn.getSpeciesSize();r++) {
+//				for(int c=0;c<crn.getSpeciesSize();c++) {
+//					bw.write(" "+matrix_smallm.getValue(r, c));
+//				}
+//				bw.write(";");
+//			}
+//			//bw.write("];");
+//			bw.write("];\n");
+			matrix_smallm=null;
+			
+			CRNReducerCommandLine.print(out,bwOut,"\n\tCreating M.");
+			Matrix matrix_bigm = new Matrix(0, crn.getSpecies());
+			for(ICRNReaction reaction : crn.getReactions()) {
+				//source=row, target=column: a_{r,c} is the prob of r going to c 
+				ISpecies rs = reaction.getReagents().getFirstReagent();
+				ISpecies ct = reaction.getProducts().getFirstReagent();
+				matrix_bigm.setValue(rs, ct, reactionToRateInModelBigM.get(reaction).doubleValue());//matrix_bigm.setValue(rs, ct, reaction.getRate().doubleValue());
+			}
+			CRNReducerCommandLine.print(out,bwOut,"\n\tWriting M.");
+			bw.write("    M = zeros("+crn.getSpeciesSize()+");\n");
+			data = matrix_bigm.getNonDefaultData();
+			for(Entry<Pair, Double> entry : data) {
+				int r=entry.getKey().getFirst().getFirstReagent().getID()+1;
+				int c=entry.getKey().getSecond().getFirstReagent().getID()+1;
+				bw.write("    M("+r+","+c+")="+entry.getValue()+";\n");
+			}
+//			bw.write("    M = [");
+//			for(int r=0;r<crn.getSpeciesSize();r++) {
+//				for(int c=0;c<crn.getSpeciesSize();c++) {
+//					bw.write(" "+matrix_bigm.getValue(r, c));
+//				}
+//				bw.write(";");
+//			}
+//			bw.write("];\n");
+			matrix_bigm=null;
+			data=null;
+//			StringBuilder m = new StringBuilder("    m = [");
+//			StringBuilder M = new StringBuilder("    M = [");
+//			for(int r=0;r<crn.getSpeciesSize();r++) {
+//				for(int c=0;c<crn.getSpeciesSize();c++) {
+//					m.append(" "+matrix_smallm.getValue(r, c));
+//					M.append(" "+matrix_bigm.getValue(r, c));
+//				}
+//				//bw.write(";");
+//				m.append(";");
+//				M.append(";");
+//			}
+//			//bw.write("];");
+//			m.append("];\n");
+//			M.append("];\n");
+//			
+//			bw.write(m.toString());
+//			bw.write(M.toString());
+			bw.write("\n");
+			
+			bw.write("    %r and phi are costs of being in a state (running and final, resp). Some of Prism's rewards can be interpreted as 'r'\n");
+			bw.write("    %r are the running costs. For prism models, we can encode one reward structure into it (those adding constants for each state with a given label\n");
+			bw.write("    r = [");
+			for(ISpecies s : crn.getSpecies()) {
+				writeValue(rRewards, bw, s);
+			}
+			bw.write("]';\n");
+
+			bw.write("    %phi are the final costs\n");
+			bw.write("    phi = [");
+			for(ISpecies s : crn.getSpecies()) {
+				writeValue(phiRewards, bw, s);
+			}
+			bw.write("]';\n");
+			bw.write("\n");
+			
+			bw.write("    %pi0 is the initial distribution of probability of being in the states\n");
+			
+			bw.write("    pi0 = [");
+			for(ISpecies s : crn.getSpecies()) {
+				writeValue(inits, bw, s);
+			}
+			bw.write("]';	%initial state. Take the init from lab\n");
+			bw.write("\n");
+			
+			bw.write("    T = "+tHoriz+";\n");
+			if(minimize)
+				bw.write("    minimize = 1;\n");
+			else
+				bw.write("    minimize = 0;\n");
+			bw.write("\n");
+			/*
+% Dummy function demonstrating the actual routine
+function UCTMC()
+
+    % Dummy test inputs
+    
+    % Model name
+    mname = 'fifi';
+    
+    % Original UCTMC
+%     m = [0 1 1; 1 0 0; 1 0 0];
+%     M = [0 1 1; 2 0 1; 2 1 0];
+%     r = [0 0 0]';
+%     phi = [0 1 1]';
+%     pi0 = [1,0,0]';
+    % Lumped UCTMC
+    m = [ [0 2]; [1 0] ];
+    M = [ [0 2]; [2 0] ];
+    %r and phi are costs of being in a state (running and final, resp). We always keep r to 0.
+    %for cluster, we could make r=1 for all states !minimum, and phi=0
+    r = [0 0]';
+    phi = [0 1]';
+    pi0 = [1,0]';	%initial state. take the 'init' from lab
+    
+    % Time horizon and min/max     
+    T = 3;
+    minimize = 1; 
+  
+  
+			 */
+//aaaa			
+			
+			MatlabODEPontryaginExporter.printResource("solveUCTMC.txt", bw,getClass());
+			
+		} catch (IOException e) {
+			CRNReducerCommandLine.println(out,bwOut,"Problems in printSolveUCTMC, exception raised while writing in the file: "+fileName);
+			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			return;
+		}
+		finally{
+			if(verbose){
+				CRNReducerCommandLine.println(out,bwOut,"Writing the script for epsilon bounds in file "+fileName+" completed");
+			}
+			try {
+				bw.flush();
+				bw.close();
+			} catch (IOException e) {
+				CRNReducerCommandLine.println(out,bwOut,"Problems in printSolveUCTMC, exception raised while closing the bufferedwriter of the file: "+fileName);
+				CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			}
+		}	
+	}
+
+	public void writeValue(LinkedHashMap<String, Double> speciesToValue, BufferedWriter bw, ISpecies s) throws IOException {
+		Double value= speciesToValue.get(s.getName());
+		if(value==null) {
+			bw.write(" 0");
+		}
+		else {
+			bw.write(" "+value);
+		}
+	}
+	
 	public void printEpsilonBoundScriptToMatlabFIle(ICRN crn, IPartition initial, String name, /*Collection<String> preambleCommentLines,*/ 
 			boolean verbose, /*String icComment,*/MessageConsoleStream out, BufferedWriter bwOut, IMessageDialogShower msgDialogShower, 
 			double tEnd, double deltat, LinkedHashSet<String> paramsToPerturb, Terminator terminator,double epsilon, double defIC, 

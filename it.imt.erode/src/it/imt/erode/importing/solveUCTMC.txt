@@ -1,0 +1,109 @@
+    % Compute optimal value
+    tic;         
+    sol = solUCTMC(m,M,r,phi,pi0,T,minimize);
+    fprintf('Optimal value of %s is %3.3f and took %3.3f sec\n', mname, sol, toc);    
+end
+
+
+%%%% Input
+% m,M: m and M are n \times n matrices of lower and upper bounds.
+% Specifically, m(i,j) <= q_ij <= M(i,j)
+% r: n \times 1 vector such that r(i) is the running cost of state i
+% phi: n \times 1 vector such that phi(i) is the final cost of state i
+% pi0: initial probability distribution of the UCTMC
+% T: finite time horizon
+% minimize: set to 1 for min, values other than 1 yield max
+%%%% Output
+% optimal cost of the UCTMC
+function sol = solUCTMC(m,M,r,phi,pi0,T,minimize)
+
+    % Dimension
+    n = size(phi,1);
+    
+    % Time points at which solution should be approximated
+    dt = T / 100;
+    I = 0:dt:T;
+    
+    % Depending whether we minimize or maximize, certain signs flip
+    if(minimize == 1)
+        pT = -phi;
+    else
+        pT = phi;
+        r = -r;
+    end
+    % Compute costates of the optimal solution using a time reversed drift
+    [I,p]=ode45(@(t,p)pDrift(t,p,m,M,r),I,pT);
+    
+    % Compute optimal state trajectory
+    p0 = p(size(p,1),:)'; % Recover p(0)
+    z0 = [p0;pi0];
+    % Compute augmented drift consisting of costates and state: knowing 
+    % p(0), an optimal solution can be computed by solving costates and 
+    % states at the same time
+    [I,z]=ode45(@(t,z)augDrift(t,z,m,M,r),I,z0);        
+    
+    % Debug plot
+    % plot(t,tr1,'-',t,tr2,'--',t,tr3,'-.'); 
+%     if(n == 3)        
+%         plot(I,z(:,4),'-',I,z(:,5),'--',I,z(:,6),'-.');
+%     else        
+%         plot(I,z(:,3),'-',I,z(:,4),'--');
+%     end
+
+    % Compute optimal running cost
+    runCost = I(2).*(z(1,n+1:2*n)*r);
+    for i = 2 : size(z,1)-1
+        runCost = runCost + (I(i+1)-I(i))*(z(i,n+1:2*n)*r);
+    end
+    runCost = abs(runCost);
+    % Compute optimal final cost
+    finCost = z(size(z,1),n+1:2*n)*phi;
+    
+    % Return overall cost
+    sol = runCost + finCost;
+end
+
+
+% Augmented drift (costate,state)
+function dz = augDrift(t,z,m,M,r)
+
+    n = size(z,1) / 2;    
+    dz = zeros(2*n,1);
+
+    %%% Off-diagonal entries of Q
+    Q = z(1:n)*ones(1,n);
+    Q = Q'-Q;
+    Q(Q<0) = 0;
+    Q(Q>0) = 1;
+    Q = m + (M-m).*Q;
+    %%% Diagonal entries of Q
+    for i = 1 : n
+        Q(i,i) = -sum(Q(i,:));
+    end 
+       
+    % Compute costate drift
+    dz(1:n) = -Q*z(1:n) + r;
+    % Compute state drift
+    dz(n+1:2*n) = Q'*z(n+1:2*n);
+end
+
+
+% Time reversed costate drift
+function dp = pDrift(t,p,m,M,r)
+
+    n = size(p,1);    
+
+    %%% Off-diagonal entries of Q
+    Q = p*ones(1,n);
+    Q = Q'-Q;
+    Q(Q<0) = 0;
+    Q(Q>0) = 1;
+    Q = m + (M-m).*Q;
+    %%% Diagonal entries of Q
+    for i = 1 : n
+        Q(i,i) = -sum(Q(i,:));
+    end    
+    
+    % Compute time reversed costate drift
+    dp = Q*p - r;
+end

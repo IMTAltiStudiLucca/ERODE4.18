@@ -1,10 +1,13 @@
 package it.imt.erode.commandline;
 
+import java.io.BufferedReader;
+
 //-Xmx8136M
 
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -551,6 +554,9 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		}
 		else if(command.startsWith("exportEpsilonBoundsScript(")){
 			handleExportEpsilonBoundsScriptCommand(command,out,bwOut);
+		}
+		else if(command.startsWith("exportScriptSolveUCTMC(")){
+			handleExportExportScriptSolveUCTMC(command,out,bwOut);
 		}
 		else if(command.startsWith("exportC2E2(")){
 			handleExportE2C2Command(command, out, bwOut);
@@ -2958,7 +2964,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		}
 		
 		//long begin = System.currentTimeMillis();
-		boolean succeeded=true;
+		//boolean succeeded=true;
 		//String smtTime=null;
 		//List<Double> smtChecksTime = null;
 		
@@ -2970,7 +2976,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			//String message="The command "+command +" failed:\n"+e.toString();//+e.getMessage();
 			//CRNReducerCommandLine.println(out, bwOut, message);
 			//CRNReducerCommandLine.printWarning(out, bwOut, true, messageDialogShower, message, true,DialogType.Error);
-			succeeded=false;
+			//succeeded=false;
 			CRNReducerCommandLine.println(out, bwOut, "The metrics computation failed.");
 		}
 		return null;
@@ -3190,7 +3196,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 						partitionInfoFileName, groupedFileName, sameICFileName, csvSMTTimeFileName, typeOfGroupedFile, 
 						computeOnlyPartition, csvFile, print, sumReductionAlgorithm, writeReducedCRN, writeGroupedCRN, 
 						writeSameICCRN, crn, null, originalCRNShort, obtainedPartition, new CRNandPartition(crn, obtainedPartition), 
-						icWarning, reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, beginBegin, smtTime, end,null);
+						icWarning, reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, beginBegin, smtTime, end,null,BigDecimal.ZERO);
 			} catch (UnsupportedFormatException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -3982,6 +3988,204 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		writeCRN(fileName,crn, partition, SupportedFormats.LNA, null, "", furtherParameters, out,bwOut,false,null);
 	}
 
+	
+	private void handleExportExportScriptSolveUCTMC(String command, MessageConsoleStream out, BufferedWriter bwOut) throws UnsupportedFormatException {
+		String parameters[] = CRNReducerCommandLine.getParameters(command);
+		String fileName=null;
+		String modelWithSmallM=null;
+		boolean minimize=true;
+		double tHoriz=-1;
+		LinkedHashMap<String, Double> rRewards=null,phiRewards=null,inits=null;
+		String deltaStr=null;
+		
+		if(parameters==null){
+			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			return;
+		}
+		for (String parameter : parameters) {
+			if(parameter.startsWith("fileIn=>")){
+				boolean loadingSuccessful = invokeLoad(parameter,out,bwOut);
+				if(!loadingSuccessful){
+					CRNReducerCommandLine.println(out,bwOut,"The loading of the file failed. I skip this command: "+command);
+					return;
+				}
+			}
+			else if(parameter.equals("")){
+				continue;
+			}
+			else if(parameter.startsWith("fileOut=>")){
+				if(parameter.length()<="fileOut=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the .m file where to write. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				fileName = parameter.substring("fileOut=>".length(), parameter.length());
+				//writeCRN(fileName,crn,partition,SupportedFormats.MatalbArbitraryODEs,null,"",out,bwOut);
+				//writeCRN(fileName,crn, partition, SupportedFormats.MatalbArbitraryODEs, null, "", String.valueOf(tEnd), out,false);
+				//break;
+			}
+			else if(parameter.startsWith("modelWithSmallM=>")){
+				if(parameter.length()<="modelWithSmallM=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the .ode file containing small m. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				modelWithSmallM = parameter.substring("modelWithSmallM=>".length(), parameter.length());
+				//writeCRN(fileName,crn,partition,SupportedFormats.MatalbArbitraryODEs,null,"",out,bwOut);
+				//writeCRN(fileName,crn, partition, SupportedFormats.MatalbArbitraryODEs, null, "", String.valueOf(tEnd), out,false);
+				//break;
+			}
+			else if(parameter.startsWith("delta=>")){
+				if(parameter.length()<="delta=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the delta to be used to compute m and M. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				deltaStr = parameter.substring("delta=>".length(), parameter.length());
+				//writeCRN(fileName,crn,partition,SupportedFormats.MatalbArbitraryODEs,null,"",out,bwOut);
+				//writeCRN(fileName,crn, partition, SupportedFormats.MatalbArbitraryODEs, null, "", String.valueOf(tEnd), out,false);
+				//break;
+			}
+			else if(parameter.startsWith("tHoriz=>")){
+				if(parameter.length()<="tHoriz=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the time horizon to use. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				tHoriz = Double.valueOf(parameter.substring("tHoriz=>".length(), parameter.length()));
+			}
+			else if(parameter.startsWith("minimize=>")){
+				if(parameter.length()<="minimize=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the time horizon to use. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				minimize = Boolean.valueOf(parameter.substring("minimize=>".length(), parameter.length()));
+			}
+			else if(parameter.startsWith("stateRewards=>")){
+				if(parameter.length()<="stateRewards=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the runtime rewards. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				String row = parameter.substring("stateRewards=>".length(), parameter.length());
+				rRewards = parseSpCoeffs(row,false);
+			}
+			else if(parameter.startsWith("stateRewardsFile=>")){
+				if(parameter.length()<="stateRewardsFile=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the runtime rewards. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				String file = parameter.substring("stateRewardsFile=>".length(), parameter.length());
+				try {
+					rRewards = readPrismRewsFile(file,true);
+				} catch (FileNotFoundException e) {
+					CRNReducerCommandLine.println(out,bwOut,"File with rewards not found: "+file);
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				} catch (IOException e) {
+					CRNReducerCommandLine.println(out,bwOut,"Problems in loading the file with rewards: "+file);
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				//rRewards = parseSpCoeffs(row);
+			}
+			else if(parameter.startsWith("phi=>")){
+				if(parameter.length()<="phi=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the final rewards (at time horizon). ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				String row = parameter.substring("phi=>".length(), parameter.length());
+				if(row.equals("[NONE]"))
+					phiRewards = new LinkedHashMap<>(0);
+				else
+					phiRewards = parseSpCoeffs(row,false);
+			}
+			else if(parameter.startsWith("inits=>")){
+				if(parameter.length()<="inits=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the initial states (paired with their probabilities). ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				String row = parameter.substring("inits=>".length(), parameter.length());
+				inits = parseSpCoeffs(row,false);
+			}
+			else if(parameter.startsWith("initsIDs=>")){
+				if(parameter.length()<="initsIDs=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the ids of the initial states (paired with their probabilities). ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				String row = parameter.substring("initsIDs=>".length(), parameter.length());
+				inits = parseSpCoeffs(row,true);
+			}
+			
+			else{
+				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameter+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+				return;
+			}
+		}
+		
+		if(tHoriz<0) {
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify a positive time horizon. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(fileName ==null || fileName.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the file where to write. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if((deltaStr==null || deltaStr.length()==0) && (modelWithSmallM ==null || modelWithSmallM.equals(""))){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the .ode file containing small M. Alternatively, specify the delta ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		if(rRewards==null || phiRewards==null || inits==null) {
+			CRNReducerCommandLine.println(out,bwOut,"Initial states and running/final rewards must be specified (potentially empty). ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		
+		if(!(crn.getMaxArity() ==1 && crn.isElementary())) {
+			CRNReducerCommandLine.println(out,bwOut,"Not supported CRN: it is not a CTMC. It must contain only mass-action reactions with 1 reagent and 1 product. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return;
+		}
+		MatlabODEsImporter moi = new MatlabODEsImporter(fileName, out, bwOut, messageDialogShower);
+		BigDecimal deltaHalf=null;
+		if(deltaStr!=null) {
+			deltaHalf=new BigDecimal(deltaStr).divide(new BigDecimal(2));
+		}
+		moi.printSolveUCTMC(crn, minimize, tHoriz, minimize, modelWithSmallM,deltaHalf,
+				inits, rRewards, phiRewards, out, bwOut, messageDialogShower, terminator);
+		
+	}
+	
+	private LinkedHashMap<String, Double> readPrismRewsFile(String file,boolean decreaseSpId) throws FileNotFoundException, IOException {
+		//1 1
+		//2 1
+		LinkedHashMap<String, Double> rRewards = new LinkedHashMap<>();
+		
+		BufferedReader br = new BufferedReader(new FileReader(file));
+		String current = br.readLine();
+		while(current!=null) {
+			String[] splitted = current.trim().split("\\ ");
+			int s = Integer.valueOf(splitted[0]);
+			if(decreaseSpId)
+				s-=1;
+			double v = Double.valueOf(splitted[1]);
+			
+			rRewards.put("S"+s, v);
+			current = br.readLine()
+					;
+		}
+		br.close();
+		
+		return rRewards;
+	}
 	private void handleExportJacobianFunctionCommand(String command, MessageConsoleStream out, BufferedWriter bwOut,boolean epsCLump) throws UnsupportedFormatException {
 		double tEnd=0.0;
 		String parameters[] = CRNReducerCommandLine.getParameters(command);
@@ -4234,16 +4438,11 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				String[] rows = M0String.split("---");
 				M0 = new ArrayList<>(rows.length);
 				for(int r=0;r<rows.length;r++) {
-					String[] coefficients = rows[r].split(";");
-					LinkedHashMap<String, Double> speciesToCoefficient=new LinkedHashMap<String, Double>(coefficients.length);
+					String row=rows[r];
+					LinkedHashMap<String, Double> speciesToCoefficient = parseSpCoeffs(row,false);
 					M0.add(speciesToCoefficient);
-					for(int i=0;i<coefficients.length;i++){
-						int colon=coefficients[i].indexOf(':');
-						String name=coefficients[i].substring(0,colon);
-						String val=coefficients[i].substring(colon+1);
-						speciesToCoefficient.put(name, crn.getMath().evaluate(val));
-					}
 				}
+				
 
 				//TODO: taking inspiration from
 				/*
@@ -4372,6 +4571,25 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			}
 		}
 
+	}
+	public LinkedHashMap<String, Double> parseSpCoeffs(String row,boolean idToSpecies) {
+		if(row.startsWith("["))
+			row=row.substring(1,row.length());
+		if(row.endsWith("]"))
+			row=row.substring(0,row.length()-1);
+		String[] coefficients = row.split(";");
+		LinkedHashMap<String, Double> speciesToCoefficient=new LinkedHashMap<String, Double>(coefficients.length);
+		for(int i=0;i<coefficients.length;i++){
+			int colon=coefficients[i].indexOf(':');
+			String name=coefficients[i].substring(0,colon);
+			if(idToSpecies) {
+				int id=Integer.valueOf(name)-1;
+				name = "S"+id;
+			}
+			String val=coefficients[i].substring(colon+1);
+			speciesToCoefficient.put(name, crn.getMath().evaluate(val));
+		}
+		return speciesToCoefficient;
 	}
 
 	
@@ -9420,11 +9638,15 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		}
 		
 		if(succeeded && !Terminator.hasToTerminate(terminator)){
+			BigDecimal delta = BigDecimal.ZERO;
+			if(deltaString!=null) {
+				delta=new BigDecimal(deltaString);
+			}
 			printReductionInfoAndComputeReducedModel(updateCRN, reduction, out, bwOut, reducedFileName,
 					partitionInfoFileName, groupedFileName, sameICFileName, csvSMTTimeFileName, typeOfGroupedFile,
 					computeOnlyPartition, csvFile, print, sumReductionAlgorithm, writeReducedCRN, writeGroupedCRN,
 					writeSameICCRN, crnToConsider, initial, originalCRNShort, obtainedPartition, cp, icWarning,
-					reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, begin, smtTime, end,extraColumnsForCSV);
+					reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, begin, smtTime, end,extraColumnsForCSV,delta);
 		}
 		else {
 			//MessageConsoleStream out, BufferedWriter bwOut, String csvFile, ICRN crn, String reduction, long timeInMS,int initPartitionSize
@@ -9447,7 +9669,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			boolean writeGroupedCRN, boolean writeSameICCRN, ICRN crnToConsider, IPartition initial,
 			String originalCRNShort, IPartition obtainedPartition, CRNandPartition cp, String icWarning,
 			String reductionName, String reducedModelName, List<Double> smtChecksTime,
-			IPartition obtainedPartitionOfParams, long begin, String smtTime, long end, LinkedHashMap<String, String> extraColumnsForCSV)
+			IPartition obtainedPartitionOfParams, long begin, String smtTime, long end, LinkedHashMap<String, String> extraColumnsForCSV,BigDecimal deltaReduced)
 			throws UnsupportedFormatException, IOException {
 		String reducedCRNShort;
 		/*
@@ -9460,7 +9682,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		String whereToCopyFile = reducedFileName.replace(toRemove, toAdd);
 		copyFile(originalFileName,whereToCopyFile);
 		*/
-		
+		CRNandPartition cp_m=null;
 		
 		int original = crnToConsider.getSpecies().size();
 		int reduced = obtainedPartition.size();
@@ -9577,7 +9799,15 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					reduction.equalsIgnoreCase("FB")||reduction.equalsIgnoreCase("FE")||reduction.equalsIgnoreCase("ENFB")
 					|| reduction.equalsIgnoreCase("uctmcfe") || reduction.equalsIgnoreCase("use")
 					){
-				cp=computeReducedCRN_DSBSMB(crnToConsider, fromGUI,terminator,reduction.toLowerCase(),reducedModelName,obtainedPartition,out,bwOut,sumReductionAlgorithm);
+//				BigDecimal delta = BigDecimal.ZERO;
+//				if(deltaString!=null) {
+//					delta=BigDecimal.valueOf(deltaString);
+//				}
+				cp=computeReducedCRN_DSBSMB(crnToConsider, fromGUI,terminator,reduction.toLowerCase(),reducedModelName,obtainedPartition,out,bwOut,sumReductionAlgorithm,deltaReduced);
+				if(reduction.equalsIgnoreCase("uctmcfe") && deltaReduced.compareTo(BigDecimal.ZERO)!=0) {
+					cp_m=computeReducedCRN_DSBSMB(crnToConsider, fromGUI,terminator,reduction.toLowerCase(),reducedModelName,obtainedPartition,out,bwOut,sumReductionAlgorithm,BigDecimal.ZERO.subtract(deltaReduced));
+				}
+				
 				//UCTMCLu computeOnlyMeasuresForBound
 				//it.imt.erode.partitionrefinement.algorithms.UCTMCLumping.computeOnlyMeasuresForBound(cp.getCRN(), BigDecimal.valueOf(1.0e-4), out, bwOut, terminator);
 			}
@@ -9630,7 +9860,19 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				 */
 				SupportedFormats format = (fromGUI)?SupportedFormats.CRNGUI:SupportedFormats.CRN;
 				//String commentSymbol =(fromGUI)?"//":"#";
-				writeCRN(reducedFileName,cp.getCRN(),cp.getPartition(),format,infoReduction.toCRNComment(),icWarning,null,out,bwOut,false,null);
+				if(cp_m==null) {
+					writeCRN(reducedFileName,cp.getCRN(),cp.getPartition(),format,infoReduction.toCRNComment(),icWarning,null,out,bwOut,false,null);
+				}
+				else {
+					String reducedFileNameM=reducedFileName.replace(".ode", "_bigM.ode");
+					reducedFileNameM = reducedFileNameM.replace("._ode", "_bigM._ode");
+					writeCRN(reducedFileNameM,cp.getCRN(),cp.getPartition(),format,infoReduction.toCRNComment(),icWarning,null,out,bwOut,false,null);
+					
+					String reducedFileNamem=reducedFileName.replace(".ode", "_smallm.ode");
+					reducedFileNamem = reducedFileNamem.replace("._ode", "_smallm._ode");
+					writeCRN(reducedFileNamem,cp_m.getCRN(),cp_m.getPartition(),format,infoReduction.toCRNComment(),icWarning,null,out,bwOut,false,null);
+				}
+				
 			}
 			
 			
@@ -10009,7 +10251,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		}
 	}*/
 
-	private static CRNandPartition computeReducedCRN_DSBSMB(ICRN crn, boolean fromGUI,Terminator terminator, String red, String nameOfCRN, IPartition obtainedPartition, MessageConsoleStream out, BufferedWriter bwOut,boolean newReductionAlgorithm) throws IOException {
+	private static CRNandPartition computeReducedCRN_DSBSMB(ICRN crn, boolean fromGUI,Terminator terminator, String red, String nameOfCRN, IPartition obtainedPartition, MessageConsoleStream out, BufferedWriter bwOut,boolean newReductionAlgorithm,BigDecimal delta) throws IOException {
 
 		/*String name = nameOfCRN;
 		if(name==null || name.equals("")){
@@ -10027,7 +10269,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				cp = CRNBisimulationsNAry.computeReducedCRNQuotient(crn,nameOfCRN, obtainedPartition, crn.getSymbolicParameters(),crn.getConstraints(),crn.getParameters(),commentSymbol,out,bwOut,terminator);
 			}
 			else{
-				cp = CRNBisimulationsNAry.computeReducedCRNOrdinary(crn,nameOfCRN, obtainedPartition, crn.getSymbolicParameters(),crn.getConstraints(),crn.getParameters(),commentSymbol,out,bwOut,terminator);
+				cp = CRNBisimulationsNAry.computeReducedCRNOrdinary(crn,nameOfCRN, obtainedPartition, crn.getSymbolicParameters(),crn.getConstraints(),crn.getParameters(),commentSymbol,out,bwOut,terminator,delta);
 			}
 		}
 		else{

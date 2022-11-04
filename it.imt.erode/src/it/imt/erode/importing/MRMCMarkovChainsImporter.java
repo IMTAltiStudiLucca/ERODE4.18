@@ -250,12 +250,15 @@ public class MRMCMarkovChainsImporter extends AbstractImporter{
 		}
 
 		String line;
-		boolean skip=true;
+		boolean skip=false;
 		HashMap<String, Set<ISpecies>> labellingFunction = new HashMap<String, Set<ISpecies>>();
 		while ((line = br.readLine()) != null) {
 			line=line.trim();
 
-			if(line.equalsIgnoreCase("#end")){
+			if(line.equalsIgnoreCase("#DECLARATION")) {
+				skip=true;
+			}
+			if(skip&&line.equalsIgnoreCase("#end")){
 				skip=false;
 				continue;
 			}

@@ -19,7 +19,6 @@ import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
 import com.microsoft.z3.Expr;
 import com.microsoft.z3.Model;
-import com.microsoft.z3.Quantifier;
 import com.microsoft.z3.RealSort;
 import com.microsoft.z3.Solver;
 import com.microsoft.z3.Sort;
@@ -30,7 +29,6 @@ import com.microsoft.z3.Z3Exception;
 import it.imt.erode.auxiliarydatastructures.CRNandPartition;
 import it.imt.erode.auxiliarydatastructures.CompositeAndBoolean;
 import it.imt.erode.auxiliarydatastructures.DoubleAndStatus;
-import it.imt.erode.auxiliarydatastructures.PartitionAndString;
 import it.imt.erode.auxiliarydatastructures.SolverAndStatus;
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.IMessageDialogShower;
@@ -43,8 +41,6 @@ import it.imt.erode.crn.interfaces.ICRN;
 import it.imt.erode.crn.interfaces.ICRNReaction;
 import it.imt.erode.crn.interfaces.IComposite;
 import it.imt.erode.crn.interfaces.ISpecies;
-import it.imt.erode.crn.label.EmptySetLabel;
-import it.imt.erode.crn.label.ILabel;
 import it.imt.erode.crn.symbolic.constraints.IConstraint;
 import it.imt.erode.expression.evaluator.MathEval;
 import it.imt.erode.importing.z3Importer;
@@ -52,7 +48,6 @@ import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
-import it.imt.erode.partitionrefinement.splittersbstandcounters.SplittersGenerator;
 
 public class SMTMetrics {
 	
@@ -62,13 +57,13 @@ public class SMTMetrics {
 	
 	private HashMap<String, String> cfg;
 	private BoolExpr absPopulationDomainAssertion;
-	private BoolExpr allConstraintAssertion;
+	//private BoolExpr allConstraintAssertion;
 	private Context ctx;
 	private /*static*/ Solver solver;
 	boolean initialized=false;
 	private HashMap<ISpecies, ArithExpr> speciesToODENames;
 	private HashMap<ISpecies, ArithExpr> speciesToODEsDef;
-	private BoolExpr allODEsDef;
+	//private BoolExpr allODEsDef;
 	//EREFL
 	/*private BoolExpr allODEsFunDef;
 	private Sort[] sortsOfodesAndSymbolicParameters;
@@ -628,7 +623,7 @@ public class SMTMetrics {
 //			speciesToODEInvocation.put(species,odeInvocation);
 //			allODEsFuncDefArray[j] = ctx.mkEq(odeInvocation, body);*/
 //		}
-		allODEsDef = ctx.mkAnd(allODEsDefArray);
+		//allODEsDef = ctx.mkAnd(allODEsDefArray);
 		//EREFL
 		//allODEsFunDef = ctx.mkAnd(allODEsFuncDefArray);
 		
@@ -1331,42 +1326,7 @@ public class SMTMetrics {
 		solver.add(ctx.mkNot(negationOfEFL));
 	}*/
 	
-	private void computAssertionToCheckEFLOnCurrentPartitionOneBlock(ICRN crn,
-			IPartition partition, IBlock blockSPL, Solver solver) throws Z3Exception {
-		
-		BoolExpr negationOfEFL = ctx.mkTrue();		
-		IBlock currentBlock = partition.getFirstBlock();
-		while(currentBlock!=null){
-			if(currentBlock.getSpecies().size()!=1){
-				boolean isBlockSPL = currentBlock.equals(blockSPL);
-				BoolExpr[] equalODEs = null;
-				if(isBlockSPL){
-					equalODEs = new BoolExpr[currentBlock.getSpecies().size()-1];
-				}
-				int s=0;
-				ISpecies rep = currentBlock.getRepresentative();
-				ArithExpr popRep = speciesToPopulation.get(rep);
-				ArithExpr odeNameRep = speciesToODENames.get(rep);
-				for (ISpecies species : currentBlock.getSpecies()) {
-					if(!species.equals(rep)){
-						BoolExpr ic = ctx.mkEq(popRep, speciesToPopulation.get(species));
-						solver.add(ic);
-						if(isBlockSPL){
-							equalODEs[s]= ctx.mkEq(odeNameRep, speciesToODENames.get(species));
-						}
-						s++;
-					}
-				}
-				if(isBlockSPL){
-					negationOfEFL= ctx.mkAnd(equalODEs);
-				}
-			}
-			currentBlock=currentBlock.getNext();
-		}
 
-		solver.add(ctx.mkNot(negationOfEFL));
-		
-	}
 
 	/*public static CRNandPartition computeReducedCRNEFLNONMassAction(ICRN crn, String name, IPartition partition, List<String> parameters, String commentSymbol,MessageConsoleStream out, BufferedWriter bwOut)  throws IOException {
 		return SMTOrdinaryFluidBisimilarityBinary.computeReducedCRNOrdinaryNonMassAction(crn, name, partition, parameters, commentSymbol, out,bwOut);

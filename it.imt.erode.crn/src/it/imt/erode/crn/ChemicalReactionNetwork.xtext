@@ -462,7 +462,7 @@ onTheFlyFR : {onTheFlyFR}
 
 z3Metrics: {z3Metrics}
 	'z3Metrics' '('
-		'C' '=' C = ArithmeticExpression ','
+		'z3C' '=' C = ArithmeticExpression ','
 		'lambda' '=' lambda = ArithmeticExpression ','
 		csvFile=CSVFile
 	')'
@@ -953,6 +953,7 @@ Export:
 	generateCME |
 	generateLogs |
 	exportJacobianFunction |
+	exportScriptSolveUCTMC|
 	exportScriptEpsCLump |
 	exportScriptsEpsCLump | 
 	exportMatlab |
@@ -1156,6 +1157,35 @@ exportEpsilonBoundsScript:
 exportJacobianFunction:
 	'exportJacobianFunction' '(' params = ParametersExport ')'
 ;
+
+exportScriptSolveUCTMC:
+	'exportScriptSolveUCTMC' '('
+		params = ParametersExport ',' //'fileOut' fileOut=STRING ','	//"counterExampleUCTMCLump2_solveUCTMC.m"
+		(
+			('modelWithSmallM' '=' modelWithSmallM=STRING)| //"counterExampleUCTMCLump2_smallm.ode",
+			('delta' '=' delta = POSITIVEINTORREAL)
+		)	','
+		'tHoriz' '=' tHoriz=ArithmeticExpression','
+		'minimize' '=' minimize=BooleanValue ',' 
+		(	('stateRewards' '=' rRewards = ListOfCoefficientsSpNat ) |
+			('stateRewardsFile' '=' rRewardsFile = STRING )
+		)
+		((',' 'phi' '=' phiRewards = ListOfCoefficientsSpNat)?)
+		',' 
+		( 
+			( 'inits' '=' '{' (initStates += [Species]  (',' initStates += [Species])*) '}') |
+			( 'initsID' '=' '{' (initStatesIds += NAT  (',' initStatesIds += NAT)*)'}'	  )
+		)
+		 
+		/*
+	r = [0 0]';
+    phi = [0 1]';
+    pi0 = [1,0]';	%initial state. take the 'init' from lab
+		 
+		 */
+')'
+;
+
 exportScriptEpsCLump:
 	'exportScriptEpsCLump' '(' params = ParametersExport ',' 
 //	'epsilon' ( ('=' epsilon=ArithmeticExpression )|

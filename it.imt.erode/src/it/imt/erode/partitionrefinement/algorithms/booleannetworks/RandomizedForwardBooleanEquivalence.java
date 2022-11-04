@@ -88,7 +88,7 @@ public class RandomizedForwardBooleanEquivalence {
 	/**
 	 * For MV networks, I want to explicitly state the domain of each species (from 0 to max)
 	 */
-	private BoolExpr speciesDomainsAssertion;
+	//private BoolExpr speciesDomainsAssertion;
 
 	private double totalSMTChecksSeconds=0.0;
 	private double initSMTTime=0.0;
@@ -1024,8 +1024,8 @@ public class RandomizedForwardBooleanEquivalence {
 			speciesToODENames.put(species, ode);
 			//speciesToODEsDef.put(species, zero);
 		}
-		if(bn.isMultiValued())
-			speciesDomainsAssertion = ctx.mkAnd(speciesDomainsAssertions);
+		//if(bn.isMultiValued())
+			//speciesDomainsAssertion = ctx.mkAnd(speciesDomainsAssertions);
 
 		//		symbParNameToSymbParZ3 = new HashMap<>(crn.getSymbolicParameters().size());
 		//		for(String symbPar : crn.getSymbolicParameters()){

@@ -171,7 +171,7 @@ SOFTWARE.
    </configurations>
 
    <repositories>
-      <repository location="http://www.erode.eu/distr/repository-macosx" enabled="true" />
+      <repository location="http://https://github.com/IMTAltiStudiLucca/ERODE-updatesites/blob/master/repository-macosx" enabled="true" />
    </repositories>
 
    <preferencesInfo>
