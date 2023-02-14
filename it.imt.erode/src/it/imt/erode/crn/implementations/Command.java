@@ -35,23 +35,27 @@ public class Command implements ICommand {
 			sb.append("({");
 		}
 		
-		int i=0;
+		//int i=0;
 		for (CommandParameter parameter : getParameters()) {
-			sb.append(parameter.getName());
-		
-			if(odeFormat){
-				sb.append("=");
+			if(odeFormat && parameter.getName().equals("computeOnlyPartition")) {
+				continue;
 			}
-			else{
-				sb.append("=>");
-			}
-			
-			sb.append(parameter.getValue());
-			if(i<getParameters().size()-1){
+			else {
+				sb.append(parameter.getName());
+
+				if(odeFormat){
+					sb.append("=");
+				}
+				else{
+					sb.append("=>");
+				}
+
+				sb.append(parameter.getValue());
 				sb.append(",");
+				//i++;
 			}
-			i++;
 		}
+		sb.delete(sb.length()-1, sb.length());//remove last ","
 		
 		if(odeFormat){
 			sb.append(")");

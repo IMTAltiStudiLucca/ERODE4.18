@@ -89,7 +89,7 @@ public class TestCreateCRN {
 		//Now use the CRN programmatically
 		boolean printPartitions=false;
 		boolean printCRNs=false;
-		EntryPointForMatlab entry = new EntryPointForMatlab(printPartitions,printCRNs,crn);
+		EntryPointForMatlab entry = new EntryPointForMatlab(printPartitions,printCRNs,crn,false);
 
 		//Create prepartition: all species with same 'number' will belong to the same block
 		int[] initialPartitionArray = new int[entry.getSpecies().size()];

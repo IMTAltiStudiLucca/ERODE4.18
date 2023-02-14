@@ -1553,7 +1553,9 @@ public class MatlabODEsImporter  extends AbstractImporter {
 		}	
 	}
 
-	public void printSolveUCTMC(ICRN crn, boolean verbose, double tHoriz, boolean minimize,String modelWithSmallM,BigDecimal deltaHalf,
+	public void printSolveUCTMC(ICRN crn, boolean verbose, double tHoriz, boolean minimize,
+			String modelWithSmallM,String modelWithBigM,
+			BigDecimal deltaHalf,
 			LinkedHashMap<String,Double> inits, LinkedHashMap<String,Double> rRewards, LinkedHashMap<String,Double> phiRewards, MessageConsoleStream out, BufferedWriter bwOut, IMessageDialogShower msgDialogShower, Terminator terminator) {
 		//String fileName = name;
 		String fileName = getFileName();
@@ -1584,6 +1586,9 @@ public class MatlabODEsImporter  extends AbstractImporter {
 			if(modelWithSmallM!=null && modelWithSmallM.length()>0) {
 				bw.write("%   Reading small m from  "+modelWithSmallM+"\n");
 			}
+			else if(modelWithBigM!=null && modelWithBigM.length()>0) {
+				bw.write("%   Reading big M from  "+modelWithBigM+"\n");
+			} 
 			else {
 				bw.write("%   Computing small m and big M removing/adding "+deltaHalf+"\n");
 			}
@@ -1612,29 +1617,45 @@ public class MatlabODEsImporter  extends AbstractImporter {
 			
 			HashMap<ICRNReaction, BigDecimal> reactionToRateInModelSmallm=new HashMap<>(crn.getReactions().size());
 			HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM=new HashMap<>(crn.getReactions().size());
-			if(modelWithSmallM!=null && modelWithSmallM.length()>0)
+			boolean externalSmallM=(modelWithSmallM!=null && modelWithSmallM.length()>0);
+			boolean externalBigM=(modelWithBigM!=null && modelWithBigM.length()>0);
+			if(externalSmallM || externalBigM)
 			{
-				CRNReducerCommandLine.print(out,bwOut,"\n\tLoading the model with small 'm' transition rates from "+modelWithSmallM+" ...");
+				String modelWithOtherM=null;
+				if(externalSmallM) {
+					modelWithOtherM=modelWithSmallM;
+					CRNReducerCommandLine.print(out,bwOut,"\n\tLoading the model with small 'm' transition rates from "+modelWithOtherM+" ...");
+				}
+				else {
+					modelWithOtherM=modelWithBigM;
+					CRNReducerCommandLine.print(out,bwOut,"\n\tLoading the model with big 'M' transition rates from "+modelWithOtherM+" ...");
+				}
 				ImporterOfSupportedNetworks importerOfSupportedNetworks=new ImporterOfSupportedNetworks();
 				AbstractImporter importer=null;
 				try {
-					if(modelWithSmallM.endsWith(".tra")) {
-						importer = importerOfSupportedNetworks.importSupportedNetwork(modelWithSmallM, false, false,SupportedFormats.MRMC,false,new String[]{"same"},out,bwOut,msgDialogShower, false,false);
+					if(modelWithOtherM.endsWith(".tra")) {
+						importer = importerOfSupportedNetworks.importSupportedNetwork(modelWithOtherM, false, false,SupportedFormats.MRMC,false,new String[]{"same"},out,bwOut,msgDialogShower, false,false);
 					}
-					else  if(modelWithSmallM.endsWith(".ode")||modelWithSmallM.endsWith("._ode")) {
-						importer = importerOfSupportedNetworks.importSupportedNetwork(modelWithSmallM, false, false,SupportedFormats.CRN,false,null,out,bwOut,msgDialogShower, false,false);
+					else  if(modelWithOtherM.endsWith(".ode")||modelWithOtherM.endsWith("._ode")) {
+						importer = importerOfSupportedNetworks.importSupportedNetwork(modelWithOtherM, false, false,SupportedFormats.CRN,false,null,out,bwOut,msgDialogShower, false,false);
 					}
 				} catch (UnsupportedFormatException | IOException | XMLStreamException e) {
 					
 					CRNReducerCommandLine.printWarning(out,bwOut,"\n\tProblems in loading the model with small m transition rates. I terminate.");
-					msgDialogShower.openSimpleDialog("Problems in loading the model with small m transition rates. I terminate.\n"+modelWithSmallM, DialogType.Error);
+					msgDialogShower.openSimpleDialog("Problems in loading the model with small m transition rates. I terminate.\n"+modelWithOtherM, DialogType.Error);
 					return;
 				}
 				ICRN crnSmallM = importer.getCRN();
+				ICRN crnBigM = crn;
+				if(externalBigM) {
+					crnSmallM = crn;
+					crnBigM = importer.getCRN();
+				}
+				
 				//partition = importer.getInitialPartition();
 				for(int i=0;i<crn.getReactions().size();i++) {
 					reactionToRateInModelSmallm.put(crn.getReactions().get(i), crnSmallM.getReactions().get(i).getRate());
-					reactionToRateInModelBigM.put(  crn.getReactions().get(i), crn.getReactions().get(i).getRate());
+					reactionToRateInModelBigM.put(  crn.getReactions().get(i), crnBigM.getReactions().get(i).getRate());
 				}
 				CRNReducerCommandLine.print(out,bwOut," completed.");
 				//TODO: here we assume that the model has same structure in file for m and M: they contain same species in order, and same reactions in same order 
@@ -1750,6 +1771,11 @@ public class MatlabODEsImporter  extends AbstractImporter {
 				bw.write("    minimize = 1;\n");
 			else
 				bw.write("    minimize = 0;\n");
+			bw.write("    if(minimize == 1)\n");
+			bw.write("        fprintf(' We minimize\\n');\n");
+			bw.write("    else\n");
+			bw.write("        fprintf(' We maximize\\n');\n");
+			bw.write("    end\n");
 			bw.write("\n");
 			/*
 % Dummy function demonstrating the actual routine
@@ -1988,7 +2014,7 @@ function UCTMC()
 				if(backward){
 					CRNReducerCommandLine.print(out,bwOut,"Computing the "+(epsilon)+"-BDE and writing the obtained linear equations ...");
 					//Compute the epsilon BDE, and write the linear system of constraints
-					computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, "closest_bde",verbose,terminator,epsilon,defaultIC,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC);
+					computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, "closest_bde",verbose,terminator,epsilon,defaultIC,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC,false);
 					bw.write("\n");
 				}
 			}
@@ -2030,7 +2056,7 @@ function UCTMC()
 
 	public static void printEpsilonScriptToMatlabFIle(ICRN crn, IPartition initial, String name, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, 
 			IMessageDialogShower msgDialogShower, LinkedHashSet<String> paramsToPerturb, Terminator terminator,double epsilon, String prePartitionUserDefined, 
-			String prePartitionWRTIC, boolean forward, boolean backward) throws UnsupportedFormatException{
+			String prePartitionWRTIC, boolean forward, boolean backward,boolean fastDegreeOneBDE) throws UnsupportedFormatException{
 		String fileName = name;
 
 		fileName=overwriteExtensionIfEnabled(fileName,".m");
@@ -2070,7 +2096,7 @@ function UCTMC()
 			if(backward){
 				CRNReducerCommandLine.print(out,bwOut,"\nComputing the "+(epsilon)+"-BDE and writing the obtained linear equations ...");
 				//Compute the epsilon BDE, and write the linear system of constraints
-				computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, functionName,verbose,terminator,epsilon,BigDecimal.ZERO,paramsToPerturb, prePartitionUserDefined, prePartitionWRTIC);
+				computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, functionName,verbose,terminator,epsilon,BigDecimal.ZERO,paramsToPerturb, prePartitionUserDefined, prePartitionWRTIC,fastDegreeOneBDE);
 				bw.write("\n");
 			}
 
@@ -2445,7 +2471,10 @@ function UCTMC()
 	}
 
 	private static void computeEpsilonBDEAndWriteLinearSystemOfConstraints(ICRN crn, IPartition initial,MessageConsoleStream out,BufferedWriter bwOut,
-			IMessageDialogShower msgDialogShower, BufferedWriter bw, String functionName, boolean verbose,Terminator terminator,double epsilon,BigDecimal defaultIC, LinkedHashSet<String> paramsToPerturb, String prePartitionUserDefined, String prePartitionWRTIC) throws UnsupportedFormatException, IOException {
+			IMessageDialogShower msgDialogShower, BufferedWriter bw, String functionName, boolean verbose,Terminator terminator,double epsilon,BigDecimal defaultIC, 
+			LinkedHashSet<String> paramsToPerturb, String prePartitionUserDefined, String prePartitionWRTIC,
+			boolean fastDegreeOneBDE
+			) throws UnsupportedFormatException, IOException {
 
 
 		/*
@@ -2478,11 +2507,32 @@ end
 		}
 
 
-		IPartitionAndBoolean obtainedPartitionAndBool = epsilonDE.computeCoarsest(Reduction.ENBB, BigDecimal.valueOf(epsilon), crn, initial, verbose, out,bwOut, terminator,false);
+		///
+		IPartitionAndBoolean obtainedPartitionAndBool;
+		if(fastDegreeOneBDE) {
+			IMessageDialogShower messageDialogShower=null;
+			
+			BigDecimal epsBD =BigDecimal.valueOf(epsilon);
+			IPartition current = initial;
+//			int prevSize=current.size();
+//			do {
+//				prevSize=current.size();
+//				//obtainedPartitionAndBool = CRNBisimulationsNAry.computeCoarsest(Reduction.BE,crn,initial, verbose,out,bwOut,terminator,messageDialogShower,epsBD);
+				obtainedPartitionAndBool = CRNBisimulationsNAry.computeCoarsest(Reduction.BE,crn,current, verbose,out,bwOut,terminator,messageDialogShower,epsBD);
+//				current=obtainedPartitionAndBool.getPartition();
+//			}while(prevSize!=current.size());
+			
+		}
+		else {
+			obtainedPartitionAndBool = epsilonDE.computeCoarsest(Reduction.ENBB, BigDecimal.valueOf(epsilon), crn, initial, verbose, out,bwOut, terminator,false);
+		}
+		///
+		
 		long end = System.currentTimeMillis();
 		double time = (end-begin)/1000.0;
 		String timeString = String.format( CRNReducerCommandLine.MSFORMAT, (time) );
 		String msg=" eps-BDE time "+timeString+ " (s) ... ";
+		msg = msg + obtainedPartitionAndBool.getPartition().size() +" blocks ... ";
 		CRNReducerCommandLine.print(out,bwOut, msg);
 		IPartition obtainedPartition = obtainedPartitionAndBool.getPartition();
 

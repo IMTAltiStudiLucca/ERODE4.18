@@ -7,6 +7,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -40,6 +41,7 @@ import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.splittersbstandcounters.SpeciesCounterField;
+import it.imt.erode.partitionrefinement.algorithms.fastepsbe.SpeciesAndBigDecimal;
 import it.imt.erode.partitionrefinement.splittersbstandcounters.CRNBisNAryOrSENAry;
 import it.imt.erode.partitionrefinement.splittersbstandcounters.ISpeciesCounterHandler;
 import it.imt.erode.partitionrefinement.splittersbstandcounters.SpeciesCounterHandlerCRNBIsimulationNAry;
@@ -86,6 +88,10 @@ public class CRNBisimulationsNAry {
 	//public static final MathContext MC = new MathContext(30, RoundingMode.HALF_DOWN);
 //public static final BigDecimal EPSILON = BigDecimal.valueOf(0.001);
 	
+	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower){
+		return computeCoarsest(red,crn, partition, verbose, out, bwOut, terminator, msgDialogShower, null);
+	}
+	
 	/**
 	 * 
 	 * @param crn
@@ -96,7 +102,8 @@ public class CRNBisimulationsNAry {
 	 * @param terminator 
 	 * @return
 	 */
-	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower){
+	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, 
+			Terminator terminator, IMessageDialogShower msgDialogShower, BigDecimal epsForFastOneDegreeEpsBE){
 
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,red.toString()+" Reducing: "+crn.getName());
@@ -132,6 +139,12 @@ public class CRNBisimulationsNAry {
 		if(!(red.equals(Reduction.FE)||red.equals(Reduction.BE) /*|| red.equals(Reduction.ENFB)||red.equals(Reduction.ENBB)*/)){
 			CRNReducerCommandLine.printWarning(out,bwOut,"Please invoke this method using FE or BE.  I terminate.");
 			return new IPartitionAndBoolean(obtainedPartition, false);
+		}
+		if(epsForFastOneDegreeEpsBE != null && epsForFastOneDegreeEpsBE.compareTo(BigDecimal.ZERO)!=0) {
+			if(crn.getMaxArity()!=1 || crn.getMinArity()!=1) {
+				CRNReducerCommandLine.printWarning(out,bwOut,"Fast eps BE can be invoked only for degree 1 models.  I terminate.");
+				return new IPartitionAndBoolean(obtainedPartition, false);
+			}
 		}
 
 		if(verbose){
@@ -169,7 +182,7 @@ public class CRNBisimulationsNAry {
 //			multisetCoefficients = computeMultisetCoefficients(crn, terminator, crn.getMaxArity());
 //		}
 
-		refine(red,crn,obtainedPartition,/*multisetCoefficients,*/speciesCounters,speciesCountersHM,terminator,out,bwOut);
+		refine(red,crn,obtainedPartition,/*multisetCoefficients,*/speciesCounters,speciesCountersHM,terminator,out,bwOut,epsForFastOneDegreeEpsBE);
 
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,"The final partition:");
@@ -196,25 +209,32 @@ public class CRNBisimulationsNAry {
 		}
 	}*/
 	
-	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut) {
-		refine(red, crn, partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, speciesCountersHM,terminator,  out, bwOut,false);
+	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, BigDecimal epsForFastOneDegreeEpsBE) {
+		refine(red, crn, partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, speciesCountersHM,terminator,  out, bwOut,false,epsForFastOneDegreeEpsBE);
 	}
 	
 	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut) {
-		refine(red, crn, partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, null,terminator,  out, bwOut,false);
+		refine(red, crn, partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, null,terminator,  out, bwOut,false,null);
 	}
 	
 	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, boolean extraTab) {
-		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, extraTab,true,null,null);
+		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, extraTab,true,null,null,null);
 	}
-	
+	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, boolean extraTab, BigDecimal epsForFastOneDegreeEpsBE) {
+		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, extraTab,true,null,null,epsForFastOneDegreeEpsBE);
+	}
 	
 	
 	
 	public static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
 			boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
 		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, 
-				extraTab, print, deltaHalf,reactionToRateToConsider,null,null);
+				extraTab, print, deltaHalf,reactionToRateToConsider,null,null,null);
+	}
+	public static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
+			boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider, BigDecimal epsForFastOneDegreeEpsBE) {
+		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, 
+				extraTab, print, deltaHalf,reactionToRateToConsider,null,null,epsForFastOneDegreeEpsBE);
 	}
 	
 	/**
@@ -232,6 +252,7 @@ public class CRNBisimulationsNAry {
 	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
 			boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider,
 			ArrayListOfReactions[] reactionsToConsiderForEachSpecies, HashMap<IComposite, BigDecimal> multisetCoefficients
+			, BigDecimal epsForFastOneDegreeEpsBE
 			) {
 		String pref = "";
 		if(extraTab) {
@@ -334,7 +355,8 @@ public class CRNBisimulationsNAry {
 				break;
 			}
 			//System.out.println(" "+iteration);
-			split(red,crn,partition,splittersGenerator,multisetCoefficients,iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider);
+			split(red,crn,partition,splittersGenerator,multisetCoefficients,iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider,
+					epsForFastOneDegreeEpsBE);
 			if(speciesCountersHM!=null) {
 				speciesCountersHM=new HashMap<>();
 			}
@@ -471,7 +493,8 @@ public class CRNBisimulationsNAry {
 			HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction,Integer> consideredAtIteration, 
 			ISpeciesCounterHandler[] speciesCounters,
 			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM,ArrayListOfReactions[] reactionsToConsiderForEachSpecies, 
-			BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
+			BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider
+			, BigDecimal epsForFastOneDegreeEpsBE) {
 		
 		IBlock blockSPL = splittersGenerator.getBlockSpl();
 		//ILabel labelSPL = splittersGenerator.getLabelSpl();
@@ -512,7 +535,21 @@ public class CRNBisimulationsNAry {
 		}
 		boolean blockOfSPlitterHasBeenSplitted;
 		
-		blockOfSPlitterHasBeenSplitted = partitionBlocksOfGivenSpecies(partition,splitterGenerators,blockSPL,splittedBlocks,splitWRT,speciesCounters,speciesCountersHM);
+		boolean skipLargestSubblock=true;
+		if(epsForFastOneDegreeEpsBE!=null && epsForFastOneDegreeEpsBE.compareTo(BigDecimal.ZERO)!=0) {
+			//fast epsbe for degree 1 models
+			skipLargestSubblock=false;
+			blockOfSPlitterHasBeenSplitted = partitionBlocksOfGivenSpecies_EPSBE(partition,splitterGenerators,blockSPL,splittedBlocks,splitWRT,speciesCounters,speciesCountersHM,epsForFastOneDegreeEpsBE,crn);
+		}
+		else {
+			//BE
+			blockOfSPlitterHasBeenSplitted = partitionBlocksOfGivenSpecies(partition,splitterGenerators,blockSPL,splittedBlocks,splitWRT,speciesCounters,speciesCountersHM);
+		}
+		
+		
+		//
+		
+		
 		/*if(red.equals(Reduction.NFB)||red.equals(Reduction.NBB)){
 			blockOfSPlitterHasBeenSplitted = partitionBlocksOfGivenSpecies(partition,splitterGenerators,blockSPL,splittedBlocks,splitWRT,speciesCounters);
 		}
@@ -524,7 +561,7 @@ public class CRNBisimulationsNAry {
 		//blockSPL.setHasBeenAlreadyUsedAsSplitter(true);
 		
 		//Now I have to update the splitters according to the newly generated partition
-		cleanPartitioAndGetNextSplitterIfNecessary(partition, splittersGenerator, blockSPL, splittedBlocks, blockOfSPlitterHasBeenSplitted,hasOnlyUnaryReactions);
+		cleanPartitioAndGetNextSplitterIfNecessary(partition, splittersGenerator, blockSPL, splittedBlocks, blockOfSPlitterHasBeenSplitted,hasOnlyUnaryReactions,skipLargestSubblock);
 		
 		
 		//Initialize the "pr" fields to 0 of all species having reactions with partners label, towards at least a species of blockSPL
@@ -540,7 +577,9 @@ public class CRNBisimulationsNAry {
 		
 	}
 	
-	protected static boolean partitionBlocksOfGivenSpecies(IPartition partition, HashSet<ISpecies> consideredSpecies,IBlock blockToCheckIfSplit, HashSet<IBlock> splittedBlocks, SpeciesCounterField keyField, ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM) {
+	protected static boolean partitionBlocksOfGivenSpecies(IPartition partition, HashSet<ISpecies> consideredSpecies,
+			IBlock blockToCheckIfSplit, HashSet<IBlock> splittedBlocks, SpeciesCounterField keyField, 
+			ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM) {
 		
 		//If "blockToCheckIfSplit" is ANYBLOCK, I assume that it means that I have to return true if at least a block has been split. 
 		boolean blocktoCheckHasBeenSplit=false;
@@ -607,6 +646,159 @@ public class CRNBisimulationsNAry {
 				}
 			}
 		}
+		return blocktoCheckHasBeenSplit;
+	}
+	
+	
+	
+
+	protected static boolean partitionBlocksOfGivenSpecies_EPSBE(IPartition partition, HashSet<ISpecies> consideredSpecies,
+			IBlock blockToCheckIfSplit, HashSet<IBlock> splittedBlocks, SpeciesCounterField keyField, 
+			ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM,BigDecimal eps/*ForFastOneDegreeEpsBE*/, ICRN crn) {
+		
+		//If "blockToCheckIfSplit" is ANYBLOCK, I assume that it means that I have to return true if at least a block has been split. 
+		boolean blocktoCheckHasBeenSplit=false;
+
+		//double scaling = blockToCheckIfSplit.getSpecies().size()/(float)crn.getSpecies().size();
+		//BigDecimal scaledEps = eps.multiply(BigDecimal.valueOf(scaling));
+		
+		//AAAAAA
+		//split each block of partition according to the computed pr[X,labelSPL,blockSPL] values.
+		HashSet<IBlock> blocks = new LinkedHashSet<>();
+ 		for (ISpecies splitterGenerator : consideredSpecies) {
+			blocks.add(partition.getBlockOf(splitterGenerator));
+		}
+		for(IBlock block : blocks) {
+			if(block.getSpecies().size()==1) {
+				continue;
+			}
+			else {
+			/*
+			ArrayList<SpeciesAndVectorOfBigDecimalsForEachLabel> speciesAndFR = new ArrayList<>(block.getSpecies().size());
+			for(ISpecies splitterGenerator : block.getSpecies()) {
+				ISpeciesCounterHandler counters =getOrAddSpeciesCounterHandler(speciesCounters, speciesCountersHM, splitterGenerator,false,CRNBisNAryOrSENAry.FEBE);
+				VectorOfBigDecimalsForEachLabel fr = new VectorOfBigDecimalsForEachLabel(counters.getFRVector());
+				SpeciesAndVectorOfBigDecimalsForEachLabel sp_fr = new SpeciesAndVectorOfBigDecimalsForEachLabel(splitterGenerator,fr);
+				speciesAndFR.add(sp_fr);
+			}
+			speciesAndFR.sort(new SpeciesAndVectorOfBigDecimalsForEachLabelComparator());
+			*/
+			ArrayList<SpeciesAndBigDecimal> speciesAndFR = new ArrayList<>(block.getSpecies().size());
+			for(ISpecies splitterGenerator : block.getSpecies()) {
+				ISpeciesCounterHandler counters =getOrAddSpeciesCounterHandler(speciesCounters, speciesCountersHM, splitterGenerator,false,CRNBisNAryOrSENAry.FEBE);
+				SpeciesAndBigDecimal curr =new SpeciesAndBigDecimal(splitterGenerator,counters==null?null:counters.getFR());
+				speciesAndFR.add(curr);
+			}
+			Collections.sort(speciesAndFR);
+			//BigDecimal eps= new BigDecimal(0.0005);
+			BigDecimal currEps=speciesAndFR.get(0).getBD();
+			BigDecimal subBlockCounter=BigDecimal.ZERO;
+			for(SpeciesAndBigDecimal currSpBD : speciesAndFR ) {
+				ISpecies currSp=currSpBD.getSpecies();
+				BigDecimal currBD = currSpBD.getBD();
+				
+				//Now I add the species to the current subblock, or to a new one.
+				BigDecimal maxNextEps=currEps.add(eps);
+				//BigDecimal maxNextEps=currEps.add(scaledEps);
+				if(maxNextEps.compareTo(currBD)>=0) {
+					//New sp can stay with the previous sp
+				}
+				else {
+					//New sp shall go to a new subblock
+					subBlockCounter=subBlockCounter.add(BigDecimal.ONE);
+				}
+
+				if(subBlockCounter.compareTo(BigDecimal.ZERO)!=0) {
+					//First I remove the species from its block
+					//IBlock block = partition.getBlockOf(currSp);
+					block.removeSpecies(currSp);
+					//Add block to the set of splitted blocks
+					splittedBlocks.add(block);
+					if(blockToCheckIfSplit != null && block.equals(blockToCheckIfSplit)){
+						blocktoCheckHasBeenSplit=true;
+					}
+					if(CRNBisimulationsNAry.USETOLERANCE){
+						block.getBST(TOLERANCE).put(subBlockCounter, currSp, partition);
+					}
+					else{
+						block.getBST().put(subBlockCounter, currSp, partition);
+					}
+				}
+				else {
+					//It remains there
+				}
+				
+				currEps=currBD;
+			}
+			}
+
+		}
+		//AAAAAA
+		
+		/*
+		for (ISpecies splitterGenerator : consideredSpecies) {
+			//If no measure has been computed for the species....
+			ISpeciesCounterHandler counters =getOrAddSpeciesCounterHandler(speciesCounters, speciesCountersHM, splitterGenerator,false,CRNBisNAryOrSENAry.FEBE);
+			if(counters==null) {
+				continue;
+			}
+//			if(speciesCounters[splitterGenerator.getID()]==null){
+//				continue;
+//			}
+//			ISpeciesCounterHandler counters = speciesCounters[splitterGenerator.getID()];
+			//If the computed measure is zero....
+			if(keyField.equals(SpeciesCounterField.FRVECTOR)&&(counters.getFRVector()==null || counters.getFRVector().size()==0)){
+				continue;
+			}
+			else if(keyField.equals(SpeciesCounterField.NRVECTOR)&&(counters.getNRVector()==null||counters.getNRVector().size()==0)){
+				continue;
+			}
+			else if(keyField.equals(SpeciesCounterField.FR)||keyField.equals(SpeciesCounterField.NR)){
+				if(BigDecimal.ZERO.compareTo(counters.get(keyField))==0){
+					continue;
+				}
+			}
+			else if(keyField.equals(SpeciesCounterField.SMBVECTOR)){
+				if(counters.getSMBCounterVector()==null||counters.getSMBCounterVector().size()==0){
+					continue;
+				}
+			}
+			
+			//TODO: maybe we can modify so that splitting is done only if the block is not a singleton
+			IBlock block = partition.getBlockOf(splitterGenerator);
+			//remove the species from its block (i.e., this block will remain with only species not performing reactions towards the splitter)
+			block.removeSpecies(splitterGenerator);
+			//Add block to the set of splitted blocks
+			splittedBlocks.add(block);
+			if(blockToCheckIfSplit != null && block.equals(blockToCheckIfSplit)){
+				blocktoCheckHasBeenSplit=true;
+			}
+//			 *
+//			 * Insert the species splitterGenerator in the tree associated to the block "block". 
+//			 * This method is used to split the block according to the computed generation rates. This may cause the creation of a new block, in which case it is automatically added to the current partition. 
+//			 * In any case, the reference of the species to the own block is updated   
+//			 *
+
+			if(keyField.equals(SpeciesCounterField.FRVECTOR)){
+				block.getBSTForVectors().put(new VectorOfBigDecimalsForEachLabel(counters.getFRVector()), splitterGenerator, partition);
+			}
+			else if(keyField.equals(SpeciesCounterField.NRVECTOR)){
+				block.getBSTForVectors().put(new VectorOfBigDecimalsForEachLabel(counters.getNRVector()), splitterGenerator, partition);
+			}
+			else if(keyField.equals(SpeciesCounterField.SMBVECTOR)){
+				block.getBSTForVectors().put(new VectorOfBigDecimalsForEachLabel(counters.getSMBCounterVector()), splitterGenerator, partition);
+			}
+			else{
+				if(CRNBisimulationsNAry.USETOLERANCE){
+					block.getBST(CRNBisimulationsNAry.TOLERANCE).put(counters.get(keyField), splitterGenerator, partition);
+				}
+				else{
+					block.getBST().put(counters.get(keyField), splitterGenerator, partition);
+				}
+			}
+		}
+		
+		*/
 		return blocktoCheckHasBeenSplit;
 	}
  
@@ -843,11 +1035,11 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 	}
 */
 
-	protected static void cleanPartitioAndGetNextSplitterIfNecessary(IPartition partition, SplittersGenerator splittersGenerator, IBlock blockSPL, HashSet<IBlock> splittedBlocks, boolean blockOfSplitterHasBeenSplitted,boolean hasOnlyUnaryReactions) {
-		cleanPartitioAndGetNextSplitterIfNecessary(partition, splittersGenerator, blockSPL, splittedBlocks,  blockOfSplitterHasBeenSplitted, hasOnlyUnaryReactions,true);
+	protected static void cleanPartitioAndGetNextSplitterIfNecessary(IPartition partition, SplittersGenerator splittersGenerator, IBlock blockSPL, HashSet<IBlock> splittedBlocks, boolean blockOfSplitterHasBeenSplitted,boolean hasOnlyUnaryReactions,boolean skipLargestSubBlock) {
+		cleanPartitioAndGetNextSplitterIfNecessary(partition, splittersGenerator, blockSPL, splittedBlocks,  blockOfSplitterHasBeenSplitted, hasOnlyUnaryReactions,true,skipLargestSubBlock);
 	}
 
-	protected static void cleanPartitioAndGetNextSplitterIfNecessary(IPartition partition, SplittersGenerator splittersGenerator, IBlock blockSPL, HashSet<IBlock> splittedBlocks, boolean blockOfSplitterHasBeenSplitted,boolean hasOnlyUnaryReactions, boolean updateTheSplitter) {
+	protected static void cleanPartitioAndGetNextSplitterIfNecessary(IPartition partition, SplittersGenerator splittersGenerator, IBlock blockSPL, HashSet<IBlock> splittedBlocks, boolean blockOfSplitterHasBeenSplitted,boolean hasOnlyUnaryReactions, boolean updateTheSplitter,boolean skipLargestSubBlock) {
 		
 		boolean blockOfSplitHasBeenRemoved = false;
 		//boolean blockOfSplitterBecameItsBiggestSubBlock = false;
@@ -900,8 +1092,10 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 					if(blockOfSplitterHasBeenSplitted && blockSPL == splittedBlock){
 						blockOfSplitHasBeenRemoved=true;
 					}
-					if(splittedBlock.hasBeenAlreadyUsedAsSplitter() || blockSPL == splittedBlock){
-						biggestSubBlock.setCanBeUsedAsSplitter(false);
+					if(skipLargestSubBlock) {
+						if(splittedBlock.hasBeenAlreadyUsedAsSplitter() || blockSPL == splittedBlock){
+							biggestSubBlock.setCanBeUsedAsSplitter(false);
+						}
 					}
 				}
 				else{
@@ -915,7 +1109,9 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 								blockOfSplitterBecameItsBiggestSubBlock=true;
 							}*/
 						}
-						biggestSubBlock.setCanBeUsedAsSplitter(false);
+						if(skipLargestSubBlock) {
+							biggestSubBlock.setCanBeUsedAsSplitter(false);
+						}
 					}
 					if(hasOnlyUnaryReactions){
 						if(CRNBisimulationsNAry.USETOLERANCE){
@@ -1146,7 +1342,7 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 
 
 	public static CRNandPartition computeReducedCRNOrdinary(ICRN crn,String name, IPartition partition, List<String> symbolicParameters, List<IConstraint> constraints,List<String> parameters,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws IOException {
-		return computeReducedCRNOrdinary(crn,name,partition,symbolicParameters,constraints,parameters,"#",out,bwOut,terminator,BigDecimal.ZERO);
+		return computeReducedCRNOrdinary(crn,name,partition,symbolicParameters,constraints,parameters,"#",out,bwOut,terminator,BigDecimal.ZERO,null);
 	}
 	/**
 	 * This method reduces the model, assuming the partition regards OFL or ordinary CTMC lumpability
@@ -1156,7 +1352,8 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 	 * @return
 	 * @throws IOException 
 	 */
-	public static CRNandPartition computeReducedCRNOrdinary(ICRN crn,String name, IPartition partition, List<String> symbolicParameters, List<IConstraint> constraints,List<String> parameters,String commSymbol,MessageConsoleStream out, BufferedWriter bwOut,Terminator terminator,BigDecimal delta) throws IOException {
+	public static CRNandPartition computeReducedCRNOrdinary(ICRN crn,String name, IPartition partition, List<String> symbolicParameters, List<IConstraint> constraints,List<String> parameters,String commSymbol,MessageConsoleStream out, BufferedWriter bwOut,Terminator terminator,
+			BigDecimal delta,HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM) throws IOException {
 		ICRN reducedCRN = new CRN(name,symbolicParameters,constraints,parameters,crn.getMath(),out,bwOut);
 //		ISpecies[] speciesIdToSpecies= new ISpecies[crn.getSpeciesSize()];
 //		crn.getSpecies().toArray(speciesIdToSpecies);
@@ -1231,13 +1428,22 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 			if(allReagentsAreBlockRepresentatives(reaction.getReagents(),partition)){
 				BigDecimal reactionRate=null;
 				String rateExpression = reaction.getRateExpression();
-				if(deltaHalf!=null) {
-					rateExpression += " + " + deltaHalf;
+				if(reactionToRateInModelBigM!=null) {
+					//I use rates external to the crn, provided in the hashmap
+					reactionRate = reactionToRateInModelBigM.get(reaction);
+					rateExpression = reactionRate.toPlainString();
 				}
-				try{
-				 reactionRate = BigDecimal.valueOf(crn.getMath().evaluate(rateExpression));
-				}catch(java.lang.ArithmeticException e){
-					//System.out.println("Symbolic rate? "+rateExpression);
+				else {
+					//I use rates of the crn
+					if(deltaHalf!=null) {
+						//I add delta to the rates
+						rateExpression += " + " + deltaHalf;
+					}
+					try{
+						reactionRate = BigDecimal.valueOf(crn.getMath().evaluate(rateExpression));
+					}catch(java.lang.ArithmeticException e){
+						//System.out.println("Symbolic rate? "+rateExpression);
+					}
 				}
 				if(BigDecimal.ZERO.compareTo(reactionRate)!=0) {
 					IComposite reducedReagents = getNewCompositeReplaceSpeciesWithReducedOneOfBlock(reaction.getReagents(),partition,correspondenceBlock_ReducedSpecies);

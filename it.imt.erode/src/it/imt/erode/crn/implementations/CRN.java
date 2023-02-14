@@ -52,7 +52,7 @@ public class CRN implements ICRN {
 	//The zero/null species of this CRN
 	private ISpecies zeroSpecies;
 	private boolean influenceNetwork=false;
-	private int maxArity=0;
+	private int maxArity=0,minArity=Integer.MAX_VALUE;
 	private int maxArityProducts=0;
 	
 	
@@ -249,6 +249,9 @@ public class CRN implements ICRN {
 	public boolean addReaction(ICRNReaction reaction) {
 		if(maxArity<reaction.getArity()){
 			maxArity=reaction.getArity();
+		}
+		if(minArity>reaction.getArity()){
+			minArity=reaction.getArity();
 		}
 		int productsArity=reaction.getProducts().computeArity();
 		if(maxArityProducts<productsArity){
@@ -886,6 +889,11 @@ public class CRN implements ICRN {
 	@Override
 	public int getMaxArity() {
 		return maxArity;
+	}
+	
+	@Override
+	public int getMinArity() {
+		return minArity;
 	}
 
 	@Override

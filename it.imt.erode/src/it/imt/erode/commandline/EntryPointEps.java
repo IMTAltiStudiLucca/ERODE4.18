@@ -14,16 +14,16 @@ import it.imt.erode.importing.UnsupportedFormatException;
 public class EntryPointEps extends EntryPointForMatlabAbstract{
 
 	public EntryPointEps(boolean printPartitions, boolean printModels) {
-		super(printPartitions, printModels);
+		super(printPartitions, printModels,false);
 		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
 	}
 	
-	public void approximateDE(String fileName, LinkedHashSet<String> paramsToPerturb,double epsilon,String prePartitionUserDefined, String prePartitionWRTIC, boolean forward, boolean backward) {
+	public void approximateDE(String fileName, LinkedHashSet<String> paramsToPerturb,double epsilon,String prePartitionUserDefined, String prePartitionWRTIC, boolean forward, boolean backward,boolean fastDegreeOneBE) {
 		boolean verbose=false;
 		CRNReducerCommandLine.print(out,bwOut,"Writing the matlab script to file "+ fileName+" ...");
 		
 		try {
-			MatlabODEsImporter.printEpsilonScriptToMatlabFIle(erode.getCRN(), erode.getPartition(), fileName, verbose, out, bwOut, null,paramsToPerturb,new Terminator(),epsilon,prePartitionUserDefined,prePartitionWRTIC,forward,backward);
+			MatlabODEsImporter.printEpsilonScriptToMatlabFIle(erode.getCRN(), erode.getPartition(), fileName, verbose, out, bwOut, null,paramsToPerturb,new Terminator(),epsilon,prePartitionUserDefined,prePartitionWRTIC,forward,backward,fastDegreeOneBE);
 		} catch (UnsupportedFormatException e) {
 			e.printStackTrace();
 		}
@@ -61,7 +61,8 @@ public class EntryPointEps extends EntryPointForMatlabAbstract{
 		String prePartitionWRTIC = "false";//true
 		boolean forward =false;
 		boolean backward = true;
-		erode.approximateDE(fileName, paramsToPerturb,epsilon, prePartitionUserDefined, prePartitionWRTIC, forward, backward);
+		boolean fastDegreeOneBE=true;
+		erode.approximateDE(fileName, paramsToPerturb,epsilon, prePartitionUserDefined, prePartitionWRTIC, forward, backward,fastDegreeOneBE);
 		
 		//simulateODE(tEnd=1000, steps=100, viewPlot = NO,library=APACHE,csvFile="csvFile")
 		double tEnd = 1000;

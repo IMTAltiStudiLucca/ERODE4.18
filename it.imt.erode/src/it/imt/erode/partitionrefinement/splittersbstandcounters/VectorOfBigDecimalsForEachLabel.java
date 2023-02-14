@@ -29,9 +29,14 @@ public class VectorOfBigDecimalsForEachLabel implements Comparable<VectorOfBigDe
 	public VectorOfBigDecimalsForEachLabel(HashMap<ILabel, BigDecimal> labelAndBigDecimals) {
 		this.labelAndBigDecimals=labelAndBigDecimals;
 
-		keys = new ILabel[labelAndBigDecimals.keySet().size()]; 
-		labelAndBigDecimals.keySet().toArray(keys);
-		Arrays.sort(keys, new ILabelComparator());
+		if(labelAndBigDecimals!=null) {
+			keys = new ILabel[labelAndBigDecimals.keySet().size()]; 
+			labelAndBigDecimals.keySet().toArray(keys);
+			Arrays.sort(keys, new ILabelComparator());
+		}
+		else {
+			keys = new ILabel[0];
+		}
 	}
 
 	@Override

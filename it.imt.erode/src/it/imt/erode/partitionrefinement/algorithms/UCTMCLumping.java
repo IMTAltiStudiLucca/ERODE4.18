@@ -30,7 +30,7 @@ import it.imt.erode.partitionrefinement.splittersbstandcounters.ISpeciesCounterH
 
 public class UCTMCLumping {
 
-	public static IPartition computeCoarsestUCTMCLumpingOrUncertainSE(Reduction red, ICRN crn, IPartition partition,
+	public static PartitionAndMappingReactionToNewRate computeCoarsestUCTMCLumpingOrUncertainSE(Reduction red, ICRN crn, IPartition partition,
 			BigDecimal delta,BigDecimal deltaPerc,boolean doNotAddDeltaToRawConstants, String modelWithBigM, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator,
 			IMessageDialogShower msgDialogShower) {
 		if(verbose){
@@ -40,7 +40,7 @@ public class UCTMCLumping {
 
 		if(red.equals(Reduction.UCTMCFE) && !(crn.isMassAction() && crn.getMaxArity() <=1)){
 			CRNReducerCommandLine.printWarning(out,bwOut,"The model is not supported because it is not a unary mass action RN (i.e., has reactions with more than one reagent, or has reactions with arbitrary rates). I terminate.");
-			return obtainedPartition;
+			return new PartitionAndMappingReactionToNewRate(obtainedPartition, null);
 		}
 		/*
 		if(!crn.isMassAction()){
@@ -59,16 +59,16 @@ public class UCTMCLumping {
 		 */
 		else if(crn.isSymbolic()){
 			CRNReducerCommandLine.printWarning(out,bwOut,"The model is not supported because it contains symbolic parameters (i.e. parameters with no acutal value assigned) I terminate.");
-			return obtainedPartition;
+			return new PartitionAndMappingReactionToNewRate(obtainedPartition, null);
 		}
 		else if(crn.algebraicSpecies()>0){
 			CRNReducerCommandLine.printWarning(out,bwOut,"The model is not supported because it is a system of differential algebraic equations (i.e. it has algebraic species) I terminate.");
-			return obtainedPartition;
+			return new PartitionAndMappingReactionToNewRate(obtainedPartition, null);
 		}
 
 		if(!(red.equals(Reduction.UCTMCFE)||red.equals(Reduction.USE))){
 			CRNReducerCommandLine.printWarning(out,bwOut,"Please invoke this method using UCTMCFE or USE. I terminate.");
-			return obtainedPartition;
+			return new PartitionAndMappingReactionToNewRate(obtainedPartition, null);
 		}
 
 		int uncertainties=0;
@@ -89,17 +89,17 @@ public class UCTMCLumping {
 		}
 		if(uncertainties!=1) {
 			CRNReducerCommandLine.printWarning(out,bwOut,"You should either provide a delta (absolute value) or a delta percentage (from 0 to 1) to implicitly build an interval of this size around each transition rate, or provide the path to another model containing parameters to build the M matrix. I terminate.");
-			return obtainedPartition;
+			return new PartitionAndMappingReactionToNewRate(obtainedPartition, null);
 		}
 
-		if(red.equals(Reduction.UCTMCFE) && !useDelta) {
-			CRNReducerCommandLine.printWarning(out,bwOut,Reduction.UCTMCFE+" can be computed only with explicit absolute delta. I terminate.");
-			return obtainedPartition;
-		}
+//		if(red.equals(Reduction.UCTMCFE) && !useDelta) {
+//			CRNReducerCommandLine.printWarning(out,bwOut,Reduction.UCTMCFE+" can be computed only with explicit absolute delta. I terminate.");
+//			return new PartitionAndMappingReactionToNewRate(obtainedPartition, null);
+//		}
 		
 		if(red.equals(Reduction.USE) && !(useDelta||useDeltaPerc)) {
 			CRNReducerCommandLine.printWarning(out,bwOut,"Uncertain SE can be computed only with explicit delta (absolute or perc). I terminate.");
-			return obtainedPartition;
+			return new PartitionAndMappingReactionToNewRate(obtainedPartition, null);
 		}
 
 
@@ -115,10 +115,10 @@ public class UCTMCLumping {
 		//int iteration =1;
 
 		
-		if(red.equals(Reduction.UCTMCFE)){
-			// USE THIS TO COMPUTE MEASURES FOR THE BOUNDS
-			computeOnlyMeasuresForBound(crn, delta, out, bwOut, terminator);
-		}
+//		if(red.equals(Reduction.UCTMCFE)){
+//			// USE THIS TO COMPUTE MEASURES FOR THE BOUNDS
+//			computeOnlyMeasuresForBound(crn, delta, out, bwOut, terminator);
+//		}
 		/*
 		boolean onlyMeasures=true;
 		if(onlyMeasures) {
@@ -126,6 +126,7 @@ public class UCTMCLumping {
 			return obtainedPartition;
 		}
 		*/
+		HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM=null;
 		
 				
 		if(useDelta||useDeltaPerc) {
@@ -133,7 +134,7 @@ public class UCTMCLumping {
 				obtainedPartition=useExplicitDelta(crn, red,useDelta?delta:deltaPerc,useDelta,doNotAddDeltaToRawConstants,out, bwOut, terminator, obtainedPartition);
 			} catch (IOException e) {
 				CRNReducerCommandLine.printWarning(out,bwOut,"Problems in performing the internal exact reductions. The model is not supported. I terminate.");
-				return obtainedPartition;
+				return new PartitionAndMappingReactionToNewRate(obtainedPartition, reactionToRateInModelBigM);
 			}
 		}
 		else {
@@ -151,12 +152,12 @@ public class UCTMCLumping {
 				
 				CRNReducerCommandLine.printWarning(out,bwOut,"\n\tProblems in loading the model with M transition rates. I terminate.");
 				msgDialogShower.openSimpleDialog("Problems in loading the model with M transition rates. I terminate.\n"+modelWithBigM, DialogType.Error);
-				return obtainedPartition;
+				return new PartitionAndMappingReactionToNewRate(obtainedPartition, reactionToRateInModelBigM);
 			}
 			CRNReducerCommandLine.print(out,bwOut," completed.");
 			ICRN crnBigM = importer.getCRN();
 			//partition = importer.getInitialPartition();
-			HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM=new HashMap<>(crn.getReactions().size());
+			reactionToRateInModelBigM=new HashMap<>(crn.getReactions().size());
 			for(int i=0;i<crn.getReactions().size();i++) {
 				reactionToRateInModelBigM.put(crn.getReactions().get(i), crnBigM.getReactions().get(i).getRate());
 
@@ -176,7 +177,7 @@ public class UCTMCLumping {
 			CRNReducerCommandLine.println(out,bwOut,red+" Partitioning completed. From "+ crn.getSpecies().size() +" species to "+ obtainedPartition.size() + " blocks. Time necessary: "+(end-begin)+ " (ms)");
 			CRNReducerCommandLine.println(out,bwOut,"");
 		}
-		return obtainedPartition;
+		return new PartitionAndMappingReactionToNewRate(obtainedPartition,reactionToRateInModelBigM);
 	}
 
 	public static void computeOnlyMeasuresForBound(ICRN crn, BigDecimal delta, MessageConsoleStream out, BufferedWriter bwOut,Terminator terminator) {
@@ -238,7 +239,7 @@ public class UCTMCLumping {
 			}
 			else {
 				//Here I know that delta is absolute
-				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,minusDeltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients);
+				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,minusDeltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients,null);
 			}
 			long endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
@@ -254,7 +255,7 @@ public class UCTMCLumping {
 				obtainedPartition=obtainedPartitionAndBool.getPartition();
 			}
 			else {
-				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,deltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients);
+				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,deltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients,null);
 			}
 			endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
@@ -352,7 +353,7 @@ public class UCTMCLumping {
 			CRNReducerCommandLine.print(out,bwOut,"\n\tComputing FE for lower bounds...");
 			long beginfe=System.currentTimeMillis();
 			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM=new HashMap<>();
-			CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false);
+			CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,null);
 			long endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
 

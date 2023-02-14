@@ -117,7 +117,7 @@ public class NetworkControllability {
 			long beginfe=System.currentTimeMillis();
 			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM=new HashMap<>();
 			//CRNBisimulationsNAry.refine(Reduction.BE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false);
-			CRNBisimulationsNAry.refine(Reduction.BE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,true,null,null,reactionsToConsiderForEachSpecies,null);
+			CRNBisimulationsNAry.refine(Reduction.BE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,true,null,null,reactionsToConsiderForEachSpecies,null,null);
 			long endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
 
@@ -126,7 +126,7 @@ public class NetworkControllability {
 			CRNReducerCommandLine.print(out,bwOut,"\tComputing BE on model for transposed matrix...");
 			beginfe=System.currentTimeMillis();
 			speciesCountersHM=new HashMap<>();
-			CRNBisimulationsNAry.refine(Reduction.BE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,true,null,null,transposedReactionsToConsiderForEachSpecies,null);
+			CRNBisimulationsNAry.refine(Reduction.BE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,true,null,null,transposedReactionsToConsiderForEachSpecies,null,null);
 			endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
 

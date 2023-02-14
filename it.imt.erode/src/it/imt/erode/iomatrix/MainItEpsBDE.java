@@ -41,7 +41,7 @@ public class MainItEpsBDE {
     	ICRN crn = c.createCRN(N,matrix);    	
     	
     	//EntryPointForMatlab entry = new EntryPointForMatlab(printPartitions,printCRNs);
-		EntryPointForMatlab entry = new EntryPointForMatlab(printPartitions,printCRNs,crn);
+		EntryPointForMatlab entry = new EntryPointForMatlab(printPartitions,printCRNs,crn,false);
     	//entry.load("ITA-RN.ode");
     	
     	// initial partition done by hand based on similar demand

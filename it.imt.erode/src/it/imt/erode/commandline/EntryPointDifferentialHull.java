@@ -10,7 +10,7 @@ public class EntryPointDifferentialHull extends EntryPointForMatlabAbstract{
 	
 	
 	public EntryPointDifferentialHull() {
-		super(false,false);
+		super(false,false,false);
 	}
 	
 	public void computeDifferentialHull(String fOut, boolean strict, double delta) throws UnsupportedFormatException, IOException {

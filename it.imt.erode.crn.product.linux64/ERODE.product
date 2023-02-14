@@ -171,7 +171,7 @@ SOFTWARE.
    </configurations>
 
    <repositories>
-      <repository location="http://https://github.com/IMTAltiStudiLucca/ERODE-updatesites/blob/master/repository-linux" enabled="true" />
+      <repository location="http://github.com/IMTAltiStudiLucca/ERODE-updatesites/blob/master/repository-linux" enabled="true" />
    </repositories>
 
    <preferencesInfo>

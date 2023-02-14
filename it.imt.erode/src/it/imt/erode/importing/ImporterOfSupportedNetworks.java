@@ -133,6 +133,10 @@ public class ImporterOfSupportedNetworks {
 			importer = new CompactCSVMatrixImporter(fileName,optionalParameters,out,bwOut,msgDialogShower);
 			((CompactCSVMatrixImporter)importer).importAffineSystem(printInfo, printCRN, print);
 		}
+		else if(format.equals(SupportedFormats.CNFasPoly)){
+			importer = new CNFImporter(fileName, out, bwOut, msgDialogShower);
+			((CNFImporter)importer).readCNFandPolynomiaze(print);
+		}
 		else if(format.equals(SupportedFormats.LinearWithInputs)){
 			//TODO
 			importer = new CompactCSVMatrixImporter(fileName,optionalParameters,out,bwOut,msgDialogShower);
@@ -149,6 +153,8 @@ public class ImporterOfSupportedNetworks {
 		
 		long endImp = System.currentTimeMillis();
 		importer.getInfoImporting().setRequiredMS(endImp-beginImp);
+		
+		
 		
 		return importer;
 	}

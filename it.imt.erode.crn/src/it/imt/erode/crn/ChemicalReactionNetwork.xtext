@@ -90,7 +90,7 @@ ModelDefinition :
 ;
 
 ImportFolder:
-	importSBMLFolder
+	importSBMLFolder|importAndPolyCNFFolder
 	//|importBoolCubeSBMLFolder
 ;
 
@@ -460,6 +460,9 @@ onTheFlyFR : {onTheFlyFR}
 	 ')'
 ;
 
+
+
+
 z3Metrics: {z3Metrics}
 	'z3Metrics' '('
 		'z3C' '=' C = ArithmeticExpression ','
@@ -614,6 +617,9 @@ importSBMLFolder:
 	'importSBMLFolder' '(' params = ParametersImportFolder (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
 	//'importSBMLFolder' '(' 'folderIn' '=' folderIn = STRING ',' 'folderOut' '=' folderOut = STRING (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
 ;
+importAndPolyCNFFolder:
+	'importAndPolyCNFFolder' '(' params = ParametersImportFolder ')'
+;
 
 Reduction:
 	MassActionReduction |
@@ -641,6 +647,8 @@ MassActionReduction:
 	reduceUSE|
 	reduceBE_AAt |
 	reduceCoRNFE
+	|
+	justBEReduction
 ;
 
 /*MassActionEpsilonReduction:
@@ -657,7 +665,7 @@ approximateFDE : {approximateFDE}
 	'approximateFDE' '('params=ParamsApprox ')'
 ;
 approximateBDE : {approximateBDE}
-	'approximateBDE' '('params=ParamsApprox ')'
+	'approximateBDE' '('params=ParamsApprox ',' 'fastDegreeOne' '=' fastDegreeOne=BooleanValue  ')'
 ;
 
 ParamsApprox:
@@ -687,6 +695,9 @@ UpdateStatusCommand:
 
 reduceBE : {reduceBE}
 	'reduceBE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+justBEReduction : {justBEReduction}
+	'justBEReduction' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
 ;
 
 reduceFE : {reduceFE}
@@ -1163,6 +1174,7 @@ exportScriptSolveUCTMC:
 		params = ParametersExport ',' //'fileOut' fileOut=STRING ','	//"counterExampleUCTMCLump2_solveUCTMC.m"
 		(
 			('modelWithSmallM' '=' modelWithSmallM=STRING)| //"counterExampleUCTMCLump2_smallm.ode",
+			('modelWithBigM' '=' modelWithBigM=STRING)|
 			('delta' '=' delta = POSITIVEINTORREAL)
 		)	','
 		'tHoriz' '=' tHoriz=ArithmeticExpression','

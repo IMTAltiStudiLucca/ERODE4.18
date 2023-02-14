@@ -2,6 +2,7 @@ package it.imt.erode.expression.parser;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.Map.Entry;
 
 import it.imt.erode.crn.interfaces.ISpecies;
 
@@ -78,6 +79,76 @@ public abstract class Monomial implements IMonomial {
 	@Override
 	public boolean isParameter() {
 		return false;
+	}
+	
+	public static final IMonomial zeroMonomial=new NumberMonomial(BigDecimal.ZERO, "0");
+	public static NumberMonomial getAndAddIfNecessary(String bd,HashMap<String, NumberMonomial> bdToMon) {
+		NumberMonomial mon= bdToMon.get(bd);
+		if(mon==null) {
+			mon=new NumberMonomial(new BigDecimal(bd) , bd);
+			bdToMon.put(bd, mon);
+		}
+		return mon;
+	}
+	public static NumberMonomial getAndAddIfNecessary(BigDecimal bd,HashMap<String, NumberMonomial> bdToMon) {
+		String bdStr=bd.toPlainString();
+		NumberMonomial mon= bdToMon.get(bdStr);
+		if(mon==null) {
+			mon=new NumberMonomial(bd , bdStr);
+			bdToMon.put(bdStr, mon);
+		}
+		return mon;
+	}
+	public static SpeciesMonomial getAndAddIfNecessary(ISpecies sp,HashMap<ISpecies, SpeciesMonomial> spToMon) {
+		SpeciesMonomial mon= spToMon.get(sp);
+		if(mon==null) {
+			mon=new SpeciesMonomial(sp);
+			spToMon.put(sp, mon);
+		}
+		return mon;
+	}
+	public static final NumberMonomial minusOneMon=new NumberMonomial(new BigDecimal(-1), "-1");
+	public static ProductMonomial getNegatedAndAddIfNecessary(ISpecies sp,HashMap<ISpecies, SpeciesMonomial> spToMon,HashMap<ISpecies, ProductMonomial> spToNegMon) {
+		ProductMonomial mon= spToNegMon.get(sp);
+		if(mon==null) {
+			IMonomial spMon= getAndAddIfNecessary(sp, spToMon);
+			mon= new ProductMonomial(minusOneMon, spMon);
+			spToNegMon.put(sp, mon);
+		}
+		return mon;
+	}
+	public static IMonomial deriveInSpecies(IMonomial monomial, ISpecies spToDerive,HashMap<String, NumberMonomial> bdToMon,HashMap<ISpecies, SpeciesMonomial> spToMon) {
+		HashMap<ISpecies, Integer> appearingSpecies = monomial.getOrComputeSpecies();
+		Integer countsp=appearingSpecies.get(spToDerive);
+		if(countsp==null || countsp==0) {
+			return zeroMonomial;
+		}
+		else {
+			BigDecimal coeff = monomial.getOrComputeCoefficient().multiply(new BigDecimal(countsp));
+			IMonomial derivedMon=getAndAddIfNecessary(coeff, bdToMon);
+			
+			//NumberMonomial coeffDeriv= new NumberMonomial(BigDecimal.valueOf(countsp), countsp+"");
+			//BigDecimal coeff = monomial.getOrComputeCoefficient();
+			//String coeffExpr = monomial.getOrComputeCoefficientExpression();
+			//IMonomial derivedMon = new ProductMonomial(coeffDeriv, new NumberMonomial(coeff, coeffExpr));
+			
+			//HashMap<ISpecies, Integer> derivedAppearingSpecies= new LinkedHashMap<ISpecies, Integer>(appearingSpecies);
+			//derivedAppearingSpecies.put(spToDerive, countsp-1);
+
+			for(Entry<ISpecies, Integer> entry:appearingSpecies.entrySet()) {
+				int count=entry.getValue();
+				ISpecies sp=entry.getKey();
+				if(sp.equals(spToDerive)) {
+					count=count-1;
+				}
+				IMonomial spMon = getAndAddIfNecessary(sp, spToMon); //new SpeciesMonomial(entry.getKey());
+				for(int i=0;i<count;i++) {
+					derivedMon=new ProductMonomial(derivedMon, spMon);
+				}
+			}
+
+			return derivedMon;
+		}
 	}
 	
 

@@ -374,7 +374,7 @@ public class ControlEquivalences {
 			//SpeciesCounterHandlerCRNBIsimulationNAry	 speciesCounters[] = new SpeciesCounterHandlerCRNBIsimulationNAry	[curriedfG.getSpecies().size()];
 			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM=new HashMap<>();
 			//CRNBisimulationsNAry.refine(Reduction.FE, curriedfG, obtainedPartitionCurriedfG/*, multisetCoefficients*/, speciesCounters, terminator,out,bwOut,true);
-			CRNBisimulationsNAry.refine(Reduction.FE, curriedfG, obtainedPartitionCurriedfG/*, multisetCoefficients*/, null,speciesCountersHM, terminator,out,bwOut,true);
+			CRNBisimulationsNAry.refine(Reduction.FE, curriedfG, obtainedPartitionCurriedfG/*, multisetCoefficients*/, null,speciesCountersHM, terminator,out,bwOut,true,null);
 			//CRNBisimulationsNAryWithoutListsOfReactions.refine(Reduction.FE, curriedfG, obtainedPartitionCurriedfG/*, multisetCoefficients*/, null,speciesCountersHM, terminator,out,bwOut,true);
 			long endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut,"\n\t\t\tComputation of FE completed in total in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");

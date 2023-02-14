@@ -55,8 +55,12 @@ import it.imt.erode.cage.CreateCAGEScript;
 import it.imt.erode.causalgraph.CausalGraphCreator;
 import it.imt.erode.crn.differentialHull.DifferentialHull;
 import it.imt.erode.crn.implementations.CRN;
+import it.imt.erode.crn.implementations.Command;
+import it.imt.erode.crn.implementations.CommandParameter;
 import it.imt.erode.crn.implementations.InfoCRNReduction;
 import it.imt.erode.crn.interfaces.ICRN;
+import it.imt.erode.crn.interfaces.ICRNReaction;
+import it.imt.erode.crn.interfaces.ICommand;
 import it.imt.erode.crn.interfaces.IComposite;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.crn.label.ILabel;
@@ -113,6 +117,7 @@ import it.imt.erode.partitionrefinement.algorithms.DifferentialSpeciesBisimilari
 import it.imt.erode.partitionrefinement.algorithms.EpsilonDifferentialEquivalences;
 import it.imt.erode.partitionrefinement.algorithms.ExactFluidBisimilarity;
 import it.imt.erode.partitionrefinement.algorithms.NetworkControllability;
+import it.imt.erode.partitionrefinement.algorithms.PartitionAndMappingReactionToNewRate;
 //import it.imt.erode.partitionrefinement.algorithms.SyntacticMarkovianBisimilarityAllLabelsNoSelfLoops;
 import it.imt.erode.partitionrefinement.algorithms.SMTExactFluidBisimilarity;
 import it.imt.erode.partitionrefinement.algorithms.SMTMetrics;
@@ -663,6 +668,11 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			partition=null;
 			handleImportSBMLFolderCommand(command,out,bwOut);
 		}
+		else if(command.startsWith("importAndPolyCNFFolder(")){
+			crn=null;
+			partition=null;
+			handleImportAndPolyCNFFolderCommand(command,out,bwOut);
+		}
 		else{
 			CRNReducerCommandLine.println(out,bwOut,"Unknown command \""+command+"\". I skip it."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut, "Type --help for usage instructions.");
 			//usage();
@@ -858,6 +868,9 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				}
 				else if(command.startsWith("reduceBE_AAt(")){
 					handleReduceCommand(command,updateCRN,"BE_AAt",out,bwOut);
+				}
+				else if(command.startsWith("justBEReduction(")){
+					handleReduceCommand(command,updateCRN,"justBEReduction",out,bwOut);
 				}
 				else if(command.startsWith("reduceEpsNFB(")){
 					handleReduceCommand(command,updateCRN,"enfb",out,bwOut);
@@ -3196,7 +3209,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 						partitionInfoFileName, groupedFileName, sameICFileName, csvSMTTimeFileName, typeOfGroupedFile, 
 						computeOnlyPartition, csvFile, print, sumReductionAlgorithm, writeReducedCRN, writeGroupedCRN, 
 						writeSameICCRN, crn, null, originalCRNShort, obtainedPartition, new CRNandPartition(crn, obtainedPartition), 
-						icWarning, reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, beginBegin, smtTime, end,null,BigDecimal.ZERO);
+						icWarning, reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, beginBegin, smtTime, end,null,BigDecimal.ZERO,null);
 			} catch (UnsupportedFormatException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -3993,6 +4006,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		String parameters[] = CRNReducerCommandLine.getParameters(command);
 		String fileName=null;
 		String modelWithSmallM=null;
+		String modelWithBigM=null;
 		boolean minimize=true;
 		double tHoriz=-1;
 		LinkedHashMap<String, Double> rRewards=null,phiRewards=null,inits=null;
@@ -4031,6 +4045,17 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 					return;
 				}
 				modelWithSmallM = parameter.substring("modelWithSmallM=>".length(), parameter.length());
+				//writeCRN(fileName,crn,partition,SupportedFormats.MatalbArbitraryODEs,null,"",out,bwOut);
+				//writeCRN(fileName,crn, partition, SupportedFormats.MatalbArbitraryODEs, null, "", String.valueOf(tEnd), out,false);
+				//break;
+			}
+			else if(parameter.startsWith("modelWithBigM=>")){
+				if(parameter.length()<="modelWithBigM=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the .ode file containing big M. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				modelWithBigM = parameter.substring("modelWithBigM=>".length(), parameter.length());
 				//writeCRN(fileName,crn,partition,SupportedFormats.MatalbArbitraryODEs,null,"",out,bwOut);
 				//writeCRN(fileName,crn, partition, SupportedFormats.MatalbArbitraryODEs, null, "", String.valueOf(tEnd), out,false);
 				//break;
@@ -4138,8 +4163,8 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 			return;
 		}
-		if((deltaStr==null || deltaStr.length()==0) && (modelWithSmallM ==null || modelWithSmallM.equals(""))){
-			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the .ode file containing small M. Alternatively, specify the delta ");
+		if((deltaStr==null || deltaStr.length()==0) && (modelWithSmallM ==null || modelWithSmallM.equals(""))&& (modelWithBigM ==null || modelWithBigM.equals(""))){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the .ode file containing small M or big M. Alternatively, specify the delta ");
 			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
 			return;
 		}
@@ -4159,7 +4184,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		if(deltaStr!=null) {
 			deltaHalf=new BigDecimal(deltaStr).divide(new BigDecimal(2));
 		}
-		moi.printSolveUCTMC(crn, minimize, tHoriz, minimize, modelWithSmallM,deltaHalf,
+		moi.printSolveUCTMC(crn, minimize, tHoriz, minimize, modelWithSmallM,modelWithBigM,deltaHalf,
 				inits, rRewards, phiRewards, out, bwOut, messageDialogShower, terminator);
 		
 	}
@@ -5767,6 +5792,8 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		LinkedHashSet<String> paramsToPerturb=new LinkedHashSet<String>();
 		String parameters[] = CRNReducerCommandLine.getParameters(command);
 		
+		boolean fastDegreeOneBDE=false; 
+		
 		String prePartitionWRTIC="false";
 		String prePartitionUserDefined="false";
 		
@@ -5852,6 +5879,14 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 				epsilonString = parameter.substring("epsilon=>".length(), parameter.length());
 				epsilonSpecified=true;
 			}
+			else if(parameter.startsWith("fastDegreeOne=>")){
+				if(parameter.length()<="fastDegreeOne=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify if we should use the fast BDE for degree one models (e.g., networks or affine systems without B). ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return;
+				}
+				fastDegreeOneBDE = parameter.substring("fastDegreeOne=>".length(), parameter.length()).equalsIgnoreCase("true");
+			}
 			else{
 				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameter+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
 				return;
@@ -5879,7 +5914,7 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		}
 		
 		CRNReducerCommandLine.print(out,bwOut,"Writing the matlab script to file "+ fileName+" ...");
-		MatlabODEsImporter.printEpsilonScriptToMatlabFIle(crn, partition, fileName, verbose, out, bwOut, messageDialogShower,paramsToPerturb,terminator,epsilon,prePartitionUserDefined,prePartitionWRTIC,forward,backward);
+		MatlabODEsImporter.printEpsilonScriptToMatlabFIle(crn, partition, fileName, verbose, out, bwOut, messageDialogShower,paramsToPerturb,terminator,epsilon,prePartitionUserDefined,prePartitionWRTIC,forward,backward,fastDegreeOneBDE);
 		CRNReducerCommandLine.println(out,bwOut," completed");
 	}
 	
@@ -8114,7 +8149,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		return true;
 	}
 	
-	@SuppressWarnings("unused")
+	//@SuppressWarnings("unused")
 	private boolean handleImportCNFFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
 		String[] parameters = CRNReducerCommandLine.getParameters(command);
 		if(parameters==null){
@@ -8160,10 +8195,10 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		}
 		try {
 			//new String[]{String.valueOf(forceMassAction)},
-			
+
 			File foldOut = new File(folderOut);
 			String foldoutPrefix = foldOut.getAbsolutePath()+File.separator;
-			
+
 			File foldIn = new File(folderIn);
 			if(foldIn.isDirectory()) {
 				String[] allFiles = foldIn.list();
@@ -8178,66 +8213,72 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					String current = foldIn.getAbsolutePath()+File.separator+allFiles[i];
 					if(allFiles[i].toLowerCase().endsWith(".cnf")) {
 						String fileOut = foldoutPrefix+AbstractImporter.overwriteExtensionIfEnabled(allFiles[i],".ode",true);
-						
+
 						CNFImporter cnfImporter = new CNFImporter(current, out, bwOut, messageDialogShower);
+
 						ArrayList<String> comments=cnfImporter.readCNF(true);
-				        IBooleanNetwork bn = cnfImporter.getBN();
-				        Collection<String> preambleComments=new ArrayList<String>(3+comments.size());
-				        preambleComments.add("Automatically imported by "+TOOLNAME+" from");
-				        preambleComments.add(current);
-				        preambleComments.add("User partition obtained by singling out the extra 'output' variable");
-				        preambleComments.addAll(comments);
-				        
-				        Collection<String> commands = new ArrayList<String>(2);
-				        Collection<String> commandsCL = new ArrayList<String>(2);
-				        
-				        String preserving="OutputPreserving";
-				        
-//				        commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+"BBE.txt\",csvFile=\"reductionsMaximalBBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+"BBE.ode\")");
-//				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
-//				        	commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+"BBE.txt\",csvFile=\"reductions"+preserving+"BBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+"BBE.ode\",prePartition=USER)\n");
-//				        }
-				        
-				        ArrayList<String> aggrs=new ArrayList<>(4);
-				        String technique="FBE";
-				        if(bn.isMultiValued()) {
-				        	technique="FME";
-				        	aggrs.add("PLUS");
-				        	aggrs.add("TIMES");
-				        	aggrs.add("MIN");
-				        	aggrs.add("MAX");
-				        }
-				        else {
-				        	aggrs.add("AND");
-				        	aggrs.add("OR");
-//				        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"FBE_OR.txt\",csvFile=\"reductionsMaximalFBE_OR.csv\",reducedFile=\""+bn.getName()+"FBE_OR.ode\")");
-//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
-//					        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_OR.txt\",csvFile=\"reductions"+preserving+"FBE_OR.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_OR.ode\",prePartition=USER)\n");
-//					        }
-//					        commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"FBE_AND.txt\",csvFile=\"reductionsMaximalFBE_AND.csv\",reducedFile=\""+bn.getName()+"FBE_AND.ode\")");
-//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
-//					        	commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_AND.txt\",csvFile=\"reductions"+preserving+"FBE_AND.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_AND.ode\",prePartition=USER)\n");
-//					        }
-				        }
-				        for(String aggr:aggrs) {
-				        	//commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".txt\",csvFile=\"reductionsMaximal"+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".ode\")");
-					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
-					        	commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+".txt\",csvFile=\"reductions"+preserving+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+"._ode\",prePartition=USER)\n");
-					        	String outPathRed = foldOut.getAbsolutePath()+ File.separator +"red"+File.separator;
-					        	commandsCL.add("reduce"+technique+"({aggregationFunction=>"+aggr+",fileWhereToStorePartition=>"+outPathRed+bn.getName()+preserving+technique+"_"+aggr+".txt,csvFile=>"+outPathRed+"reductions"+preserving+technique+"_"+aggr+".csv,reducedFile=>"+outPathRed+bn.getName()+preserving+technique+"_"+aggr+"._ode,prePartition=>USER})\n");
-					        }
-				        }
-				        
-				        BooleanNetworkCommandLine bnCL = new BooleanNetworkCommandLine(null, bn, partition);
-				        for(String com : commandsCL) {
-				        	bnCL.handleReduceCommand(com, false, technique, out, bwOut);
-				        }
-				        
-				        
-						//GUIBooleanNetworkImporter.printToBNERODEFIle(bn, cnfImporter.getInitialPartition(),
-				        //		fileOut,preambleComments, true, out, bwOut, false,commands);
-						
+						IBooleanNetwork bn = cnfImporter.getBN();
+						Collection<String> preambleComments=new ArrayList<String>(3+comments.size());
+						preambleComments.add("Automatically imported by "+TOOLNAME+" from");
+						preambleComments.add(current);
+						preambleComments.add("User partition obtained by singling out the extra 'output' variable");
+						preambleComments.addAll(comments);
+
+						Collection<String> commands = new ArrayList<String>(2);
+						Collection<String> commandsCL = new ArrayList<String>(2);
+
+						String preserving="OutputPreserving";
+
+						//				        commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+"BBE.txt\",csvFile=\"reductionsMaximalBBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+"BBE.ode\")");
+						//				        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+						//				        	commands.add("reduceBBE(fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+"BBE.txt\",csvFile=\"reductions"+preserving+"BBE.csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+"BBE.ode\",prePartition=USER)\n");
+						//				        }
+
+						ArrayList<String> aggrs=new ArrayList<>(4);
+						String technique="FBE";
+						if(bn.isMultiValued()) {
+							technique="FME";
+							aggrs.add("PLUS");
+							aggrs.add("TIMES");
+							aggrs.add("MIN");
+							aggrs.add("MAX");
+						}
+						else {
+							aggrs.add("OR");
+							aggrs.add("AND");
+
+							//				        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+"FBE_OR.txt\",csvFile=\"reductionsMaximalFBE_OR.csv\",reducedFile=\""+bn.getName()+"FBE_OR.ode\")");
+							//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+							//					        	commands.add("reduceFBE(aggregationFunction=OR,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_OR.txt\",csvFile=\"reductions"+preserving+"FBE_OR.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_OR.ode\",prePartition=USER)\n");
+							//					        }
+							//					        commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+"FBE_AND.txt\",csvFile=\"reductionsMaximalFBE_AND.csv\",reducedFile=\""+bn.getName()+"FBE_AND.ode\")");
+							//					        if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+							//					        	commands.add("reduceFBE(aggregationFunction=AND,fileWhereToStorePartition=\""+bn.getName()+preserving+"FBE_AND.txt\",csvFile=\"reductions"+preserving+"FBE_AND.csv\",reducedFile=\""+bn.getName()+preserving+"FBE_AND.ode\",prePartition=USER)\n");
+							//					        }
+						}
+						for(String aggr:aggrs) {
+							//commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".txt\",csvFile=\"reductionsMaximal"+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+technique+"_"+aggr+".ode\")");
+							if(bn.getUserDefinedPartition()!=null && bn.getUserDefinedPartition().size()>0) {
+								commands.add("reduce"+technique+"(aggregationFunction="+aggr+",fileWhereToStorePartition=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+".txt\",csvFile=\"reductions"+preserving+technique+"_"+aggr+".csv\",reducedFile=\"red"+File.separator+bn.getName()+preserving+technique+"_"+aggr+"._ode\",prePartition=USER)\n");
+								String outPathRed = foldOut.getAbsolutePath()+ File.separator +"red"+File.separator;
+								commandsCL.add("reduce"+technique+"({aggregationFunction=>"+aggr+",fileWhereToStorePartition=>"+outPathRed+bn.getName()+preserving+technique+"_"+aggr+".txt,csvFile=>"+outPathRed+"reductions"+preserving+technique+"_"+aggr+".csv,reducedFile=>"+outPathRed+bn.getName()+preserving+technique+"_"+aggr+"._ode,prePartition=>USER})\n");
+							}
+						}
+
+						BooleanNetworkCommandLine bnCL = new BooleanNetworkCommandLine(null, bn, partition);
+						for(String com : commandsCL) {
+							bnCL.handleReduceCommand(com, false, technique, out, bwOut);
+						}
+
+
+						boolean writeFile=true;
+						if(writeFile) {
+							GUIBooleanNetworkImporter.printToBNERODEFIle(bn, cnfImporter.getInitialPartition(),
+									fileOut,preambleComments, true, out, bwOut, false,commands);
+						}
+
 						CRNReducerCommandLine.println(out,bwOut,"");
+
 					}
 				}
 			}
@@ -8254,10 +8295,10 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			//CRNReducerCommandLine.printStackTrace(out,bwOut,e);
 			return false;
 		} 
-		
+
 		return true;
 	}
-	
+
 	private boolean handleImportSBMLQualFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
 		String[] parameters = CRNReducerCommandLine.getParameters(command);
 		if(parameters==null){
@@ -8426,6 +8467,202 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			return false;
 		} 
 		return true;
+	}
+	
+	//importAndPolyCNFFolder
+	private boolean handleImportAndPolyCNFFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
+		String[] parameters = CRNReducerCommandLine.getParameters(command);
+		if(parameters==null){
+			CRNReducerCommandLine.println(out,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+			return false;
+		}
+		String folderIn=null;
+		String folderOut=null;
+		for(int p=0;p<parameters.length;p++){
+			if(parameters[p].startsWith("folderIn=>")){
+				if(parameters[p].length()<="folderIn=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the folder from which to read. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return false;
+				}
+				folderIn = parameters[p].substring("folderIn=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].startsWith("folderOut=>")){
+				if(parameters[p].length()<="folderOut=>".length()){
+					CRNReducerCommandLine.println(out,bwOut,"Please, specify the name of the folder where to write the imported models. ");
+					CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+					return false;
+				}
+				folderOut = parameters[p].substring("folderOut=>".length(), parameters[p].length());
+			}
+			else if(parameters[p].equals("")){
+				continue;
+			}
+			else{
+				CRNReducerCommandLine.println(out,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
+				return false;
+			}
+		}
+		if(folderIn ==null || folderIn.equals("")){
+			CRNReducerCommandLine.println(out,bwOut,"Please, specify the file to be loaded. ");
+			CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
+			return false;
+		}
+		try {			
+			File foldOut = new File(folderOut);
+			String writeCommandPrefix = "write({fileOut=>"+foldOut.getAbsolutePath()+File.separator;
+			File foldIn = new File(folderIn);
+			if(foldIn.isDirectory()) {
+				String[] allFiles = foldIn.list();
+				CRNReducerCommandLine.println(out,bwOut,"Loading all CNF files in folder:");
+				CRNReducerCommandLine.println(out,bwOut,"\t"+folderIn);
+				CRNReducerCommandLine.println(out,bwOut,"The folder contains "+allFiles.length+" files:");
+				for(int i=0;i<allFiles.length;i++) {
+					CRNReducerCommandLine.println(out,bwOut,"\t"+allFiles[i]);
+				}
+				CRNReducerCommandLine.println(out,bwOut,"");
+				//boolean skip=true;
+				for(int i=0;i<allFiles.length;i++) {
+					String current = foldIn.getAbsolutePath()+File.separator+allFiles[i];
+					if(allFiles[i].toLowerCase().endsWith(".cnf") ) {
+//						if(skip) {
+//							//if(allFiles[i].endsWith("vlsat2_33582_4529625.cnf")) {
+//							//if(allFiles[i].endsWith("vlsat2_45150_7165285.cnf")) {
+//							//if(allFiles[i].endsWith("vlsat2_27507_3314450.cnf")) {
+//							//if(allFiles[i].endsWith("vlsat2_5568_1124240.cnf")) {
+//							if(allFiles[i].endsWith("vlsat2_28930_6497511.cnf")) {
+//								skip=false;
+//							}
+//							else {
+//								continue;
+//							}
+//						}
+						boolean failed=false;
+						try { 
+							failed=loadFile(current,SupportedFormats.CNFasPoly,true,true,null,out,bwOut,false,false);
+							//CRNReducerCommandLine.println(out,bwOut,"");
+						} catch (FileNotFoundException e) {
+							CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"File not found: "+folderIn,DialogType.Error);
+						} catch(UnsupportedFormatException ue) {
+							String errorMSG = "Loading failed because we got a clause too large.\n\t"+ue.getMessage();
+							CRNReducerCommandLine.printWarning(out, bwOut,errorMSG);
+							//return false;
+							continue;
+						}
+						
+						if(crn.getReactions().size()==0 || crn.getSpecies().size()==0) {
+							String errorMSG = "Loading failed because we got a model with no dynamics. The model might be not supported or there might be problems in the importer.";
+							CRNReducerCommandLine.printWarning(out, bwOut,errorMSG);
+							//return false;
+							continue;
+						}
+						else {
+							if(!failed) {
+								
+								addReduceCommand(writeCommandPrefix, allFiles[i],"FE",false,false);
+//								if(crn.getUserDefinedPartition()!=null && crn.getUserDefinedPartition().size()>0) {
+//									addReduceCommand(writeCommandPrefix, allFiles[i],"FE",true,false);
+//								}
+								addReduceCommand(writeCommandPrefix, allFiles[i],"BE",false,false);
+								if(crn.getUserDefinedPartition()!=null && crn.getUserDefinedPartition().size()>0) {
+									addReduceCommand(writeCommandPrefix, allFiles[i],"BE",true,false);
+								}
+								
+								//write({fileOut=>/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/TCS_CMSB/BioModels_Database-r31_pub-sbml_files/Imported_BioModels_Database-r31_pub-sbml_files/curated/BIOMD0000000002.ode})
+								String writeCommand = writeCommandPrefix+AbstractImporter.overwriteExtensionIfEnabled(allFiles[i], "_ode", true) + "})";
+								handleWriteCommand(writeCommand, out, bwOut);
+								CRNReducerCommandLine.println(out,bwOut,"");
+								
+								
+								
+								for(ICommand cmd : crn.getCommands()){
+									String cmdStr=cmd.toCRNFormat();
+									String reduction=cmd.getName().replace("reduce", "");
+									this.handleReduceCommand(cmdStr, false, reduction, out, bwOut);
+								}
+							}
+						}
+						CRNReducerCommandLine.println(out,bwOut,"");
+
+//						if(!failed) {
+//							String writeCommand = writeCommandPrefix+AbstractImporter.overwriteExtensionIfEnabled(allFiles[i], "ode", true) + "})";
+//							handleWriteCommand(writeCommand, out, bwOut);
+//							CRNReducerCommandLine.println(out,bwOut,"");
+//						}
+
+					}
+				}
+			}
+		} catch (UnsupportedFormatException e) {
+			if(e.getMessage()!=null){
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of "+folderIn+" failed.\nError message:\n"+e.getMessage(),DialogType.Error);
+			}
+			else{
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of "+folderIn+" failed.",DialogType.Error);
+			}
+			return false;
+		} catch (IOException e) {
+			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled IO errors.\nError message:\n"+e.getMessage(),DialogType.Error);
+			//CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			return false;
+		} catch (JDOMException e) {
+			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled errors.\nError message:\nError message:\n"+e.getMessage(),DialogType.Error);
+			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+		}  catch (XMLStreamException e) {
+			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled error.\nError message:\n"+e.getMessage(),DialogType.Error);
+			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+		}
+		
+		return true;
+	}
+	public void addReduceCommand(String writeCommandPrefix, String file, String redCommand,boolean userPrep,boolean reducedFile) {
+		List<CommandParameter> params=new ArrayList<>();
+		String redFile = writeCommandPrefix.replace("write({fileOut=>","");
+		int sep=redFile.lastIndexOf(File.separator);
+		String redPref=redFile.substring(0,sep);
+		redFile=redFile.substring(sep+1);
+		redFile="red"+File.separator+redFile;
+		redFile=redPref+File.separator+redFile;
+		redFile+=AbstractImporter.overwriteExtensionIfEnabled(file, "", true)+"_"+redCommand;
+		if(userPrep) {
+			redFile+="_userPrep";
+		}
+		redFile="\""+redFile+"._ode\"";
+		
+		CommandParameter cp;
+		if(reducedFile) {
+			cp = new CommandParameter("reducedFile", redFile);
+			params.add(cp);
+		}
+		else {
+			cp = new CommandParameter("computeOnlyPartition", "true");
+			params.add(cp);
+		}
+		
+		if(userPrep) {
+			cp=new CommandParameter("prePartition", "USER");
+			params.add(cp);
+		}
+		
+		
+		String csvFile=redPref+File.separator+"red"+File.separator+redCommand+((userPrep)?"user":"");
+		csvFile="\""+csvFile+".csv\"";
+		cp=new CommandParameter("csvFile", csvFile);
+		params.add(cp);
+		
+		Command cmd= new Command("reduce"+redCommand, params);
+		getCRN().addCommand(cmd);
+		
+		//"reduceFE"
+//		if(crn.getUserDefinedPartition()!=null && crn.getUserDefinedPartition().size()>0) {
+//			params=new ArrayList<>();
+//			redFile = writeCommandPrefix.replace("write({fileOut=>","");
+//			redFile+=AbstractImporter.overwriteExtensionIfEnabled(file, "", true)+"_FE_UserPrep.ode" + "})";
+//			cp = new CommandParameter("reducedFile", redFile);
+//			params.add(cp);
+//			cmd= new Command("reduceFE", params);
+//			getCRN().addCommand(cmd);
+//		}
 	}
 	
 	private boolean handleImportSBMLFolderCommand(String command, MessageConsoleStream out, BufferedWriter bwOut) {
@@ -8783,7 +9020,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		boolean print=true;
 		boolean sumReductionAlgorithm=false;
 		
-		if(reduction.equalsIgnoreCase(Reduction.FE.name())||reduction.equalsIgnoreCase(Reduction.BE.name()) || reduction.equalsIgnoreCase("BE_AAt")/*||reduction.equalsIgnoreCase(Reduction.SE.name())*/){
+		if(reduction.equalsIgnoreCase(Reduction.FE.name())||reduction.equalsIgnoreCase(Reduction.BE.name()) || reduction.equalsIgnoreCase("BE_AAt") /*|| reduction.equalsIgnoreCase("JUSTBEREDUCTION")*//*||reduction.equalsIgnoreCase(Reduction.SE.name())*/){
 			sumReductionAlgorithm=true;
 		}
 		
@@ -9076,6 +9313,8 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				return null;
 			}
 		}
+		
+		HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM=null;
 
 		if(crn==null){
 			CRNReducerCommandLine.println(out,bwOut,"Before reducing a model it is necessary to load it. "); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(out,bwOut,"Type --help for usage instructions.");
@@ -9382,6 +9621,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		long begin = System.currentTimeMillis();
 		boolean succeeded=true;
 		String smtTime=null;
+		
 		if(reduction.equalsIgnoreCase("DSB")||reduction.equalsIgnoreCase("smb")||reduction.equalsIgnoreCase("se")||/*reduction.equalsIgnoreCase("EMSB")||*/reduction.equalsIgnoreCase("fb")||reduction.equalsIgnoreCase("fe")||reduction.equalsIgnoreCase("enfb")||reduction.equalsIgnoreCase("ufe") || reduction.equalsIgnoreCase("uctmcfe") || reduction.equalsIgnoreCase("use") || reduction.equalsIgnoreCase("CoRNFE")){
 			IPartitionAndBoolean obtainedPartitionAndBool=null;
 			
@@ -9403,7 +9643,9 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			else if(reduction.equalsIgnoreCase("UCTMCFE")){
 				
 				begin = System.currentTimeMillis();
-				obtainedPartition = UCTMCLumping.computeCoarsestUCTMCLumpingOrUncertainSE(Reduction.UCTMCFE, crnToConsider, initial, new BigDecimal(deltaString),BigDecimal.ZERO, false,modelWithBigM, verbose, out, bwOut, terminator, messageDialogShower);
+				PartitionAndMappingReactionToNewRate ret = UCTMCLumping.computeCoarsestUCTMCLumpingOrUncertainSE(Reduction.UCTMCFE, crnToConsider, initial, new BigDecimal(deltaString),BigDecimal.ZERO, false,modelWithBigM, verbose, out, bwOut, terminator, messageDialogShower);
+				obtainedPartition= ret.getObtainedPartition();
+				reactionToRateInModelBigM=ret.getReactionToRateInModelBigM();
 				obtainedPartitionAndBool = new IPartitionAndBoolean(obtainedPartition, true);
 				//computeOnlyPartition="true";
 				if(reducedFileName!=null && reducedFileName.length()>0) {
@@ -9421,8 +9663,9 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				BigDecimal deltPerc =new BigDecimal(deltaPercentageString);
 				
 				begin = System.currentTimeMillis();
-				obtainedPartition = UCTMCLumping.computeCoarsestUCTMCLumpingOrUncertainSE(Reduction.USE, crnToConsider, initial, 
+				PartitionAndMappingReactionToNewRate ret = UCTMCLumping.computeCoarsestUCTMCLumpingOrUncertainSE(Reduction.USE, crnToConsider, initial, 
 						delt,deltPerc,doNotAddDeltaToRawConstants, modelWithBigM, verbose, out, bwOut, terminator, messageDialogShower);
+				obtainedPartition = ret.getObtainedPartition();
 				obtainedPartitionAndBool = new IPartitionAndBoolean(obtainedPartition, true);
 				//computeOnlyPartition="true";
 				if(reducedFileName!=null && reducedFileName.length()>0) {
@@ -9549,6 +9792,9 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			succeeded=obtainedPartitionAndBool.getBool();
 			obtainedPartition=obtainedPartitionAndBool.getPartition();
 		}
+		else if(reduction.equalsIgnoreCase("JUSTBEREDUCTION")){
+			obtainedPartition = initial;
+		}
 		//BB, slower algorithm at time of CONCUR
 		else if(reduction.equalsIgnoreCase("EFL")){
 			obtainedPartition = ExactFluidBisimilarity.computeEFL(crnToConsider, initial, verbose,out,bwOut,messageDialogShower);
@@ -9646,7 +9892,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 					partitionInfoFileName, groupedFileName, sameICFileName, csvSMTTimeFileName, typeOfGroupedFile,
 					computeOnlyPartition, csvFile, print, sumReductionAlgorithm, writeReducedCRN, writeGroupedCRN,
 					writeSameICCRN, crnToConsider, initial, originalCRNShort, obtainedPartition, cp, icWarning,
-					reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, begin, smtTime, end,extraColumnsForCSV,delta);
+					reductionName, reducedModelName, smtChecksTime, obtainedPartitionOfParams, begin, smtTime, end,extraColumnsForCSV,delta,reactionToRateInModelBigM);
 		}
 		else {
 			//MessageConsoleStream out, BufferedWriter bwOut, String csvFile, ICRN crn, String reduction, long timeInMS,int initPartitionSize
@@ -9669,7 +9915,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 			boolean writeGroupedCRN, boolean writeSameICCRN, ICRN crnToConsider, IPartition initial,
 			String originalCRNShort, IPartition obtainedPartition, CRNandPartition cp, String icWarning,
 			String reductionName, String reducedModelName, List<Double> smtChecksTime,
-			IPartition obtainedPartitionOfParams, long begin, String smtTime, long end, LinkedHashMap<String, String> extraColumnsForCSV,BigDecimal deltaReduced)
+			IPartition obtainedPartitionOfParams, long begin, String smtTime, long end, LinkedHashMap<String, String> extraColumnsForCSV,BigDecimal deltaReduced, HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM)
 			throws UnsupportedFormatException, IOException {
 		String reducedCRNShort;
 		/*
@@ -9804,15 +10050,23 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 //					delta=BigDecimal.valueOf(deltaString);
 //				}
 				cp=computeReducedCRN_DSBSMB(crnToConsider, fromGUI,terminator,reduction.toLowerCase(),reducedModelName,obtainedPartition,out,bwOut,sumReductionAlgorithm,deltaReduced);
-				if(reduction.equalsIgnoreCase("uctmcfe") && deltaReduced.compareTo(BigDecimal.ZERO)!=0) {
-					cp_m=computeReducedCRN_DSBSMB(crnToConsider, fromGUI,terminator,reduction.toLowerCase(),reducedModelName,obtainedPartition,out,bwOut,sumReductionAlgorithm,BigDecimal.ZERO.subtract(deltaReduced));
+				if(reduction.equalsIgnoreCase("uctmcfe")) {
+					if(deltaReduced.compareTo(BigDecimal.ZERO)!=0) {
+						cp_m=computeReducedCRN_DSBSMB(crnToConsider, fromGUI,terminator,reduction.toLowerCase(),reducedModelName,obtainedPartition,out,bwOut,sumReductionAlgorithm,BigDecimal.ZERO.subtract(deltaReduced));
+					}
+					else {
+						CRNandPartition cp_M=computeReducedCRN_DSBSMB(crnToConsider, fromGUI,terminator,reduction.toLowerCase(),reducedModelName,obtainedPartition,out,bwOut,sumReductionAlgorithm,BigDecimal.ZERO,reactionToRateInModelBigM);
+						cp_m=cp;
+						cp=cp_M;
+					}
 				}
+				
 				
 				//UCTMCLu computeOnlyMeasuresForBound
 				//it.imt.erode.partitionrefinement.algorithms.UCTMCLumping.computeOnlyMeasuresForBound(cp.getCRN(), BigDecimal.valueOf(1.0e-4), out, bwOut, terminator);
 			}
 			else if(reduction.equalsIgnoreCase("EFL") || reduction.equalsIgnoreCase("BDE") || reduction.equalsIgnoreCase("GEFLsmt")||reduction.equalsIgnoreCase("BB")||reduction.equalsIgnoreCase("BE")||reduction.equalsIgnoreCase("ENBB")
-					||reduction.equalsIgnoreCase("BE_AAt")){
+					||reduction.equalsIgnoreCase("BE_AAt") || reduction.equalsIgnoreCase("JUSTBEREDUCTION")){
 				/*CRNReducerCommandLine.println(out,bwOut,"\n\n");
 				CRNReducerCommandLine.println(out,bwOut,crn);
 				CRNReducerCommandLine.println(out,bwOut,"\n\n");
@@ -10252,7 +10506,11 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 	}*/
 
 	private static CRNandPartition computeReducedCRN_DSBSMB(ICRN crn, boolean fromGUI,Terminator terminator, String red, String nameOfCRN, IPartition obtainedPartition, MessageConsoleStream out, BufferedWriter bwOut,boolean newReductionAlgorithm,BigDecimal delta) throws IOException {
-
+		return computeReducedCRN_DSBSMB(crn, fromGUI,terminator, red, nameOfCRN, obtainedPartition, out, bwOut,newReductionAlgorithm,delta,null);
+	}
+	private static CRNandPartition computeReducedCRN_DSBSMB(ICRN crn, boolean fromGUI,Terminator terminator, String red, String nameOfCRN, IPartition obtainedPartition, MessageConsoleStream out, BufferedWriter bwOut,boolean newReductionAlgorithm,
+			BigDecimal delta,HashMap<ICRNReaction, BigDecimal> reactionToRateInModelBigM) throws IOException {
+		
 		/*String name = nameOfCRN;
 		if(name==null || name.equals("")){
 			name = crn.getName();
@@ -10269,7 +10527,7 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 				cp = CRNBisimulationsNAry.computeReducedCRNQuotient(crn,nameOfCRN, obtainedPartition, crn.getSymbolicParameters(),crn.getConstraints(),crn.getParameters(),commentSymbol,out,bwOut,terminator);
 			}
 			else{
-				cp = CRNBisimulationsNAry.computeReducedCRNOrdinary(crn,nameOfCRN, obtainedPartition, crn.getSymbolicParameters(),crn.getConstraints(),crn.getParameters(),commentSymbol,out,bwOut,terminator,delta);
+				cp = CRNBisimulationsNAry.computeReducedCRNOrdinary(crn,nameOfCRN, obtainedPartition, crn.getSymbolicParameters(),crn.getConstraints(),crn.getParameters(),commentSymbol,out,bwOut,terminator,delta,reactionToRateInModelBigM);
 			}
 		}
 		else{

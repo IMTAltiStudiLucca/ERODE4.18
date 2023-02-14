@@ -1129,20 +1129,23 @@ public class MyParserUtil {
 	private static String parseImportFolder(ImportFolder imp, String commandName, String absoluteParentPath) {
 		StringBuilder sb = new StringBuilder(commandName);
 		sb.append("({");
+		
+		//BEGIN To be moved outside if when we will have more 'ImportFolder'
+		sb.append("folderIn=>");
+		sb.append(computeFileName(imp.getParams().getFolderIn(), absoluteParentPath,false));
+		sb.append(',');
+		sb.append("folderOut=>");
+		sb.append(computeFileName(imp.getParams().getFolderOut(), absoluteParentPath,false));
+		sb.append(',');
+		//END To be moved outside if when we will have more 'ImportFolder'
+		
 		if(imp instanceof importSBMLFolder) {
-			//BEGIN To be moved outside if when we will have more 'ImportFolder'
-			sb.append("folderIn=>");
-			sb.append(computeFileName(((importSBMLFolder) imp).getParams().getFolderIn(), absoluteParentPath,false));
-			sb.append(',');
-			sb.append("folderOut=>");
-			sb.append(computeFileName(((importSBMLFolder) imp).getParams().getFolderOut(), absoluteParentPath,false));
-			sb.append(',');
-			//END To be moved outside if when we will have more 'ImportFolder'
 			if(((importSBMLFolder) imp).isForceMassAction()){
 				sb.append("forceMassAction=>true");
 				sb.append(',');
 			}
 		}
+		//importAndPolyCNFFolder
 		
 		sb.deleteCharAt(sb.length()-1);
 		sb.append("})");
@@ -1914,6 +1917,11 @@ public class MyParserUtil {
 				sb.append(computeFileName(script.getModelWithSmallM(),absoluteParentPath));
 				sb.append(',');
 			}
+			else if(script.getModelWithBigM()!=null) {
+				sb.append("modelWithBigM=>");
+				sb.append(computeFileName(script.getModelWithBigM(),absoluteParentPath));
+				sb.append(',');
+			}
 			else {
 				sb.append("delta=>");
 				sb.append(script.getDelta());
@@ -2449,6 +2457,13 @@ public class MyParserUtil {
 		}
 		sb.append(p);
 		sb.append(',');
+		
+		if(command instanceof approximateBDE) {
+			boolean fastDegreeOne=((approximateBDE) command).isFastDegreeOne();
+			sb.append("fastDegreeOne=>");
+			sb.append(fastDegreeOne);
+			sb.append(',');
+		}
 
 
 		sb.deleteCharAt(sb.length()-1);

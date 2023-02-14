@@ -407,6 +407,23 @@ public class SMTForwardBooleanEquivalence {
 						break;
 					}
 					/*Bool*/Expr cumulativeODEsOfCSB = sumsOfTheBlocks[indexOfSplitterBlock];
+					
+					
+					/*
+					//Christian's trick
+					swappedTT=cumulativeODEsOfCSB.substitute(repOfCurrentSubBlockPop, true);
+					swappedTT=swappedTT.substitute(currentSpeciesPop      , true);
+					
+					swappedTF=cumulativeODEsOfCSB.substitute(repOfCurrentSubBlockPop, true);
+					swappedTF=swappedTF.substitute(currentSpeciesPop      , false);
+					
+					swappedFT=cumulativeODEsOfCSB.substitute(repOfCurrentSubBlockPop, false);
+					swappedFT=swappedFT.substitute(currentSpeciesPop      , true);
+					
+					Ask to z3 if swappedTT=swappedTF=swappedFT
+					*/
+							
+					
 					/*Bool*/Expr swappedSum = cumulativeODEsOfCSB.substitute(repOfCurrentSubBlockPop, redistributorApp);
 					// Replace currentSpecies with neutral element
 					Expr neutralElement = neutralElement(bn,currentSpecies,repOfCurrentSubBlock);

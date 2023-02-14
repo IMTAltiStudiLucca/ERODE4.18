@@ -9,6 +9,12 @@ import it.imt.erode.crn.interfaces.ISpecies;
 public interface IMonomial {
 
 	//ICRNReaction toReaction(ISpecies product, ISpecies I);
+	/**
+	 * Creates a reaction that adds a term equal to this monomial to the derivation of variable product. If necessary, it will use species I which represents 1 
+	 * @param product the variable to whose derivative we should add this monomial 
+	 * @param I the special species I that represents the constant 1  
+	 * @return the reaction adding this monomial to the derivative of product. The boolean is true if I was needed
+	 */
 	ICRNReactionAndBoolean toReaction(ISpecies product, ISpecies I);
 
 	HashMap<ISpecies, Integer> getOrComputeSpecies();

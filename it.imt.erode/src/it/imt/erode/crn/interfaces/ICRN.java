@@ -35,6 +35,7 @@ public interface ICRN extends IModel{
 	public boolean addReaction(ICRNReaction reaction);
 	
 	public int getMaxArity();
+	public int getMinArity();
 
 	public void printCRN();
 

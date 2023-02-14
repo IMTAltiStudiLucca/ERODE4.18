@@ -18,6 +18,10 @@ public class DivisionMonomial extends Monomial {
 	public DivisionMonomial(IMonomial left, IMonomial right) {
 		this.left=left;
 		this.right=right;
+		HashMap<ISpecies, Integer> speciesInDividend = right.getOrComputeSpecies();
+		if(speciesInDividend.size()>0) {
+			throw new UnsupportedOperationException("We can only divide by numeric expressions"); 
+		}
 	}
 	
 	@Override

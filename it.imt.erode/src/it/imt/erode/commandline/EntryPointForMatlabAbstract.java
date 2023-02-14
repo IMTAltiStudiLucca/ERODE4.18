@@ -38,17 +38,19 @@ public abstract class EntryPointForMatlabAbstract {
 	protected  MessageConsoleStream out = null;
 	protected  BufferedWriter bwOut=null;
 	//protected  String[] idToSpeciesNames;
+	private boolean fastDegreeOneBE = false;
 
 	protected EpsilonDifferentialEquivalences epsilonDE;
 	
-	public EntryPointForMatlabAbstract(boolean printPartitions, boolean printCRNs){
+	public EntryPointForMatlabAbstract(boolean printPartitions, boolean printCRNs,boolean fastDegreeOneBE){
 		erode = new CRNReducerCommandLine(new CommandsReader(new ArrayList<String>(0),out,bwOut));
 		this.printPartitions=printPartitions;
 		this.printCRNs=printCRNs;
+		this.fastDegreeOneBE=fastDegreeOneBE;
 	}
 	
-	public EntryPointForMatlabAbstract(boolean printPartitions, boolean printCRNs, ICRN crn){
-		this(printPartitions,printCRNs);
+	public EntryPointForMatlabAbstract(boolean printPartitions, boolean printCRNs, ICRN crn,boolean fastDegreeOneBE){
+		this(printPartitions,printCRNs,fastDegreeOneBE);
 		erode.setCRN(crn);
 	}
 
@@ -326,7 +328,16 @@ public abstract class EntryPointForMatlabAbstract {
 		
 		epsilonDE = new EpsilonDifferentialEquivalences();
 		long begin = System.currentTimeMillis();
-		IPartitionAndBoolean obtainedPartitionAndBool = epsilonDE.computeCoarsest(Reduction.ENBB, BigDecimal.valueOf(epsilon), erode.getCRN(), erode.getPartition(), false, out,bwOut, new Terminator(),false);
+		
+		IPartitionAndBoolean obtainedPartitionAndBool;
+		if(fastDegreeOneBE) {
+			obtainedPartitionAndBool =CRNBisimulationsNAry.computeCoarsest(Reduction.BE,erode.getCRN(),erode.getPartition(), false,out,bwOut,new Terminator(),null,BigDecimal.valueOf(epsilon));
+		}
+		else {
+			obtainedPartitionAndBool = epsilonDE.computeCoarsest(Reduction.ENBB, BigDecimal.valueOf(epsilon), erode.getCRN(), erode.getPartition(), false, out,bwOut, new Terminator(),false);
+		}
+		
+		
 		
 		//IPartitionAndBoolean obtainedPartitionAndBool = crnreducer.handleReduceCommand("reduceEpsNBB({computeOnlyPartition=>true,print=>false})",false,"enbb",out,bwOut);
 		//IPartition obtainedPartition = crnreducer.handleReduceCommand("reduceBDE({computeOnlyPartition=>true,print=>false})",false,"bde",out,bwOut);

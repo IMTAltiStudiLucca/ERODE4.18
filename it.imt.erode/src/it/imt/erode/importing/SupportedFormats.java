@@ -9,5 +9,6 @@ BioLayout,Modelica,CERENA, LNA, KonectDoNotEnsureUndirGraph, KonectEnsureUndirGr
 CompactBNG,
 UMIST,OSU,	//ASTROCHEMISTRY
 StochKit, StoichiometryMatrix,
-SpaceEx
+SpaceEx,
+CNFasPoly
 }

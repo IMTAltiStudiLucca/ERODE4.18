@@ -58,6 +58,10 @@ public abstract class AbstractImporter {
 		}
 	}
 	
+	public void addReaction(ICRNReaction reaction) {
+		getCRN().addReaction(reaction);
+	}
+	
 	public static void addReaction(ICRN crn, int arity, 
 			ICRNReaction reaction) {
 		crn.addReaction(reaction);
@@ -103,7 +107,7 @@ public abstract class AbstractImporter {
 	public static String overwriteExtensionIfEnabled(String name,String newExtension,boolean enabled){
 		if(enabled){
 			String fileName = name;
-			String[] knownExtensions = {".net", ".crn",".ode",".lbs", ".xml", ".sbml", ".hyxml", ".bngl", ".txt", ".pop", ".maude", ".z3",".inp", ".CKI",".dat",".cdat", ".tra", ".csv",".mo", ".m", ".cc",".bnet"};
+			String[] knownExtensions = {".net", ".crn",".ode",".lbs", ".xml", ".sbml", ".hyxml", ".bngl", ".txt", ".pop", ".maude", ".z3",".inp", ".CKI",".dat",".cdat", ".tra", ".csv",".mo", ".m", ".cc",".bnet",".cnf"};
 			
 			for(int i=0;i<knownExtensions.length;i++) {
 				if(fileName.endsWith(knownExtensions[i])) {

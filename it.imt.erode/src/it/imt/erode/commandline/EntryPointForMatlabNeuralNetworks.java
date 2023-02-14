@@ -18,7 +18,7 @@ public class EntryPointForMatlabNeuralNetworks extends EntryPointForMatlabAbstra
 	private HashMap<String, ISpecies> speciesNameToSpecies;
 	//private SimulationSolutions solutions;
 	public EntryPointForMatlabNeuralNetworks(boolean printPartitions, boolean printCRNs){
-		super(printPartitions, printCRNs);
+		super(printPartitions, printCRNs,false);
 		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
 	}
 	

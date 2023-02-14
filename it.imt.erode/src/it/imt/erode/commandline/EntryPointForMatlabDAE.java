@@ -17,7 +17,7 @@ import it.imt.erode.partitionrefinement.algorithms.ExactFluidBisimilarity;
 public class EntryPointForMatlabDAE extends EntryPointForMatlabAbstract {
 
 	public EntryPointForMatlabDAE(boolean printPartitions, boolean printCRNs){
-		super(printPartitions, printCRNs);
+		super(printPartitions, printCRNs,false);
 		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
 	}
 

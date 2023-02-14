@@ -55,9 +55,11 @@ public class EpsilonDifferentialEquivalences {
 	private HashMap<ISpecies, ArrayList<IMonomial>> speciesToMonomialODE;
 	private HashMap<ISpecies, ASTNode> speciesToDrift;
 	private HashMap<String, ISpecies> speciesNameToSpecies;
+	private boolean init=false;
 	
 	
-	public IPartitionAndBoolean computeCoarsest(Reduction red,BigDecimal epsilon, ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator,boolean printEps) throws UnsupportedFormatException{
+	public IPartitionAndBoolean computeCoarsest(Reduction red,BigDecimal epsilon, ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, 
+			BufferedWriter bwOut, Terminator terminator,boolean printEps) throws UnsupportedFormatException{
 		
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,red.toString()+" (eps="+epsilon.doubleValue()+") Reducing: "+crn.getName());
@@ -98,6 +100,7 @@ public class EpsilonDifferentialEquivalences {
 			CRNReducerCommandLine.println(out,bwOut,"Init requred: "+String.format(CRNReducerCommandLine.MSFORMAT,String.valueOf(initTime))+" (s)");
 		}
 		
+		
 		refine(red,epsilon,crn,obtainedPartition,terminator);
 		
 		if(verbose){
@@ -132,6 +135,15 @@ public class EpsilonDifferentialEquivalences {
 			BufferedWriter bwOut, boolean solveLinearSystem, LinkedHashSet<String> paramsToPerturb,Terminator terminator, 
 			boolean printM, boolean printSolution) throws UnsupportedFormatException {
 		List<String> linearEquations = new ArrayList<String>();
+		
+		if(!init) {
+			if(red.equals(Reduction.ENBB)) {
+				initOnTheFlyENBB(crn,false,out,bwOut,terminator);
+			}
+			else {
+				init(red,crn,false,out,bwOut,terminator);
+			}
+		}
 		
 		computeLineaEquations(red, obtainedPartition, linearEquations,paramsToPerturb,terminator, crn.getMath());
 
@@ -220,6 +232,11 @@ public class EpsilonDifferentialEquivalences {
 	}
 
 	private void computeLineaEquations(Reduction red, IPartition obtainedPartition, List<String> linearEquations, Collection<String> paramsToPerturb, Terminator terminator, MathEval math) throws UnsupportedFormatException {
+		
+//		if(!init) {
+//			initOnTheFlyENBB(crn,verbose,out,bwOut,terminator);
+//		}
+		
 		IBlock currentBlock = obtainedPartition.getFirstBlock();
 
 		//Build the linear constraints (the equations) used to compute the values for the parameters that make the partition BDE. We compute an hashmap mapping each aggregate monomial to the expression of its coefficient.
@@ -416,6 +433,7 @@ public class EpsilonDifferentialEquivalences {
 	}
 
 	private void init(Reduction red, ICRN crn, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws UnsupportedFormatException {
+		init=true;
 		//ArrayList<IMonomial> monomials= parseGUIPolynomialODE(reaction.getRateLaw(),speciesNameToSpecies,math);
 		MathEval math = crn.getMath();
 		speciesToMonomialODE = new HashMap<ISpecies, ArrayList<IMonomial>>(crn.getSpecies().size());
@@ -500,6 +518,7 @@ public class EpsilonDifferentialEquivalences {
 	}
 	
 	private void initOnTheFlyENBB(ICRN crn, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator) throws UnsupportedFormatException {
+		init=true;
 		//Reduction red=Reduction.ENBB;
 		/*HashMap<String, ISpecies>*/ speciesNameToSpecies = new HashMap<String, ISpecies>(crn.getSpecies().size());
 		for (ISpecies species : crn.getSpecies()) {
@@ -512,7 +531,8 @@ public class EpsilonDifferentialEquivalences {
 
 		
 		speciesToMonomialODE = new HashMap<ISpecies, ArrayList<IMonomial>>(crn.getSpecies().size());
-		computeMonomialsOfAllSpecies(crn,speciesToMonomialODE,speciesNameToSpecies,true);
+		boolean keepExpressionInMA=false;
+		computeMonomialsOfAllSpecies(crn,speciesToMonomialODE,speciesNameToSpecies,keepExpressionInMA);
 	}
 	
 	private static final BigDecimal MinusOne=BigDecimal.valueOf(-1);
@@ -613,7 +633,7 @@ public class EpsilonDifferentialEquivalences {
 					HashMap<ISpecies, ArrayList<ISpecies>> speciesToItsEquivalence;
 					
 					if(red.equals(Reduction.ENBB)){
-						speciesToItsEquivalence = computeNonTrnasitiveEpsilonBDEquivalences(epsilon, obtainedPartition, blockToRefine,terminator);
+						speciesToItsEquivalence = computeNonTransitiveEpsilonBDEquivalences(epsilon, obtainedPartition, blockToRefine,terminator);
 					}
 					else{
 						//ENFB
@@ -700,11 +720,47 @@ public class EpsilonDifferentialEquivalences {
 		return speciesToItsEquivalence;
 	}
 
-	private HashMap<ISpecies, ArrayList<ISpecies>> computeNonTrnasitiveEpsilonBDEquivalences(BigDecimal epsilon,
+	private HashMap<ISpecies, ArrayList<ISpecies>> computeNonTransitiveEpsilonBDEquivalences(BigDecimal epsilon,
 			IPartition obtainedPartition, IBlock blockToRefine, Terminator terminator) {
 		HashMap<ISpecies, VectorOfCoefficientsForEachMonomial> aggregateCoefficients= computeAggregateCoefficients(blockToRefine, obtainedPartition,terminator);
 		//We now compute the equivalence class of each species according to epsilon BDE. We might get a non transitive relation.
 		HashMap<ISpecies, ArrayList<ISpecies>> speciesToItsEquivalence = new HashMap<>(blockToRefine.getSpecies().size());
+
+		
+		ArrayList<ISpecies> blockToRefineAsList = new ArrayList<>(blockToRefine.getSpecies());
+		for(int current=0;current<blockToRefineAsList.size();current++) {
+			ISpecies currentSpecies = blockToRefineAsList.get(current);
+			VectorOfCoefficientsForEachMonomial aggrCoeffsOfCurrent = aggregateCoefficients.get(currentSpecies);
+			//System.out.println(currentSpecies.getName()+" "+ aggrCoeffsOfCurrent);
+			if(aggrCoeffsOfCurrent==null) {
+				HashMap<HashMap<ISpecies, Integer>, BigDecimal> empty_hmVariablesToCoefficients= new LinkedHashMap<>(0);
+				aggrCoeffsOfCurrent=new VectorOfCoefficientsForEachMonomial(empty_hmVariablesToCoefficients);
+			}
+			ArrayList<ISpecies> equivalenceOfSP = speciesToItsEquivalence.get(currentSpecies);
+			if(equivalenceOfSP==null){
+				equivalenceOfSP=new ArrayList<ISpecies>();
+				speciesToItsEquivalence.put(currentSpecies, equivalenceOfSP);
+				equivalenceOfSP.add(currentSpecies);
+			}
+			for(int toCompare=current+1;toCompare<blockToRefineAsList.size();toCompare++) {
+				ISpecies speciesToCompare = blockToRefineAsList.get(toCompare);
+				VectorOfCoefficientsForEachMonomial aggrCoeffsOfToCompare = aggregateCoefficients.get(speciesToCompare);
+				//System.out.println("\t"+speciesToCompare.getName()+" "+ aggrCoeffsOfToCompare);
+				if(aggrCoeffsOfCurrent.atEpsilonDistance(aggrCoeffsOfToCompare, epsilon)){
+					equivalenceOfSP.add(speciesToCompare);
+					ArrayList<ISpecies> equivalence = speciesToItsEquivalence.get(speciesToCompare);
+					if(equivalence==null){
+						equivalence=new ArrayList<>();
+						speciesToItsEquivalence.put(speciesToCompare,equivalence);
+						equivalence.add(speciesToCompare);
+					}
+					equivalence.add(currentSpecies);
+				}
+			}
+		}
+	
+
+		/*
 		int current=0;
 		for (ISpecies currentSpecies : blockToRefine.getSpecies()) {
 			VectorOfCoefficientsForEachMonomial aggrCoeffsOfCurrent = aggregateCoefficients.get(currentSpecies);
@@ -737,6 +793,7 @@ public class EpsilonDifferentialEquivalences {
 			}
 			current++;
 		}
+		*/
 		return speciesToItsEquivalence;
 	}
 

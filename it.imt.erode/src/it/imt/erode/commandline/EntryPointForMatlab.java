@@ -22,13 +22,23 @@ import it.imt.erode.simulation.output.MutableBoolean;
 
 public class EntryPointForMatlab extends EntryPointForMatlabAbstract{
 
+	public EntryPointForMatlab(boolean printPartitions, boolean printCRNs, ICRN crn,boolean fastDegreeOneBE){
+		super(printPartitions,printCRNs,crn,fastDegreeOneBE);
+		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
+	}
+	
+	public EntryPointForMatlab(boolean printPartitions, boolean printCRNs,boolean fastDegreeOneBE){
+		super(printPartitions, printCRNs,fastDegreeOneBE);
+		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
+	}
+	
 	public EntryPointForMatlab(boolean printPartitions, boolean printCRNs, ICRN crn){
-		super(printPartitions,printCRNs,crn);
+		super(printPartitions,printCRNs,crn,false);
 		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
 	}
 	
 	public EntryPointForMatlab(boolean printPartitions, boolean printCRNs){
-		super(printPartitions, printCRNs);
+		super(printPartitions, printCRNs,false);
 		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
 	}
 
@@ -39,7 +49,8 @@ public class EntryPointForMatlab extends EntryPointForMatlabAbstract{
 		//Start up ERODE
 		boolean printPartitions=true;
 		boolean printCRNs=true;
-		EntryPointForMatlab entry = new EntryPointForMatlab(printPartitions,printCRNs);
+		boolean fastDegreeOneBE=true;
+		EntryPointForMatlab entry = new EntryPointForMatlab(printPartitions,printCRNs,fastDegreeOneBE);
 		//entry.importBNG("./BNGNetworks/Mre.net");
 		//entry.importBNG("./BNGNetworks/max.net");
 		//entry.computeBB(new int[]{2,2,3,3,3});

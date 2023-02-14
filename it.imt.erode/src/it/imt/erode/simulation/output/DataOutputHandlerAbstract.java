@@ -295,6 +295,12 @@ public abstract class DataOutputHandlerAbstract implements IDataOutputHandler {
 	
 	//@Override
 		public static void writeOneLineCSV(String csvFile,String extension, List<String> labels, List<String> values,MessageConsoleStream out,BufferedWriter bwOut) {
+			if(csvFile.startsWith("\"")) {
+				csvFile=csvFile.substring(1);
+			}
+			if(csvFile.endsWith("\"")) {
+				csvFile=csvFile.substring(0,csvFile.length()-1);
+			}
 			csvFile=AbstractImporter.overwriteExtensionIfEnabled(csvFile, "", true);
 			csvFile = csvFile+"."+extension;
 			AbstractImporter.createParentDirectories(csvFile);
