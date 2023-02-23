@@ -4211,7 +4211,8 @@ public class CRNReducerCommandLine extends AbstractCommandLine {
 		
 		return rRewards;
 	}
-	private void handleExportJacobianFunctionCommand(String command, MessageConsoleStream out, BufferedWriter bwOut,boolean epsCLump) throws UnsupportedFormatException {
+	private void handleExportJacobianFunctionCommand(String command, MessageConsoleStream out, BufferedWriter bwOut,
+			boolean epsCLump) throws UnsupportedFormatException {
 		double tEnd=0.0;
 		String parameters[] = CRNReducerCommandLine.getParameters(command);
 		String fileName=null;
