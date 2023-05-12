@@ -8559,15 +8559,19 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 						}
 						else {
 							if(!failed) {
-								
-								addReduceCommand(writeCommandPrefix, allFiles[i],"FE",false,false);
+								boolean prep=false;
+								boolean reducedModel=false;
+								addReduceCommand(writeCommandPrefix, allFiles[i],"FE",prep,reducedModel);
 //								if(crn.getUserDefinedPartition()!=null && crn.getUserDefinedPartition().size()>0) {
 //									addReduceCommand(writeCommandPrefix, allFiles[i],"FE",true,false);
 //								}
-								addReduceCommand(writeCommandPrefix, allFiles[i],"BE",false,false);
+								
+								
+								addReduceCommand(writeCommandPrefix, allFiles[i],"BE",prep,reducedModel);
 								if(crn.getUserDefinedPartition()!=null && crn.getUserDefinedPartition().size()>0) {
 									addReduceCommand(writeCommandPrefix, allFiles[i],"BE",true,false);
 								}
+								
 								
 								//write({fileOut=>/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/TCS_CMSB/BioModels_Database-r31_pub-sbml_files/Imported_BioModels_Database-r31_pub-sbml_files/curated/BIOMD0000000002.ode})
 								String writeCommand = writeCommandPrefix+AbstractImporter.overwriteExtensionIfEnabled(allFiles[i], "_ode", true) + "})";

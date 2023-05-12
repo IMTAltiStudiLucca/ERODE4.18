@@ -102,7 +102,8 @@ public class CRNBisimulationsNAry {
 	 * @param terminator 
 	 * @return
 	 */
-	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, 
+	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, 
+			BufferedWriter bwOut, 
 			Terminator terminator, IMessageDialogShower msgDialogShower, BigDecimal epsForFastOneDegreeEpsBE){
 
 		if(verbose){

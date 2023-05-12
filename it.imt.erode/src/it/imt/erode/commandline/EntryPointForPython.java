@@ -37,7 +37,7 @@ gateway = JavaGateway()
 
 n = gateway.entry_point.loadCRN("ncc.crn")
 
-h = gateway.entry_point.computeBB()
+h = gateway.entry_point.computeBE()
 
 #p = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
@@ -46,7 +46,7 @@ int_array = gateway.new_array(int_class,18)
 #int_array = 
 print int_array[17]
 
-hi = gateway.entry_point.computeBB(int_array,False)
+hi = gateway.entry_point.computeBE(int_array,False)
 
 #gateway.entry_point.printPartition(h)
 
@@ -86,8 +86,8 @@ public class EntryPointForPython {
 		EntryPointForPython entry = new EntryPointForPython(false,true);
 		//entry.importBNG("./BNGNetworks/Mre.net");
 		//entry.importBNG("./BNGNetworks/max.net");
-		//entry.computeBB(new int[]{2,2,3,3,3});
-		//entry.computeBB(new int[]{3,3,3,3,3});
+		//entry.computeBE(new int[]{2,2,3,3,3});
+		//entry.computeBE(new int[]{3,3,3,3,3});
 		//crnreducer = new CRNReducerCommandLine(new CommandsReader(new ArrayList<String>(0)));
 		//CRNReducerCommandLine.println("CRNReducer instantiated");
 		
@@ -110,15 +110,15 @@ public class EntryPointForPython {
 		
 		
 		/*entry.loadCRN("./CRNNetworks/gw.crn");
-		int[] bb = entry.computeBB();
+		int[] bb = entry.computeBE();
 		entry.computeJacobian(bb);
 		
 		entry.loadCRN("./CRNNetworks/mi.crn");
-		bb = entry.computeBB();
+		bb = entry.computeBE();
 		entry.computeJacobian(bb);
 		
 		entry.loadCRN("./CRNNetworks/ncc.crn");
-		bb = entry.computeBB();
+		bb = entry.computeBE();
 		entry.computeJacobian(bb);*/
 		
 		/*entry.loadCRN("./CRNNetworks/mi.crn");
@@ -133,7 +133,7 @@ public class EntryPointForPython {
 		//System.out,bwOut.println("ciao");
 		
 		//entry.loadCRN("./CRNNetworks/simpncc.crn");
-		//entry.computeBB();
+		//entry.computeBE();
 		
 	}
 
@@ -183,13 +183,13 @@ public class EntryPointForPython {
 		return crnreducer.getCRN().getSpecies().size();
 	}
 
-	public int[] computeBB() throws UnsupportedFormatException, Z3Exception, IOException{
+	public int[] computeBE() throws UnsupportedFormatException, Z3Exception, IOException{
 		int[] initialPartitionArray = new int[idToSpecies.length];
 		Arrays.fill(initialPartitionArray, 1);
-		return computeBB(initialPartitionArray);
+		return computeBE(initialPartitionArray);
 	}
 	
-	public int[] computeBB(int[] initialPartitionArray, boolean numbersAreIDOfRepresentativeSpecies) throws UnsupportedFormatException, Z3Exception, IOException{
+	public int[] computeBE(int[] initialPartitionArray, boolean numbersAreIDOfRepresentativeSpecies) throws UnsupportedFormatException, Z3Exception, IOException{
 
 		IPartition initialPartition = importPartition(idToSpecies, initialPartitionArray,numbersAreIDOfRepresentativeSpecies);
 		crnreducer.setPartition(initialPartition);
@@ -209,8 +209,8 @@ public class EntryPointForPython {
 		return obtainedPartitionToExport;
 	}
 	
-	public int[] computeBB(int[] initialPartitionArray) throws UnsupportedFormatException, Z3Exception, IOException{
-		return computeBB(initialPartitionArray,true);
+	public int[] computeBE(int[] initialPartitionArray) throws UnsupportedFormatException, Z3Exception, IOException{
+		return computeBE(initialPartitionArray,true);
 	}
 	
 	public int[] computeFE() throws UnsupportedFormatException, Z3Exception, IOException{

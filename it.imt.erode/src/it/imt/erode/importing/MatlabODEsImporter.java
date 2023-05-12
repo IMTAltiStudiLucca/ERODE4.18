@@ -2096,7 +2096,8 @@ function UCTMC()
 			if(backward){
 				CRNReducerCommandLine.print(out,bwOut,"\nComputing the "+(epsilon)+"-BDE and writing the obtained linear equations ...");
 				//Compute the epsilon BDE, and write the linear system of constraints
-				computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, functionName,verbose,terminator,epsilon,BigDecimal.ZERO,paramsToPerturb, prePartitionUserDefined, prePartitionWRTIC,fastDegreeOneBDE);
+				computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, functionName,verbose,terminator,epsilon,BigDecimal.ZERO,
+						paramsToPerturb, prePartitionUserDefined, prePartitionWRTIC,fastDegreeOneBDE);
 				bw.write("\n");
 			}
 
