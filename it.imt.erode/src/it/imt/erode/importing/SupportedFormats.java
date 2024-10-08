@@ -10,5 +10,5 @@ CompactBNG,
 UMIST,OSU,	//ASTROCHEMISTRY
 StochKit, StoichiometryMatrix,
 SpaceEx,
-CNFasPoly
+CNFasPoly,CNFasQuantumOptSAT
 }

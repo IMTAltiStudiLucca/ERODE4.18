@@ -2,6 +2,7 @@ package it.imt.erode.crn.ui.handler;
 
 import java.io.BufferedWriter;
 import java.io.File;
+//import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 //import java.net.URI;
@@ -27,6 +28,7 @@ import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.CommandsReader;
 import it.imt.erode.commandline.ICommandLine;
 import it.imt.erode.commandline.IMessageDialogShower;
+import it.imt.erode.commandline.ProbProgCommandLine;
 import it.imt.erode.crn.ModelDefKind;
 import it.imt.erode.crn.ModelElementsCollector;
 import it.imt.erode.crn.MyParserUtil;
@@ -75,6 +77,7 @@ import it.imt.erode.importing.GUICRNImporter;
 import it.imt.erode.importing.ODEorNET;
 import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.importing.booleannetwork.GUIBooleanNetworkImporter;
+import it.imt.erode.importing.probprog.GUIProbProgImporter;
 import it.imt.erode.simulation.output.IDataOutputHandler;
 
 /**
@@ -632,6 +635,86 @@ public class MyCRNProgramExecutor {
 			cl.setMessageDialogShower(msgVisualizer);
 			cl.setTerminator(console.getTerminator());
 			
+		}
+		else if(mec.getModelDefKind().equals(ModelDefKind.ProbProg)) {
+			GUIProbProgImporter probProgImporter = new GUIProbProgImporter(consoleOut,bwOut,msgVisualizer);
+			
+			ODEorNET format=ODEorNET.ODE;
+			boolean printModel=false;
+			try {
+			probProgImporter.importProbProg(true,printModel,true,mec.getModelName(),
+					mec.getProbProgParameters(),
+					mec.getParsedConditionsProbProg(),
+					mec.getReactionsProbProg(),
+					mec.getInitialConcentrations(),mec.getUserPartition(),format, consoleOut);
+			} catch (IOException e1) {
+				CRNReducerCommandLine.println(consoleOut,bwOut, "Unhandled errors arised while loading the prob progexecuting the commands.");
+				CRNReducerCommandLine.printStackTrace(consoleOut,bwOut,e1);
+				failed=true;
+			}
+			
+			cl = new ProbProgCommandLine(commandsReader,probProgImporter.getCRN(),probProgImporter.getInitialPartition(), true,
+					probProgImporter.getProbProgParameters(),
+					probProgImporter.getReactionsOfEachGuard(), probProgImporter.getReactionsOfEachClause()
+					, consoleOut, bwOut
+					);
+			cl.setDataOutputHandler(guidog);
+			cl.setMessageDialogShower(msgVisualizer);
+			cl.setTerminator(console.getTerminator());
+		}
+		else if(mec.getModelDefKind().equals(ModelDefKind.PROBPROGIMPORT)) {
+			
+			String command=mec.getImportString();
+			String[] parameters = CRNReducerCommandLine.getParameters(command);
+			if(parameters==null){
+				CRNReducerCommandLine.println(consoleOut,bwOut,"Problems in loading the parameters of command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(consoleOut,bwOut,"Type --help for usage instructions.");
+				return null;
+			}
+			String fileName=null;
+			for(int p=0;p<parameters.length;p++){
+				if(parameters[p].startsWith("fileIn=>")){
+					if(parameters[p].length()<="fileIn=>".length()){
+						CRNReducerCommandLine.println(consoleOut,bwOut,"Please, specify the name of the file to read. ");
+						CRNReducerCommandLine.println(consoleOut,bwOut,"I skip this command: "+command);
+						return null;
+					}
+					fileName = parameters[p].substring("fileIn=>".length(), parameters[p].length());
+				}
+				else if(parameters[p].equals("")){
+					continue;
+				}
+				else{
+					CRNReducerCommandLine.println(consoleOut,bwOut,"Unknown parameter \""+parameters[p]+"\" in command "+command+". I skip this command."); if(CommandsReader.PRINTHELPADVICE) CRNReducerCommandLine.println(consoleOut,bwOut,"Type --help for usage instructions.");
+					return null;
+				}
+			}
+			if(fileName ==null || fileName.equals("")){
+				CRNReducerCommandLine.println(consoleOut,bwOut,"Please, specify the file to be loaded. ");
+				CRNReducerCommandLine.println(consoleOut,bwOut,"I skip this command: "+command);
+				return null;
+			}
+			
+			
+			GUIProbProgImporter probProgImporter = new GUIProbProgImporter(fileName,consoleOut,bwOut,msgVisualizer);
+			//boolean printModel=false;
+			ODEorNET format=ODEorNET.ODE;
+			try {
+				probProgImporter.importProbProgNetwork(false, false, true,format);
+			} catch (IOException e) {
+				CRNReducerCommandLine.println(consoleOut,bwOut, "Unhandled errors arised while executing the commands.");
+				CRNReducerCommandLine.printStackTrace(consoleOut,bwOut,e);
+				failed=true;
+			}
+			if(!failed) {
+				cl = new ProbProgCommandLine(commandsReader,probProgImporter.getCRN(),probProgImporter.getInitialPartition(), true,
+						probProgImporter.getProbProgParameters(),
+						probProgImporter.getReactionsOfEachGuard(), probProgImporter.getReactionsOfEachClause()
+						, consoleOut, bwOut
+						);
+				cl.setDataOutputHandler(guidog);
+				cl.setMessageDialogShower(msgVisualizer);
+				cl.setTerminator(console.getTerminator());
+			}
 		}
 		else if(mec.getModelDefKind().equals(ModelDefKind.RN)||mec.getModelDefKind().equals(ModelDefKind.ODE)){
 			GUICRNImporter crnImporter = new GUICRNImporter(consoleOut,bwOut,msgVisualizer);

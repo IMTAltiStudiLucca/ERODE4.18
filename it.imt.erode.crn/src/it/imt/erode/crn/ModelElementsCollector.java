@@ -2,6 +2,7 @@ package it.imt.erode.crn;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 import org.eclipse.emf.common.util.EList;
 
@@ -14,9 +15,11 @@ import it.imt.erode.crn.chemicalReactionNetwork.ImportBoolean;
 import it.imt.erode.crn.chemicalReactionNetwork.ImportFolder;
 import it.imt.erode.crn.chemicalReactionNetwork.MVNodeDefinition;
 import it.imt.erode.crn.chemicalReactionNetwork.NodeDefinition;
+import it.imt.erode.crn.chemicalReactionNetwork.ProbCommand;
 
 public class ModelElementsCollector {
 
+	private ArrayList<String> probProgParameters = new ArrayList<String>(0);
 	private ArrayList<String> symbolicParameters = new ArrayList<String>(0);
 	private ArrayList<ArrayList<String>> parameters = new ArrayList<ArrayList<String>>(0);
 	private ArrayList<LinkedHashMap<String,String>> reactions = new ArrayList<>(0);
@@ -27,6 +30,7 @@ public class ModelElementsCollector {
 	private ArrayList<ArrayList<String>> initialAlgConcentrations = new ArrayList<ArrayList<String>>(0);
 	private ArrayList<Command> commandsList = new ArrayList<>();
 	private ArrayList<BooleanCommand> booleanCommandsList = new ArrayList<>();
+	private ArrayList<ProbCommand> probCommandsList = new ArrayList<>();
 	private String importString=null;
 	private Import importCommand=null;
 	private String importFolderString=null;
@@ -40,17 +44,24 @@ public class ModelElementsCollector {
 	private EList<BoolExpr> constraintsListXTEXT;
 	private EList<NodeDefinition> booleanUpdateFunctionsXTEXT;
 	private EList<MVNodeDefinition> mvBooleanUpdateFunctionsXTEXT;
+	private List<ArrayList<String>> parsedConditionsProbProg;
 	private boolean realSortMVNet=false;
 	private ImportBoolean importBooleanCommand;
+	private ArrayList<ArrayList<LinkedHashMap<String, String>>> reactionsProbProg;
 	
-	public ModelElementsCollector(String modelName,ArrayList<String> symbolicParameters, EList<BoolExpr> constraintsListXTEXT, ArrayList<ArrayList<String>> parameters, 
+	
+	public ModelElementsCollector(String modelName,ArrayList<String> symbolicParameters,ArrayList<String> probProgParameters, EList<BoolExpr> constraintsListXTEXT, ArrayList<ArrayList<String>> parameters, 
 			ArrayList<LinkedHashMap<String,String>> reactions, ArrayList<LinkedHashMap<String,String>> algebraicConstraints,
 			ArrayList<ArrayList<String>> views, ArrayList<ArrayList<String>> initialConcentrations,ArrayList<ArrayList<String>> initialAlgConcentrations,ArrayList<ArrayList<String>> userPartition,
-			ArrayList<Command> commandsList, ArrayList<BooleanCommand> booleanCommandsList, String importString, Import importCommand, ImportBoolean importBooleanCommand, String importFolderString, ImportFolder importFolderCommand, BooleanImportFolder booleanImportFolderCommand, String importName,
-			ModelDefKind modelDefKind, EList<NodeDefinition> booleanUpdateFunctionsXTEXT, EList<MVNodeDefinition> mvBooleanUpdateFunctionsXTEXT, boolean synchEditor, String absolutePath) {
+			ArrayList<Command> commandsList, ArrayList<BooleanCommand> booleanCommandsList, ArrayList<ProbCommand> probCommandsList, String importString, Import importCommand, ImportBoolean importBooleanCommand, String importFolderString, ImportFolder importFolderCommand, BooleanImportFolder booleanImportFolderCommand, String importName,
+			ModelDefKind modelDefKind, 
+			ArrayList<ArrayList<String>> parsedConditionsOfAllClauses,//List<String> parsedConditions,	//EList<Expression> conditions,
+			ArrayList<ArrayList<LinkedHashMap<String, String>>> reactionsOfAllClauses, 
+			EList<NodeDefinition> booleanUpdateFunctionsXTEXT, EList<MVNodeDefinition> mvBooleanUpdateFunctionsXTEXT, boolean synchEditor, String absolutePath) {
 		super();
 		this.absolutePath=absolutePath;
 		this.modelName = modelName;
+		this.probProgParameters=probProgParameters;
 		this.symbolicParameters=symbolicParameters;
 		this.setConstraintsListXTEXT(constraintsListXTEXT);
 		this.parameters = parameters;
@@ -62,6 +73,7 @@ public class ModelElementsCollector {
 		this.userPartition=userPartition;
 		this.commandsList = commandsList;
 		this.booleanCommandsList=booleanCommandsList;
+		this.probCommandsList = probCommandsList;
 		this.importString = importString;
 		this.importCommand = importCommand;
 		this.importBooleanCommand = importBooleanCommand;
@@ -71,6 +83,9 @@ public class ModelElementsCollector {
 		this.booleanImportFolderCommand = booleanImportFolderCommand;
 		this.modelDefKind = modelDefKind;
 		this.synchEditor=synchEditor;
+		
+		this.parsedConditionsProbProg=parsedConditionsOfAllClauses;
+		this.reactionsProbProg=reactionsOfAllClauses;
 		
 		this.booleanUpdateFunctionsXTEXT=booleanUpdateFunctionsXTEXT;
 		this.mvBooleanUpdateFunctionsXTEXT=mvBooleanUpdateFunctionsXTEXT;
@@ -82,6 +97,9 @@ public class ModelElementsCollector {
 	
 	public ArrayList<String> getSymbolicParameters() {
 		return symbolicParameters;
+	}
+	public ArrayList<String> getProbProgParameters() {
+		return probProgParameters;
 	}
 	
 	public ArrayList<ArrayList<String>> getParameters() {
@@ -120,6 +138,9 @@ public class ModelElementsCollector {
 
 	public ArrayList<Command> getCommandsList() {
 		return commandsList;
+	}
+	public ArrayList<ProbCommand> getProbCommandsList() {
+		return probCommandsList;
 	}
 	
 	public ArrayList<BooleanCommand> getBooleanCommandsList() {
@@ -171,6 +192,13 @@ public class ModelElementsCollector {
 		this.constraintsListXTEXT = constraintsListXTEXT;
 	}
 
+	public List<ArrayList<String>> getParsedConditionsProbProg() {
+		return parsedConditionsProbProg;
+	}
+	public ArrayList<ArrayList<LinkedHashMap<String, String>>> getReactionsProbProg() {
+		return reactionsProbProg;
+	}
+	
 	public EList<NodeDefinition> getBooleanUpdateFunctionsXTEXT() {
 		return booleanUpdateFunctionsXTEXT;
 	}

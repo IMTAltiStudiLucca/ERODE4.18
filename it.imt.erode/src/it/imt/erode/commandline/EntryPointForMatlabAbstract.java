@@ -331,7 +331,7 @@ public abstract class EntryPointForMatlabAbstract {
 		
 		IPartitionAndBoolean obtainedPartitionAndBool;
 		if(fastDegreeOneBE) {
-			obtainedPartitionAndBool =CRNBisimulationsNAry.computeCoarsest(Reduction.BE,erode.getCRN(),erode.getPartition(), false,out,bwOut,new Terminator(),null,BigDecimal.valueOf(epsilon));
+			obtainedPartitionAndBool =CRNBisimulationsNAry.computeCoarsest(Reduction.BE,erode.getCRN(),getCRN().getReactions(), erode.getPartition(), false,out,bwOut,new Terminator(),null,BigDecimal.valueOf(epsilon));
 		}
 		else {
 			obtainedPartitionAndBool = epsilonDE.computeCoarsest(Reduction.ENBB, BigDecimal.valueOf(epsilon), erode.getCRN(), erode.getPartition(), false, out,bwOut, new Terminator(),false);

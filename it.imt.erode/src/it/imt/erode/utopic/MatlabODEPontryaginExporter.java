@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -35,6 +36,7 @@ import it.imt.erode.crn.implementations.Species;
 import it.imt.erode.crn.interfaces.ICRN;
 import it.imt.erode.crn.interfaces.ICRNReaction;
 import it.imt.erode.crn.interfaces.ISpecies;
+import it.imt.erode.expression.evaluator.MathEval;
 import it.imt.erode.importing.AbstractImporter;
 import it.imt.erode.importing.GUICRNImporter;
 import it.imt.erode.importing.MatlabODEsImporter;
@@ -44,6 +46,7 @@ import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
+import it.imt.erode.simulation.output.MutableBoolean;
 
 public class MatlabODEPontryaginExporter {
 	
@@ -668,7 +671,7 @@ public class MatlabODEPontryaginExporter {
 		
 		if(!writeSymbolicJacobian){
 			if(!crn.isMassAction()){
-				CRNandPartition crnAndSpecies=computeRNEncoding(crn, out, bwOut, null,true);
+				CRNandPartition crnAndSpecies=computeRNEncoding(crn, crn.getReactions(), out, bwOut, null,true);
 				if(crnAndSpecies==null){
 					return;
 				}
@@ -871,28 +874,32 @@ public class MatlabODEPontryaginExporter {
 
 	public static CRNandPartition computeRNEncoding(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut,
 			IPartition partition,boolean print) {
-		return computeRNEncoding(crn, out, bwOut,partition,crn.getUserDefinedPartition(),print);
+		return computeRNEncoding(crn, crn.getReactions(), out, bwOut,partition,crn.getUserDefinedPartition(),print);
+	}
+	public static CRNandPartition computeRNEncoding(ICRN crn, List<ICRNReaction> reactionsToConsider, MessageConsoleStream out, BufferedWriter bwOut,
+			IPartition partition,boolean print) {
+		return computeRNEncoding(crn, reactionsToConsider, out, bwOut,partition,crn.getUserDefinedPartition(),print);
 	}
 	
-	public static CRNandPartition computeRNEncoding(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut,
+	public static CRNandPartition computeRNEncoding(ICRN crn, List<ICRNReaction> reactionsToConsider,MessageConsoleStream out, BufferedWriter bwOut,
 			IPartition partition, ArrayList<HashSet<ISpecies>> userPartition,boolean print) {
-		return computeRNEncoding(crn, out, bwOut, true,partition,userPartition,print);
+		return computeRNEncoding(crn, reactionsToConsider, out, bwOut, true,partition,userPartition,print);
 	}
 	
-	public static CRNandPartition computeRNEncoding(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut,
+	public static CRNandPartition computeRNEncoding(ICRN crn, List<ICRNReaction> reactionsToConsider, MessageConsoleStream out, BufferedWriter bwOut,
 			/*HashMap<String, ISpecies> speciesNameToSpecies,*/boolean collapseReactions,IPartition partition,boolean print) {
-		return computeRNEncoding(crn, out, bwOut, collapseReactions, partition,crn.getUserDefinedPartition(),print);
+		return computeRNEncoding(crn, reactionsToConsider, out, bwOut, collapseReactions, partition,crn.getUserDefinedPartition(),print);
 	}
 	
-	public static CRNandPartition computeRNEncoding(ICRN crn, MessageConsoleStream out, BufferedWriter bwOut,
+	public static CRNandPartition computeRNEncoding(ICRN crn, List<ICRNReaction> reactionsToConsider, MessageConsoleStream out, BufferedWriter bwOut,
 			/*HashMap<String, ISpecies> speciesNameToSpecies,*/boolean collapseReactions,IPartition partition, ArrayList<HashSet<ISpecies>> userPartition,boolean print) {
 		boolean computeRNEncoding=true;
-		ArrayList<ICRNReaction> rnReactions = new ArrayList<>(crn.getReactions().size());
+		ArrayList<ICRNReaction> rnReactions = new ArrayList<>(reactionsToConsider.size());
 		if(print) {
 			CRNReducerCommandLine.print(out, bwOut, " ( converting the ODEs in reaction network form ... ");
 		}
-		String errorMessage="";
-		ISpecies I = new Species(Species.I_SPECIESNAME, null, crn.getSpecies().size(), BigDecimal.ONE, "1",false);
+		
+		ISpecies I = makeISpeciesWithoutAddingIt(crn);
 		
 		ICRN polynomialCRN = new CRN(crn.getName(), crn.getSymbolicParameters(), crn.getConstraints(), crn.getParameters(), crn.getMath(), out, bwOut);
 		HashMap<String, ISpecies> speciesNameToSpecies=new HashMap<String, ISpecies>(crn.getSpecies().size());
@@ -909,48 +916,22 @@ public class MatlabODEPontryaginExporter {
 		}
 		
 		//polynomialCRN.addSpecies(I);
-		boolean usedI = false;
+		//boolean usedI = false;
+		MutableBoolean usedI=new MutableBoolean();
+		usedI.setValue(false);
 		
-		for(ICRNReaction reaction : crn.getReactions()){
-			if(!reaction.hasArbitraryKinetics()) {
-				rnReactions.add(reaction);
-			}
-			//If the reaction is X -> X+X, arbitrary drift
-			else if(reaction.isODELike()){
-				try{
-					ISpecies speciesOfODE = reaction.getReagents().getFirstReagent(); //oldSpeciesToNewSpecies.get(reaction.getReagents().getFirstReagent());
-					boolean anyReactionsUsedI = GUICRNImporter.computeRNEncoding((CRNReactionArbitraryGUI)reaction,speciesOfODE,speciesNameToSpecies,crn.getMath(),I,rnReactions);
-					usedI = usedI || anyReactionsUsedI;
-				}
-				catch(UnsupportedReactionNetworkEncodingException e){
-					computeRNEncoding=false;
-					break;
-				} catch (IOException e) {
-					computeRNEncoding=false;
-					break;
-				}
-			}
-			else{
-				//computeRNEncoding=false;
-				//break;
-				try{
-					boolean anyReactionsUsedI = GUICRNImporter.computeRNEncodingOfArbitraryReaction((CRNReactionArbitraryGUI)reaction,speciesNameToSpecies,crn.getMath(),I,rnReactions/*,oldSpeciesToNewSpecies*/);
-					usedI = usedI || anyReactionsUsedI;
-				}
-				catch(UnsupportedReactionNetworkEncodingException e){
-					computeRNEncoding=false;
-					errorMessage=e.getMessage();
-					break;
-				} catch (IOException e) {
-					computeRNEncoding=false;
-					errorMessage=e.getMessage();
-					break;
-				}
-				
-			}
-		}
+		MutableBoolean mutableComputeRNEncoding=new MutableBoolean(); 
+		mutableComputeRNEncoding.setValue(computeRNEncoding);
 		
-		if(usedI) {
+		List<ICRNReaction> reactions = reactionsToConsider;
+		MathEval math = crn.getMath();
+		
+		String errorMessage = RNifyReactions(rnReactions, I, speciesNameToSpecies, usedI,
+				mutableComputeRNEncoding, reactions, math);
+		
+		computeRNEncoding=mutableComputeRNEncoding.getValue();
+		
+		if(usedI.getValue()) {
 			polynomialCRN.addSpecies(I);
 		}
 		
@@ -972,62 +953,7 @@ public class MatlabODEPontryaginExporter {
 			
 			
 			
-			/////////////
-			//ArrayList<HashSet<ISpecies>> userPartition = crn.getUserDefinedPartition();
-			if(userPartition!=null&&userPartition.size()>0){
-				/*
-				ArrayList<HashSet<ISpecies>> newUserPartition=new ArrayList<HashSet<ISpecies>>(userPartition.size());
-				for (HashSet<ISpecies> hashSet : userPartition) {
-					HashSet<ISpecies> newHashSet=new HashSet<>(hashSet.size());
-					newUserPartition.add(newHashSet);
-					for (ISpecies species : hashSet) {
-						newHashSet.add(oldSpeciesToNewSpecies.get(species));
-					}
-				}
-				
-				if(usedI) {
-					HashSet<ISpecies> newHashSet=new HashSet<>(1);
-					newUserPartition.add(newHashSet);
-					newHashSet.add(I);
-				}
-				polynomialCRN.setUserDefinedPartition(newUserPartition);
-				*/
-				
-				polynomialCRN.setUserDefinedPartition(userPartition);
-			}
-
-
-
-			IPartition newInitial = new Partition(polynomialCRN.getSpecies().size());
-			if(partition!=null){
-				IBlock current = partition.getFirstBlock();
-				while(current!=null){
-					IBlock newCurrent=new Block();
-					newInitial.add(newCurrent);
-					for (ISpecies species : current.getSpecies()) {
-						newCurrent.addSpecies(species);  //newCurrent.addSpecies(oldSpeciesToNewSpecies.get(species));
-					}
-					current=current.getNext();
-				}
-				if(usedI) {
-					IBlock blockOfI = new Block();
-					newInitial.add(blockOfI);
-					blockOfI.addSpecies(I);
-				}
-			}
-			else{
-				IBlock block = new Block();
-				newInitial.add(block);
-				for (ISpecies species : polynomialCRN.getSpecies()) {
-					block.addSpecies(species);
-				}
-				if(usedI) {
-					IBlock blockOfI = new Block();
-					newInitial.add(blockOfI);
-					blockOfI.addSpecies(I);
-				}
-			}
-			/////////////
+			IPartition newInitial = handlePartitionAfterRNificaton(partition, userPartition, I, polynomialCRN, usedI);
 			
 			
 			if(print) {
@@ -1036,6 +962,118 @@ public class MatlabODEPontryaginExporter {
 			
 			return new CRNandPartition(polynomialCRN, newInitial);	
 		}
+	}
+
+	public static IPartition handlePartitionAfterRNificaton(IPartition partition, ArrayList<HashSet<ISpecies>> userPartition,
+			ISpecies I, ICRN polynomialCRN, MutableBoolean usedI) {
+		/////////////
+		//ArrayList<HashSet<ISpecies>> userPartition = crn.getUserDefinedPartition();
+		if(userPartition!=null&&userPartition.size()>0){
+			
+			ArrayList<HashSet<ISpecies>> newUserPartition=new ArrayList<HashSet<ISpecies>>(userPartition.size());
+			for (HashSet<ISpecies> hashSet : userPartition) {
+				HashSet<ISpecies> newHashSet=new HashSet<>(hashSet.size());
+				newUserPartition.add(newHashSet);
+				for (ISpecies species : hashSet) {
+					newHashSet.add(species);
+				}
+			}
+			
+			if(usedI.getValue()) {
+				HashSet<ISpecies> newHashSet=new HashSet<>(1);
+				newUserPartition.add(newHashSet);
+				newHashSet.add(I);
+			}
+			polynomialCRN.setUserDefinedPartition(newUserPartition);
+			
+			
+			//polynomialCRN.setUserDefinedPartition(userPartition);
+		}
+
+
+
+		IPartition newInitial = new Partition(polynomialCRN.getSpecies().size());
+		if(partition!=null){
+			IBlock current = partition.getFirstBlock();
+			while(current!=null){
+				IBlock newCurrent=new Block();
+				newInitial.add(newCurrent);
+				for (ISpecies species : current.getSpecies()) {
+					newCurrent.addSpecies(species);  //newCurrent.addSpecies(oldSpeciesToNewSpecies.get(species));
+				}
+				current=current.getNext();
+			}
+			if(usedI.getValue()) {
+				IBlock blockOfI = new Block();
+				newInitial.add(blockOfI);
+				blockOfI.addSpecies(I);
+			}
+		}
+		else{
+			IBlock block = new Block();
+			newInitial.add(block);
+			for (ISpecies species : polynomialCRN.getSpecies()) {
+				block.addSpecies(species);
+			}
+			if(usedI.getValue()) {
+				IBlock blockOfI = new Block();
+				newInitial.add(blockOfI);
+				blockOfI.addSpecies(I);
+			}
+		}
+		/////////////
+		return newInitial;
+	}
+
+	public static String RNifyReactions(ArrayList<ICRNReaction> rnReactions, ISpecies I,
+			HashMap<String, ISpecies> speciesNameToSpecies, MutableBoolean usedI,
+			MutableBoolean mutableComputeRNEncoding, List<ICRNReaction> reactions, MathEval math) {
+		String errorMessage="";
+		for(ICRNReaction reaction : reactions){
+			if(!reaction.hasArbitraryKinetics()) {
+				rnReactions.add(reaction);
+			}
+			//If the reaction is X -> X+X, arbitrary drift
+			else if(reaction.isODELike()){
+				try{
+					ISpecies speciesOfODE = reaction.getReagents().getFirstReagent(); //oldSpeciesToNewSpecies.get(reaction.getReagents().getFirstReagent());
+					boolean anyReactionsUsedI = GUICRNImporter.computeRNEncoding((CRNReactionArbitraryGUI)reaction,speciesOfODE,speciesNameToSpecies,math,I,rnReactions);
+					usedI.setValue(usedI.getValue() || anyReactionsUsedI);
+				}
+				catch(UnsupportedReactionNetworkEncodingException e){
+					mutableComputeRNEncoding.setValue(false);
+					break;
+				} catch (IOException e) {
+					mutableComputeRNEncoding.setValue(false);
+					break;
+				}
+			}
+			else{
+				//computeRNEncoding=false;
+				//break;
+				try{
+					boolean anyReactionsUsedI = GUICRNImporter.computeRNEncodingOfArbitraryReaction((CRNReactionArbitraryGUI)reaction,speciesNameToSpecies,math,I,rnReactions/*,oldSpeciesToNewSpecies*/);
+					//usedI = usedI || anyReactionsUsedI;
+					usedI.setValue(usedI.getValue() || anyReactionsUsedI);
+				}
+				catch(UnsupportedReactionNetworkEncodingException e){
+					mutableComputeRNEncoding.setValue(false);
+					errorMessage=e.getMessage();
+					break;
+				} catch (IOException e) {
+					mutableComputeRNEncoding.setValue(false);
+					errorMessage=e.getMessage();
+					break;
+				}
+				
+			}
+		}
+		return errorMessage;
+	}
+
+	public static ISpecies makeISpeciesWithoutAddingIt(ICRN crn) {
+		ISpecies I = new Species(Species.I_SPECIESNAME, null, crn.getSpecies().size(), BigDecimal.ONE, "1",false);
+		return I;
 	}
 
 
@@ -1228,7 +1266,7 @@ public class MatlabODEPontryaginExporter {
 		
 		if(!writeSymbolicJacobian){
 			if(!crn.isMassAction()){
-				CRNandPartition crnAndSpecies =computeRNEncoding(crn, out, bwOut, null,true);
+				CRNandPartition crnAndSpecies =computeRNEncoding(crn, crn.getReactions(), out, bwOut, null,true);
 				if(crnAndSpecies==null){
 					return;
 				}

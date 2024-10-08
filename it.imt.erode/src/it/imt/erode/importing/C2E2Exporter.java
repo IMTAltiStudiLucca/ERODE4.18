@@ -53,7 +53,7 @@ public class C2E2Exporter {
 		
 		if(!crn.isMassAction()){
 			//CRNandSpecies crnAndSpecies = MatlabODEPontryaginExporter.computeRNEncoding(crn, out, bwOut, speciesNameToSpecies);
-			CRNandPartition crnAndSpecies = MatlabODEPontryaginExporter.computeRNEncoding(crn, out, bwOut, false,null,true);
+			CRNandPartition crnAndSpecies = MatlabODEPontryaginExporter.computeRNEncoding(crn, crn.getReactions(), out, bwOut, false,null,true);
 			if(crnAndSpecies==null){
 				return;
 			}
@@ -69,7 +69,7 @@ public class C2E2Exporter {
 		}
 		
 		HashMap<String,ISpecies> speciesNameToExpandedSpecies = new HashMap<>(crn.getSpecies().size());
-		ICRN crnExpanded = MatlabODEsImporter.expandCRN(false,crn, pToPert, speciesNameToExpandedSpecies);
+		ICRN crnExpanded = MatlabODEsImporter.expandCRN(false,crn, pToPert, speciesNameToExpandedSpecies,false);
 		
 		String fileName = name;
 		String fileName2=AbstractImporter.overwriteExtensionIfEnabled(fileName,"",true);

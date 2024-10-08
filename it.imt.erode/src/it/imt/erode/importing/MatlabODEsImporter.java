@@ -50,6 +50,7 @@ import it.imt.erode.auxiliarydatastructures.Reduction;
 import it.imt.erode.commandline.CRNReducerCommandLine;
 import it.imt.erode.commandline.DialogType;
 import it.imt.erode.commandline.IMessageDialogShower;
+import it.imt.erode.commandline.IPartitionAndBooleanAndAxB;
 import it.imt.erode.commandline.Terminator;
 import it.imt.erode.crn.implementations.CRN;
 import it.imt.erode.crn.implementations.CRNReaction;
@@ -1861,7 +1862,7 @@ function UCTMC()
 			for (ISpecies species : crn.getSpecies()) {
 				speciesNameToSpecies.put(species.getName(), species);
 			}
-			CRNandPartition crnAndSpeciesAndPartition = MatlabODEPontryaginExporter.computeRNEncoding(crn, out, bwOut, false,initial,true);
+			CRNandPartition crnAndSpeciesAndPartition = MatlabODEPontryaginExporter.computeRNEncoding(crn, crn.getReactions(), out, bwOut, false,initial,true);
 			if(crnAndSpeciesAndPartition==null||crnAndSpeciesAndPartition.getCRN()==null){
 				return;
 			}
@@ -1899,7 +1900,7 @@ function UCTMC()
 			parseParametersToPerturb(crn, paramsToPerturb);
 
 			HashMap<String,ISpecies> speciesNameToExpandedSpecies = new HashMap<>(crn.getSpecies().size());
-			ICRN crnExpanded = expandCRN(false,crn, paramsToPerturb, speciesNameToExpandedSpecies);
+			ICRN crnExpanded = expandCRN(false,crn, paramsToPerturb, speciesNameToExpandedSpecies,false);
 
 			/*
 			if(preambleCommentLines!=null && preambleCommentLines.size()>0){
@@ -2004,7 +2005,7 @@ function UCTMC()
 				if(forward){
 					CRNReducerCommandLine.print(out,bwOut,"Computing the "+(epsilon)+"-FDE and writing the obtained linear equations ...");
 					//Compute the epsilon FDE, and write the linear system of constraints
-					computeEpsilonFDEAndWriteLinearSystemOfConstraints(crn, initial,out,bwOut, msgDialogShower, bw, "closest_fde",/*functionName,*/verbose,terminator,epsilon/*,defaultIC*/,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC);
+					computeEpsilonFDEAndWriteLinearSystemOfConstraints(crn, initial,out,bwOut, msgDialogShower, bw, "closest_fde",/*functionName,*/verbose,terminator,epsilon/*,defaultIC*/,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC,false);
 					CRNReducerCommandLine.println(out,bwOut," completed");
 
 					bw.write("\n");
@@ -2014,7 +2015,7 @@ function UCTMC()
 				if(backward){
 					CRNReducerCommandLine.print(out,bwOut,"Computing the "+(epsilon)+"-BDE and writing the obtained linear equations ...");
 					//Compute the epsilon BDE, and write the linear system of constraints
-					computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, "closest_bde",verbose,terminator,epsilon,defaultIC,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC,false);
+					computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, "closest_bde",verbose,terminator,epsilon,defaultIC,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC,false,false);
 					bw.write("\n");
 				}
 			}
@@ -2043,10 +2044,11 @@ function UCTMC()
 			String first = paramsToPerturb.iterator().next(); 
 			if(first.equals("ALL")){
 				paramsToPerturb.clear();
-				for (String p : crn.getParameters()) {
-					String[] nameAndVal = p.split("\\ ");
-					paramsToPerturb.add(nameAndVal[0]);
-				}
+				if(crn.getParameters()!=null)
+					for (String p : crn.getParameters()) {
+						String[] nameAndVal = p.split("\\ ");
+						paramsToPerturb.add(nameAndVal[0]);
+					}
 			}
 			else if(first.equals("NONE")){
 				paramsToPerturb.clear();
@@ -2054,70 +2056,85 @@ function UCTMC()
 		}
 	}
 
-	public static void printEpsilonScriptToMatlabFIle(ICRN crn, IPartition initial, String name, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, 
+	public static IPartitionAndBooleanAndAxB printEpsilonScriptToMatlabFIle(ICRN crn, IPartition initial, String name, boolean verbose, MessageConsoleStream out, BufferedWriter bwOut, 
 			IMessageDialogShower msgDialogShower, LinkedHashSet<String> paramsToPerturb, Terminator terminator,double epsilon, String prePartitionUserDefined, 
-			String prePartitionWRTIC, boolean forward, boolean backward,boolean fastDegreeOneBDE) throws UnsupportedFormatException{
+			String prePartitionWRTIC, boolean forward, boolean backward,boolean fastDegreeOneBDE,boolean computeOnlyPartition) throws UnsupportedFormatException{
 		String fileName = name;
+		String functionName = "function_name";
+		BufferedWriter bw=null;
+		
+		if(!computeOnlyPartition) {
+			fileName=overwriteExtensionIfEnabled(fileName,".m");
+			if(verbose){
+				CRNReducerCommandLine.print(out,bwOut,"Writing the epsilon script in file "+fileName);
+			}
 
-		fileName=overwriteExtensionIfEnabled(fileName,".m");
-		if(verbose){
-			CRNReducerCommandLine.print(out,bwOut,"Writing the epsilon script in file "+fileName);
+			createParentDirectories(fileName);
+			try {
+				bw = new BufferedWriter(new FileWriter(fileName));
+			} catch (IOException e) {
+				CRNReducerCommandLine.println(out,bwOut,"Problems in printEpsilonScriptToMatlabFIle, exception raised while creating the filewriter for file: "+fileName);
+				CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+				return null;
+			}
+			
+			functionName = fileName.replace(".m", "");
+			int indexOfLastSep = functionName.lastIndexOf(File.separator);
+			if(indexOfLastSep>=0){
+				functionName=functionName.substring(indexOfLastSep+1);
+			}
 		}
 
-		createParentDirectories(fileName);
-		BufferedWriter bw;
-		try {
-			bw = new BufferedWriter(new FileWriter(fileName));
-		} catch (IOException e) {
-			CRNReducerCommandLine.println(out,bwOut,"Problems in printEpsilonScriptToMatlabFIle, exception raised while creating the filewriter for file: "+fileName);
-			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
-			return;
-		}
-
-		String functionName = fileName.replace(".m", "");
-		int indexOfLastSep = functionName.lastIndexOf(File.separator);
-		if(indexOfLastSep>=0){
-			functionName=functionName.substring(indexOfLastSep+1);
-		}
+		
 
 		parseParametersToPerturb(crn, paramsToPerturb);
+		
+		IPartitionAndBooleanAndAxB ret=null;
 
 		try {
 			if(forward){
 				CRNReducerCommandLine.print(out,bwOut,"\nComputing the "+(epsilon)+"-FDE and writing the obtained linear equations ...");
 				//Compute the epsilon FDE, and write the linear system of constraints
-				computeEpsilonFDEAndWriteLinearSystemOfConstraints(crn, initial,out,bwOut, msgDialogShower, bw, functionName,verbose,terminator,epsilon/*,defaultIC*/,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC);
+				computeEpsilonFDEAndWriteLinearSystemOfConstraints(crn, initial,out,bwOut, msgDialogShower, bw, functionName,verbose,terminator,epsilon/*,defaultIC*/,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC,computeOnlyPartition);
 				CRNReducerCommandLine.println(out,bwOut," completed");
 
-				bw.write("\n");
-				bw.write("\n");
-				bw.write("\n");
+				if(!computeOnlyPartition) {
+					bw.write("\n");
+					bw.write("\n");
+					bw.write("\n");
+				}
 			}
 			if(backward){
-				CRNReducerCommandLine.print(out,bwOut,"\nComputing the "+(epsilon)+"-BDE and writing the obtained linear equations ...");
+				CRNReducerCommandLine.print(out,bwOut,"\nComputing the "+(epsilon)+"-BDE and the obtained linear equations ...");
 				//Compute the epsilon BDE, and write the linear system of constraints
-				computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, functionName,verbose,terminator,epsilon,BigDecimal.ZERO,
-						paramsToPerturb, prePartitionUserDefined, prePartitionWRTIC,fastDegreeOneBDE);
-				bw.write("\n");
+				ret=computeEpsilonBDEAndWriteLinearSystemOfConstraints(crn, initial,out, bwOut,msgDialogShower, bw, functionName,verbose,terminator,epsilon,BigDecimal.ZERO,
+						paramsToPerturb, prePartitionUserDefined, prePartitionWRTIC,fastDegreeOneBDE,computeOnlyPartition);
+				
+				if(!computeOnlyPartition)
+					bw.write("\n");
 			}
 
 		} catch (IOException e) {
 			CRNReducerCommandLine.println(out,bwOut,"Problems in printEpsilonScriptToMatlabFIle, exception raised while writing in the file: "+fileName);
 			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
-			return;
+			return null;
 		}
 		finally{
 			if(verbose){
 				CRNReducerCommandLine.println(out,bwOut,"Writing the script for epsilon bounds in file "+fileName+" completed");
 			}
-			try {
-				bw.flush();
-				bw.close();
-			} catch (IOException e) {
-				CRNReducerCommandLine.println(out,bwOut,"Problems in printEpsilonScriptToMatlabFIle, exception raised while closing the bufferedwriter of the file: "+fileName);
-				CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			if(!computeOnlyPartition) {
+				try {
+					bw.flush();
+					bw.close();
+				} catch (IOException e) {
+					CRNReducerCommandLine.println(out,bwOut,"Problems in printEpsilonScriptToMatlabFIle, exception raised while closing the bufferedwriter of the file: "+fileName);
+					CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+				}
 			}
 		}
+		
+		return ret;
 
 
 
@@ -2285,23 +2302,17 @@ function UCTMC()
 	}*/
 
 	public static ICRN expandCRN(boolean addParams,ICRN crn, LinkedHashSet<String> paramsToPerturb,
-			HashMap<String, ISpecies> speciesNameToExpandedSpecies/*,boolean eliminateRemainingRates*/) throws UnsupportedFormatException {
-		return expandCRN(addParams,crn, paramsToPerturb,speciesNameToExpandedSpecies,false,false);
+			HashMap<String, ISpecies> speciesNameToExpandedSpecies/*,boolean eliminateRemainingRates*/,boolean reuseSpecies) throws UnsupportedFormatException {
+		return expandCRN(addParams,crn, paramsToPerturb,speciesNameToExpandedSpecies,reuseSpecies,false,false);
 	}
 
 	public static ICRN expandCRN(boolean addParams,ICRN crn, LinkedHashSet<String> paramsToTransformInSpecies,
-			HashMap<String, ISpecies> speciesNameToExpandedSpecies/*,boolean eliminateRemainingRates*/, boolean ignoreRemainingRates,boolean simpleRateParamOrConstant) throws UnsupportedFormatException{
+			HashMap<String, ISpecies> speciesNameToExpandedSpecies/*,boolean eliminateRemainingRates*/, boolean reuseSpecies,boolean ignoreRemainingRates,boolean simpleRateParamOrConstant) throws UnsupportedFormatException{
 
 		MathEval math = new MathEval();
-		ICRN crnExpanded = new CRN(crn.getName(),math,crn.getOut(),crn.getBWOut());
-		crnExpanded.setMdelDefKind(crn.getMdelDefKind());
-		//CRN.copySpecies(crn, crnExpanded);
-		for (ISpecies species : crn.getSpecies()) {
-			ISpecies newSpecies = species.cloneWithoutReactions();
-			newSpecies.setInitialConcentration(species.getInitialConcentration(), species.getInitialConcentration().toPlainString());
-			crnExpanded.addSpecies(newSpecies);
-			speciesNameToExpandedSpecies.put(newSpecies.getName(), newSpecies);
-		}
+		HashMap<String, ISpecies> parameterToCorrespondingSpecies = new HashMap<>(paramsToTransformInSpecies.size());
+		String prefixNewPar = "p_";
+		ICRN crnExpanded = expandCRN_createCRNAndCurriedSpecies(crn, speciesNameToExpandedSpecies, reuseSpecies, math,addParams,parameterToCorrespondingSpecies,prefixNewPar,paramsToTransformInSpecies);
 
 		/*
 		for(ISpecies species : crnExpanded.getSpecies()){
@@ -2329,26 +2340,22 @@ function UCTMC()
 			id++;
 		}
 		 */
+		
 		//boolean addParams = true;
-		String prefixNewPar = "p_";
-		int id=crnExpanded.getSpecies().size();
-		//Transform the parameters to be perturbed in species
-		HashMap<String, ISpecies> parameterToCorrespondingSpecies = new HashMap<>(paramsToTransformInSpecies.size());
-		for (String p : paramsToTransformInSpecies) {
-			double val = crn.getMath().evaluate(p);
-			ISpecies sp =new Species(p, id, BigDecimal.valueOf(val), String.valueOf(val),false);
-			crnExpanded.addSpecies(sp);
-			parameterToCorrespondingSpecies.put(p, sp);
-			id++;
-			speciesNameToExpandedSpecies.put(p, sp);
+		 
+		List<ICRNReaction> reactions = crn.getReactions();
+		curryTheReactions(addParams, speciesNameToExpandedSpecies, simpleRateParamOrConstant, math,
+				parameterToCorrespondingSpecies, prefixNewPar, crnExpanded, reactions);
+		//}
+		return crnExpanded;
+	}
 
-			if(addParams) {
-				//crnExpanded.addParameter(prefixNewPar+p, "1");
-				AbstractImporter.addParameter(prefixNewPar+p, "1", true, crnExpanded);
-			}
-		}
+	public static ArrayList<ICRNReaction> curryTheReactions(boolean addParams, HashMap<String, ISpecies> speciesNameToExpandedSpecies,
+			boolean simpleRateParamOrConstant, MathEval math, HashMap<String, ISpecies> parameterToCorrespondingSpecies,
+			String prefixNewPar, ICRN crnExpanded, List<ICRNReaction> reactions) throws UnsupportedFormatException {
 		//Copy the reactions transforming the parameters to be perturbed in species
-		for(ICRNReaction reaction : crn.getReactions()){
+		ArrayList<ICRNReaction> curriedReactions=new ArrayList<>();
+		for(ICRNReaction reaction : reactions){
 			if(reaction.hasArbitraryKinetics()) {
 				//This is the simple case where I don't have to do anything.
 				IComposite reagents = reaction.getReagents();
@@ -2364,7 +2371,9 @@ function UCTMC()
 					throw new UnsupportedFormatException("Problems in parsing the rate of this arbitrary reaction: "+reaction.toString());
 				}
 				//crnExpanded.addReaction(expandedReaction);
-				CRNImporter.addReaction(crnExpanded, expandedReag, expandedProd, expandedReaction);
+				if(crnExpanded!=null)
+					CRNImporter.addReaction(crnExpanded, expandedReag, expandedProd, expandedReaction);
+				curriedReactions.add(expandedReaction);
 			}
 			else {
 				IComposite reagents = reaction.getReagents();
@@ -2443,11 +2452,66 @@ function UCTMC()
 					//ICRNReaction expandedReaction = new CRNReaction(rateWithoutParametersToPerturbAndWithEvaluatedParameters, expandedReag, expandedProd, rateWithoutParametersToPerturbAndWithEvaluatedParameters.toPlainString(),null);
 					ICRNReaction expandedReaction = new CRNReaction(rateWithoutParametersToPerturbAndWithEvaluatedParameters, expandedReag, expandedProd, rateExpr,reaction.getID());
 					//crnExpanded.addReaction(expandedReaction);
-					CRNImporter.addReaction(crnExpanded, expandedReag, expandedProd, expandedReaction);
+					if(crnExpanded!=null)
+						CRNImporter.addReaction(crnExpanded, expandedReag, expandedProd, expandedReaction);
+					curriedReactions.add(expandedReaction);
 				}
 			}
 		}
-		//}
+		return curriedReactions;
+	}
+
+	public static void addCurriedSpecies(boolean addParams, ICRN crn,
+			LinkedHashSet<String> paramsToTransformInSpecies, HashMap<String, ISpecies> speciesNameToExpandedSpecies,
+			ICRN crnExpanded, HashMap<String, ISpecies> parameterToCorrespondingSpecies,String prefixNewPar) {
+		int id=crnExpanded.getSpecies().size();
+		//Transform the parameters to be perturbed in species
+		
+		for (String p : paramsToTransformInSpecies) {
+			double val;
+			try {
+				val=crn.getMath().evaluate(p);
+			}catch(java.lang.ArithmeticException e) {
+				//If the parameter is not defined, we use a default value of 1
+				val=1;
+			}
+			ISpecies sp =new Species(p, id, BigDecimal.valueOf(val), String.valueOf(val),false);
+			crnExpanded.addSpecies(sp);
+			parameterToCorrespondingSpecies.put(p, sp);
+			id++;
+			speciesNameToExpandedSpecies.put(p, sp);
+
+			if(addParams) {
+				//crnExpanded.addParameter(prefixNewPar+p, "1");
+				AbstractImporter.addParameter(prefixNewPar+p, "1", true, crnExpanded);
+			}
+		}
+		
+	}
+
+	public static ICRN expandCRN_createCRNAndCurriedSpecies(ICRN crn,
+			HashMap<String, ISpecies> speciesNameToExpandedSpecies, boolean reuseSpecies, MathEval math,
+			boolean addParams,HashMap<String, ISpecies> parameterToCorrespondingSpecies,String prefixNewPar,LinkedHashSet<String> paramsToTransformInSpecies) {
+		ICRN crnExpanded = new CRN(crn.getName(),math,crn.getOut(),crn.getBWOut());
+		crnExpanded.setMdelDefKind(crn.getMdelDefKind());
+		//CRN.copySpecies(crn, crnExpanded);
+		for (ISpecies species : crn.getSpecies()) {
+			ISpecies newSpecies=null;
+			if(reuseSpecies) {
+				newSpecies=species;
+			}
+			else {
+				newSpecies = species.cloneWithoutReactions();
+				newSpecies.setInitialConcentration(species.getInitialConcentration(), species.getInitialConcentration().toPlainString());
+			}
+			
+			crnExpanded.addSpecies(newSpecies);
+			speciesNameToExpandedSpecies.put(newSpecies.getName(), newSpecies);
+		}
+		
+		addCurriedSpecies(addParams, crn, paramsToTransformInSpecies,speciesNameToExpandedSpecies, crnExpanded, 
+				parameterToCorrespondingSpecies,prefixNewPar);
+		
 		return crnExpanded;
 	}
 
@@ -2471,10 +2535,10 @@ function UCTMC()
 		return d;
 	}
 
-	private static void computeEpsilonBDEAndWriteLinearSystemOfConstraints(ICRN crn, IPartition initial,MessageConsoleStream out,BufferedWriter bwOut,
+	private static IPartitionAndBooleanAndAxB computeEpsilonBDEAndWriteLinearSystemOfConstraints(ICRN crn, IPartition initial,MessageConsoleStream out,BufferedWriter bwOut,
 			IMessageDialogShower msgDialogShower, BufferedWriter bw, String functionName, boolean verbose,Terminator terminator,double epsilon,BigDecimal defaultIC, 
 			LinkedHashSet<String> paramsToPerturb, String prePartitionUserDefined, String prePartitionWRTIC,
-			boolean fastDegreeOneBDE
+			boolean fastDegreeOneBDE, boolean computeOnlyPartition
 			) throws UnsupportedFormatException, IOException {
 
 
@@ -2519,7 +2583,7 @@ end
 //			do {
 //				prevSize=current.size();
 //				//obtainedPartitionAndBool = CRNBisimulationsNAry.computeCoarsest(Reduction.BE,crn,initial, verbose,out,bwOut,terminator,messageDialogShower,epsBD);
-				obtainedPartitionAndBool = CRNBisimulationsNAry.computeCoarsest(Reduction.BE,crn,current, verbose,out,bwOut,terminator,messageDialogShower,epsBD);
+				obtainedPartitionAndBool = CRNBisimulationsNAry.computeCoarsest(Reduction.BE,crn,crn.getReactions(), current, verbose,out,bwOut,terminator,messageDialogShower,epsBD);
 //				current=obtainedPartitionAndBool.getPartition();
 //			}while(prevSize!=current.size());
 			
@@ -2543,17 +2607,10 @@ end
 		//double[] b = axb.getB();
 		LinkedHashSet<String> columns = axb.getColumns();
 
-		//int nonSingletonBlocks=0;
-		//int extraConstraints=0;
-		int incr=1;
-		bw.write("\n");
-		//bw.write("function closest_bde()\n");
-		bw.write("function "+functionName+"()\n");
-		bw.write("\n");
-		bw.write("    % The obtained partition\n");
-		IBlock currentBlock=obtainedPartition.getFirstBlock();
-		int bl=1;
+		
+		
 		ArrayList<IComposite> icConstraints = new ArrayList<IComposite>();
+		IBlock currentBlock=obtainedPartition.getFirstBlock();
 		while(currentBlock!=null){
 			int size = currentBlock.getSpecies().size();
 			if(size>1){
@@ -2565,19 +2622,46 @@ end
 					}
 				}
 			}
-			bw.write("    % Block "+bl+", Size: "+size+"\n");
-			for (ISpecies species : currentBlock.getSpecies()) {
-				bw.write("    %   y("+(species.getID()+incr)+")  "+species.getName()+"\n");
-			}
-			bl++;
 			currentBlock=currentBlock.getNext();
+		}
+		
+		
+		
+		if(!computeOnlyPartition) {
+			//int nonSingletonBlocks=0;
+			//int extraConstraints=0;
+			int incr=1;
+			bw.write("\n");
+			//bw.write("function closest_bde()\n");
+			bw.write("function "+functionName+"()\n");
+			bw.write("\n");
+			bw.write("    % The obtained partition\n");
+			currentBlock=obtainedPartition.getFirstBlock();
+			int bl=1;
+			//ArrayList<IComposite> icConstraints = new ArrayList<IComposite>();
+			while(currentBlock!=null){
+				int size = currentBlock.getSpecies().size();
+				//			if(size>1){
+				//				ISpecies rep = currentBlock.getRepresentative();
+				//				for (ISpecies species : currentBlock.getSpecies()) {
+				//					if(!species.equals(rep)){
+				//						//ic of rep = ic of species
+				//						icConstraints.add(new Composite(rep, species));
+				//					}
+				//				}
+				//			}
+				bw.write("    % Block "+bl+", Size: "+size+"\n");
+				for (ISpecies species : currentBlock.getSpecies()) {
+					bw.write("    %   y("+(species.getID()+incr)+")  "+species.getName()+"\n");
+				}
+				bl++;
+				currentBlock=currentBlock.getNext();
+			}
 		}
 
 
 		AXB axbWithIC = expandWithICConstraints(crn, obtainedPartition, axb, icConstraints);
-
-		double[][] AwithICConstraints = axbWithIC.getA();
-		double[] bwithICConstraints = axbWithIC.getB();
+		axb = axbWithIC;
 		
 		/*
 		//The parameters followed by the species
@@ -2660,146 +2744,190 @@ end
 		bw.write("%\t A extended with constraints on initial concentrations: rep of a block = each other species in the block\n");
 		bw.write("\n");
 		bw.write("\n");*/
-
-		bw.write("\n");
-		/*bw.write("    % The parameters followed by the species\n");
-		  bw.write("    %\t "+columns.toString()+"  ,  ");
-		  bw.write(crn.getSpecies().toString()+"\n");
-		 */
-		bw.write("    % The species followed by the parameters\n");
-		bw.write("    %\t "+crn.getSpecies().toString()+"  ,  ");
-		bw.write(columns.toString()+"\n");
-		bw.write("\n");
-		bw.write("    % The linear system Ap = b to be satisfied for BDE\n");
-		bw.write("    A = [\n");
-		for(int r=0;r<AwithICConstraints.length;r++){
-			//bw.write("    \t"+A[r].toString()+";\n");
-			if(AwithICConstraints[r].length>1){
-				bw.write("    \t\t[");
-			}
-			else{
-				bw.write("    \t\t ");
-			}
-			for(int c=0;c<AwithICConstraints[r].length;c++){
-				bw.write(String.valueOf(AwithICConstraints[r][c]));
-				if(c<AwithICConstraints[r].length-1){
-					bw.write(", ");
-				}
-			}
-			if(AwithICConstraints[r].length>1){
-				bw.write("];\n");
-			}
-			else{
-				bw.write(" ;\n");
-			}
+		
+		int cSize=0;
+		if(columns!=null) {
+			cSize=columns.size();
 		}
-		bw.write("        ];\n");
-		bw.write("\n");
-
-		//bw.write("    b = "+b.toString()+";\n");
-		if(bwithICConstraints.length!=1){
-			bw.write("    b = [");
-		}
-		else{
-			bw.write("    b = ");
-		}
-		for(int i=0;i<bwithICConstraints.length;i++){
-			bw.write(String.valueOf(bwithICConstraints[i]));
-			if(i<bwithICConstraints.length-1){
-				bw.write(", ");
-			}
-		}
-		if(bwithICConstraints.length!=1){
-			bw.write("];\n");
-		}
-		else{
-			bw.write(" ;\n");
-		}
-		bw.write("\n");
-
-		bw.write("    % Check whether the BDE constraints can be satisfied\n");
-		bw.write("    p = A\\b';\n");
-		//bw.write("    if(norm(A*p - b') > eps)\n");
-		//bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > eps)\n");
-		bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > (10^-10))\n");
-
-		bw.write("        fprintf('\\n======== BDE constraints cannot be satisfied ========\\n');\n");
-		bw.write("        return;\n");
-		bw.write("    end\n");
-		bw.write("\n");
-		bw.write("\n");
-
-		bw.write("    % The the initial concentrations of the species, followed by parameters of the reference trajectory\n");
-		//bw.write("p0ic = [1, 1, 1];\n");
-
-		bw.write("    p0 = [");
+		double[] p0=new double[crn.getSpecies().size() + cSize];
 		int s=0;
 		for(ISpecies species : crn.getSpecies()){
 			BigDecimal ic = species.getInitialConcentration();
 			if(ic.compareTo(BigDecimal.ZERO)==0){
 				ic=defaultIC;
 			}
-			bw.write(ic.toPlainString());
-			if(!(columns.size()==0 && s==crn.getSpecies().size()-1)){
-				bw.write(", ");
-			}
+			p0[s]=ic.doubleValue();
 			s++;
 		}
 		int i=0;
 		for(String par : columns){
 			double p = crn.getMath().evaluate(par);
-			bw.write(String.valueOf(p));
-			if(i<columns.size()-1){
-				bw.write(", ");
-			}
+			p0[s+i]=p;
 			i++;
 		}
-		bw.write("];\n");
+
+		if(!computeOnlyPartition) {
+			double[][] AwithICConstraints = axbWithIC.getA();
+			double[] bwithICConstraints = axbWithIC.getB();
+			
+			
+			bw.write("\n");
+			/*bw.write("    % The parameters followed by the species\n");
+		  bw.write("    %\t "+columns.toString()+"  ,  ");
+		  bw.write(crn.getSpecies().toString()+"\n");
+			 */
+			bw.write("    % The species followed by the parameters\n");
+			bw.write("    %\t "+crn.getSpecies().toString()+"  ,  ");
+			bw.write(columns.toString()+"\n");
+			bw.write("\n");
+			bw.write("    % The linear system Ap = b to be satisfied for BDE\n");
+			bw.write("    A = [\n");
+			for(int r=0;r<AwithICConstraints.length;r++){
+				//bw.write("    \t"+A[r].toString()+";\n");
+				if(AwithICConstraints[r].length>1){
+					bw.write("    \t\t[");
+				}
+				else{
+					bw.write("    \t\t ");
+				}
+				for(int c=0;c<AwithICConstraints[r].length;c++){
+					bw.write(String.valueOf(AwithICConstraints[r][c]));
+					if(c<AwithICConstraints[r].length-1){
+						bw.write(", ");
+					}
+				}
+				if(AwithICConstraints[r].length>1){
+					bw.write("];\n");
+				}
+				else{
+					bw.write(" ;\n");
+				}
+			}
+			bw.write("        ];\n");
+			bw.write("\n");
+
+			//bw.write("    b = "+b.toString()+";\n");
+			if(bwithICConstraints.length!=1){
+				bw.write("    b = [");
+			}
+			else{
+				bw.write("    b = ");
+			}
+			for(i=0;i<bwithICConstraints.length;i++){
+				bw.write(String.valueOf(bwithICConstraints[i]));
+				if(i<bwithICConstraints.length-1){
+					bw.write(", ");
+				}
+			}
+			if(bwithICConstraints.length!=1){
+				bw.write("];\n");
+			}
+			else{
+				bw.write(" ;\n");
+			}
+			bw.write("\n");
+
+			bw.write("    % Check whether the BDE constraints can be satisfied\n");
+			bw.write("    p = A\\b';\n");
+			//bw.write("    if(norm(A*p - b') > eps)\n");
+			//bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > eps)\n");
+			bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > (10^-10))\n");
+
+			bw.write("        fprintf('\\n======== BDE constraints cannot be satisfied ========\\n');\n");
+			bw.write("        return;\n");
+			bw.write("    end\n");
+			bw.write("\n");
+			bw.write("\n");
+
+			bw.write("    % The the initial concentrations of the species, followed by parameters of the reference trajectory\n");
+			//bw.write("p0ic = [1, 1, 1];\n");
+
+//			double[] p0=new double[crn.getSpecies().size()];
+//			bw.write("    p0 = [");
+//			int s=0;
+//			for(ISpecies species : crn.getSpecies()){
+//				BigDecimal ic = species.getInitialConcentration();
+//				if(ic.compareTo(BigDecimal.ZERO)==0){
+//					ic=defaultIC;
+//				}
+//				p0[s]=ic.doubleValue();
+//				bw.write(ic.toPlainString());
+//				if(!(columns.size()==0 && s==crn.getSpecies().size()-1)){
+//					bw.write(", ");
+//				}
+//				s++;
+//			}
+//			int i=0;
+//			for(String par : columns){
+//				double p = crn.getMath().evaluate(par);
+//				p0[s+i]=p;
+//				bw.write(String.valueOf(p));
+//				if(i<columns.size()-1){
+//					bw.write(", ");
+//				}
+//				i++;
+//			}
+//			bw.write("];\n");
+			bw.write("    p0 = [");
+			for(i=0;i<p0.length;i++) {
+				bw.write(String.valueOf(p0[i]));
+				if(i<p0.length-1) {
+					bw.write(", ");
+				}
+				else {
+					bw.write("];\n");
+				}
+			}
+			
 
 
-		bw.write("\n");
-		bw.write("\n");
+			bw.write("\n");
+			bw.write("\n");
 
-		bw.write("    % Find a point p that satisfies the BDE constraints and that minimizes\n"); 
-		bw.write("    % the Euclidian distance to p0, i.e., solve the quadratic\n");
-		bw.write("    % program min_{p : Ap = b} \\lVert p - p0 \\rVert_2\n");
-		//bw.write("    fprintf('\\n====== Closest BDE attained at =======================\\n');\n");    
-		//bw.write("    quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b)\n");
-		bw.write("    pOpt = quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b);\n");
+			bw.write("    % Find a point p that satisfies the BDE constraints and that minimizes\n"); 
+			bw.write("    % the Euclidian distance to p0, i.e., solve the quadratic\n");
+			bw.write("    % program min_{p : Ap = b} \\lVert p - p0 \\rVert_2\n");
+			//bw.write("    fprintf('\\n====== Closest BDE attained at =======================\\n');\n");    
+			//bw.write("    quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b)\n");
+			bw.write("    pOpt = quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b);\n");
 
-		bw.write("    fprintf('====== The approximate BDE is made exact by setting the following initial concentrations: =======================\\n')\n");
-		int p=1;
-		for (ISpecies species : crn.getSpecies()) {
-			bw.write("    fprintf('"+species.getName()+"=');\n");
-			bw.write("    disp(pOpt("+p+"))\n");
-			p++;
+			bw.write("    fprintf('====== The approximate BDE is made exact by setting the following initial concentrations: =======================\\n')\n");
+			int p=1;
+			for (ISpecies species : crn.getSpecies()) {
+				bw.write("    fprintf('"+species.getName()+"=');\n");
+				bw.write("    disp(pOpt("+p+"))\n");
+				p++;
+			}
+			//bw.write("    fprintf('k13=%f\n',pOpt(2));\n");
+			bw.write("    fprintf('\\n\\n');\n");
+
+			bw.write("    fprintf('====== and parameter values: =======================\\n')\n");
+			//		for (String param : columns) {
+			//			bw.write("    fprintf('"+param+"=%f\\n',pOpt("+p+"));\n");
+			//			p++;
+			//		}
+			for (String param : columns) {
+				bw.write("    fprintf('"+param+"=');\n");
+				bw.write("    disp(pOpt("+p+"))\n");
+				p++;
+			}
+			//bw.write("    fprintf('k13=%f\n',pOpt(2));\n");
+			bw.write("    fprintf('\\n\\n');\n");
+
+
+
+			bw.write("    dist = pOpt' - p0;\n");
+			bw.write("    fprintf('The euclidian norm \\n');\n");
+			bw.write("    distEucl = norm(dist)\n");
+			bw.write("    fprintf('The inf norm       \\n');\n");
+			bw.write("    distInf = max(dist)\n");
+			bw.write("    		\n");
+			bw.write("\n");
+			bw.write("end\n");
 		}
-		//bw.write("    fprintf('k13=%f\n',pOpt(2));\n");
-		bw.write("    fprintf('\\n\\n');\n");
-
-		bw.write("    fprintf('====== and parameter values: =======================\\n')\n");
-		//		for (String param : columns) {
-		//			bw.write("    fprintf('"+param+"=%f\\n',pOpt("+p+"));\n");
-		//			p++;
-		//		}
-		for (String param : columns) {
-			bw.write("    fprintf('"+param+"=');\n");
-			bw.write("    disp(pOpt("+p+"))\n");
-			p++;
-		}
-		//bw.write("    fprintf('k13=%f\n',pOpt(2));\n");
-		bw.write("    fprintf('\\n\\n');\n");
-
-
-
-		bw.write("    dist = pOpt' - p0;\n");
-		bw.write("    fprintf('The euclidian norm \\n');\n");
-		bw.write("    distEucl = norm(dist)\n");
-		bw.write("    fprintf('The inf norm       \\n');\n");
-		bw.write("    distInf = max(dist)\n");
-		bw.write("    		\n");
-		bw.write("\n");
-		bw.write("end\n");
+		
+		//return obtainedPartitionAndBool;
+		return new IPartitionAndBooleanAndAxB(obtainedPartitionAndBool.getPartition(), obtainedPartitionAndBool.getBool(), axb,p0);
 
 	}
 
@@ -2868,7 +2996,8 @@ end
 	}
 
 	private static void computeEpsilonFDEAndWriteLinearSystemOfConstraints(ICRN crn, IPartition initial,MessageConsoleStream out,BufferedWriter bwOut,
-			IMessageDialogShower msgDialogShower, BufferedWriter bw, String functionName, boolean verbose,Terminator terminator,double epsilon/*,BigDecimal defaultIC*/, LinkedHashSet<String> paramsToPerturb, String prePartitionUserDefined, String prePartitionWRTIC) throws UnsupportedFormatException, IOException {
+			IMessageDialogShower msgDialogShower, BufferedWriter bw, String functionName, boolean verbose,Terminator terminator,double epsilon/*,BigDecimal defaultIC*/, LinkedHashSet<String> paramsToPerturb, String prePartitionUserDefined, String prePartitionWRTIC,
+			boolean computeOnlyPartition) throws UnsupportedFormatException, IOException {
 
 		{	
 
@@ -2896,143 +3025,146 @@ end
 			double[] b = axb.getB();
 			LinkedHashSet<String> columns = axb.getColumns();
 
-			bw.write("\n");
-			//bw.write("function closest_fde()\n");
-			bw.write("function "+functionName+"()\n");
-			bw.write("\n");
 
-			//bw.write("\n");
-			bw.write("    % The obtained partition\n");
-			IBlock currentBlock=obtainedPartition.getFirstBlock();
-			int bl=1;
-			int incr=1;
-			while(currentBlock!=null){
-				int size = currentBlock.getSpecies().size();
-				bw.write("    % Block "+bl+", Size: "+size+"\n");
-				for (ISpecies species : currentBlock.getSpecies()) {
-					bw.write("    %   y("+(species.getID()+incr)+")  "+species.getName()+"\n");
+			if(!computeOnlyPartition) {
+				bw.write("\n");
+				//bw.write("function closest_fde()\n");
+				bw.write("function "+functionName+"()\n");
+				bw.write("\n");
+
+				//bw.write("\n");
+				bw.write("    % The obtained partition\n");
+				IBlock currentBlock=obtainedPartition.getFirstBlock();
+				int bl=1;
+				int incr=1;
+				while(currentBlock!=null){
+					int size = currentBlock.getSpecies().size();
+					bw.write("    % Block "+bl+", Size: "+size+"\n");
+					for (ISpecies species : currentBlock.getSpecies()) {
+						bw.write("    %   y("+(species.getID()+incr)+")  "+species.getName()+"\n");
+					}
+					bl++;
+					currentBlock=currentBlock.getNext();
 				}
-				bl++;
-				currentBlock=currentBlock.getNext();
-			}
-			bw.write("\n");
+				bw.write("\n");
 
-			bw.write("    % The parameters\n");
-			bw.write("    %\t "+columns.toString()+"\n");
-			bw.write("\n");
+				bw.write("    % The parameters\n");
+				bw.write("    %\t "+columns.toString()+"\n");
+				bw.write("\n");
 
-			bw.write("    % The linear system to be satisfied for FDE\n");
-			bw.write("    A = [\n");
-			for(int r=0;r<A.length;r++){
-				//bw.write("    \t"+A[r].toString()+";\n");
-				if(A[r].length>1){
-					bw.write("    \t\t[");
+				bw.write("    % The linear system to be satisfied for FDE\n");
+				bw.write("    A = [\n");
+				for(int r=0;r<A.length;r++){
+					//bw.write("    \t"+A[r].toString()+";\n");
+					if(A[r].length>1){
+						bw.write("    \t\t[");
+					}
+					else{
+						bw.write("    \t\t ");
+					}
+					for(int c=0;c<A[r].length;c++){
+						bw.write(String.valueOf(A[r][c]));
+						if(c<A[r].length-1){
+							bw.write(", ");
+						}
+					}
+					if(A[r].length>1){
+						bw.write("];\n");
+					}
+					else{
+						bw.write(" ;\n");
+					}
+				}
+				bw.write("        ];\n");
+				bw.write("\n");
+
+				//bw.write("    b = "+b.toString()+";\n");
+				if(b.length!=1){
+					bw.write("    b = [");
 				}
 				else{
-					bw.write("    \t\t ");
+					bw.write("    b =  ");
 				}
-				for(int c=0;c<A[r].length;c++){
-					bw.write(String.valueOf(A[r][c]));
-					if(c<A[r].length-1){
+				for(int i=0;i<b.length;i++){
+					bw.write(String.valueOf(b[i]));
+					if(i<b.length-1){
 						bw.write(", ");
 					}
 				}
-				if(A[r].length>1){
+				if(b.length!=1){
 					bw.write("];\n");
 				}
 				else{
 					bw.write(" ;\n");
 				}
-			}
-			bw.write("        ];\n");
-			bw.write("\n");
+				bw.write("\n");
 
-			//bw.write("    b = "+b.toString()+";\n");
-			if(b.length!=1){
-				bw.write("    b = [");
-			}
-			else{
-				bw.write("    b =  ");
-			}
-			for(int i=0;i<b.length;i++){
-				bw.write(String.valueOf(b[i]));
-				if(i<b.length-1){
-					bw.write(", ");
+				bw.write("    % Check whether the FDE constraints can be satisfied\n");
+				bw.write("    p = A\\b';\n");
+				//bw.write("    if(norm(A*p - b') > eps)\n");
+				//bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > eps)\n");
+				bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > (10^-10))\n");
+				bw.write("        fprintf('\\n======== FDE constraints cannot be satisfied ========\\n');\n");
+				bw.write("        return;\n");
+				bw.write("    end    \n");
+				bw.write("\n");
+
+				bw.write("    % The parameters of the reference trajectory\n");
+				//bw.write("p0 = [1, 1, 1];\n");
+				if(columns.size()!=1){
+					bw.write("    p0 = [");
 				}
-			}
-			if(b.length!=1){
-				bw.write("];\n");
-			}
-			else{
-				bw.write(" ;\n");
-			}
-			bw.write("\n");
+				else{
+					bw.write("    p0 =  ");
+				}
 
-			bw.write("    % Check whether the FDE constraints can be satisfied\n");
-			bw.write("    p = A\\b';\n");
-			//bw.write("    if(norm(A*p - b') > eps)\n");
-			//bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > eps)\n");
-			bw.write("    if(sum(isinf(p) + isnan(p)) > 0 || norm(A*p - b') > (10^-10))\n");
-			bw.write("        fprintf('\\n======== FDE constraints cannot be satisfied ========\\n');\n");
-			bw.write("        return;\n");
-			bw.write("    end    \n");
-			bw.write("\n");
-
-			bw.write("    % The parameters of the reference trajectory\n");
-			//bw.write("p0 = [1, 1, 1];\n");
-			if(columns.size()!=1){
-				bw.write("    p0 = [");
-			}
-			else{
-				bw.write("    p0 =  ");
-			}
-
-			{
-				int i=0;
-				for(String par : columns){
-					double p = crn.getMath().evaluate(par);
-					bw.write(String.valueOf(p));
-					if(i<columns.size()-1){
-						bw.write(", ");
+				{
+					int i=0;
+					for(String par : columns){
+						double p = crn.getMath().evaluate(par);
+						bw.write(String.valueOf(p));
+						if(i<columns.size()-1){
+							bw.write(", ");
+						}
+						i++;
 					}
-					i++;
 				}
+				if(columns.size()!=1){
+					bw.write("];\n");
+				}
+				else{
+					bw.write(" ;\n");
+				}
+				bw.write("\n");
+
+				bw.write("    % Find a point p that satisfies the FDE constraints and that minimizes\n"); 
+				bw.write("    % the Euclidian distance to p0, i.e., solve the quadratic\n");
+				bw.write("    % program min_{p : Ap = b} \\lVert p - p0 \\rVert_2\n");
+				//bw.write("    fprintf('\\n====== Closest FDE attained at =======================\\n');\n");        
+				//bw.write("    p = quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b)\n");
+				bw.write("    pOpt = quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b);\n\n");
+
+				bw.write("    fprintf('====== The approximate FDE is made exact by setting the following parameter values: =======================\\n')\n");
+				int p=1;
+				for (String param : columns) {
+					bw.write("    fprintf('"+param+"=');\n");
+					bw.write("    disp(pOpt("+p+"))\n");
+					p++;
+				}
+				//bw.write("    fprintf('k13=%f\n',pOpt(2));\n");
+				bw.write("    fprintf('\\n\\n');\n");
+
+
+
+				bw.write("    dist = pOpt' - p0;\n");
+				bw.write("    fprintf('The euclidian norm \\n');\n");
+				bw.write("    distEucl = norm(dist)\n");
+				bw.write("    fprintf('The inf norm       \\n');\n");
+				bw.write("    distInf = max(dist)\n");
+				bw.write("    		\n");
+				bw.write("\n");
+				bw.write("end\n");
 			}
-			if(columns.size()!=1){
-				bw.write("];\n");
-			}
-			else{
-				bw.write(" ;\n");
-			}
-			bw.write("\n");
-
-			bw.write("    % Find a point p that satisfies the FDE constraints and that minimizes\n"); 
-			bw.write("    % the Euclidian distance to p0, i.e., solve the quadratic\n");
-			bw.write("    % program min_{p : Ap = b} \\lVert p - p0 \\rVert_2\n");
-			//bw.write("    fprintf('\\n====== Closest FDE attained at =======================\\n');\n");        
-			//bw.write("    p = quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b)\n");
-			bw.write("    pOpt = quadprog(eye(size(p0,2)), -p0, zeros(size(A,1),size(A,2)), zeros(1,size(b,2)), A, b);\n\n");
-
-			bw.write("    fprintf('====== The approximate FDE is made exact by setting the following parameter values: =======================\\n')\n");
-			int p=1;
-			for (String param : columns) {
-				bw.write("    fprintf('"+param+"=');\n");
-				bw.write("    disp(pOpt("+p+"))\n");
-				p++;
-			}
-			//bw.write("    fprintf('k13=%f\n',pOpt(2));\n");
-			bw.write("    fprintf('\\n\\n');\n");
-
-
-
-			bw.write("    dist = pOpt' - p0;\n");
-			bw.write("    fprintf('The euclidian norm \\n');\n");
-			bw.write("    distEucl = norm(dist)\n");
-			bw.write("    fprintf('The inf norm       \\n');\n");
-			bw.write("    distInf = max(dist)\n");
-			bw.write("    		\n");
-			bw.write("\n");
-			bw.write("end\n");
 		}
 
 	}

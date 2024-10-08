@@ -42,6 +42,10 @@ public class MyParserUtil {
 			Parameter val = (Parameter)expr;
 			return val.getName();
 		} 
+		else if(expr instanceof ProbParameter){
+			ProbParameter val = (ProbParameter)expr;
+			return val.getName();
+		} 
 		/*else if(expr instanceof Species){
 			Species val = (Species)expr;
 			if(val.getName()==null){
@@ -56,6 +60,9 @@ public class MyParserUtil {
 				ParameterOrSymbolicParameterOrSpecies ref = ((ReferenceToParameterOrSymbolicParameterOrSpecies)expr).getReference();
 				if(ref instanceof Parameter){
 					name = ((Parameter) ref).getName();
+				}
+				if(ref instanceof ProbParameter){
+					name = ((ProbParameter) ref).getName();
 				}
 				else if(ref instanceof SymbolicParameter){
 					name = ((SymbolicParameter) ref).getName();
@@ -453,6 +460,7 @@ public class MyParserUtil {
 	public static ModelElementsCollector getModelElements(ModelDefinition modelDef,String absoluteParentPath,String absolutePath){
 		ArrayList<String> symbolicParameters = new ArrayList<String>(0);
 		ArrayList<ArrayList<String>> parameters = new ArrayList<ArrayList<String>>(0);
+		ArrayList<String> probParameters = new ArrayList<>(0);
 		ArrayList<LinkedHashMap<String, String>> reactions = new ArrayList<>(0);
 		ArrayList<LinkedHashMap<String, String>> algebraicConstraints = new ArrayList<>(0);
 		ArrayList<ArrayList<String>> views = new ArrayList<ArrayList<String>>(0);
@@ -460,9 +468,11 @@ public class MyParserUtil {
 		ArrayList<ArrayList<String>> initialAlgConcentrations = new ArrayList<ArrayList<String>>(0);
 		ArrayList<Command> commandsList = new ArrayList<>(0);
 		ArrayList<BooleanCommand> booleanCommandsList = new ArrayList<>(0);
+		ArrayList<ProbCommand> probCommandsList = new ArrayList<>(0);
 		ArrayList<ArrayList<String>> initialPartition = new ArrayList<ArrayList<String>>(0);
 		String importString=null;
 		Import importCommand=null;
+		ProbImport probImportCommand=null;
 		ImportBoolean importBooleanCommand=null;
 		ImportFolder importFolderCommand=null;
 		BooleanImportFolder booleanImportFolderCommand=null;
@@ -481,10 +491,17 @@ public class MyParserUtil {
 		
 		String modelName = modelDef.getName();
 		
+		ArrayList<ArrayList<String>> parsedConditionsOfAllClauses=new ArrayList<>(10);
+		ArrayList<ArrayList<LinkedHashMap<String, String>>> reactionsOfAllClauses = new ArrayList<>(10);
+		
 
+		
 		for (EObject element : modelDef.getElements()) {
 			if(element instanceof Command){
 				commandsList.add((Command)element);
+			}
+			else if(element instanceof ProbCommand){
+				probCommandsList.add((ProbCommand)element);
 			}
 			else if(element instanceof Import){
 				importName = element.toString();
@@ -493,6 +510,15 @@ public class MyParserUtil {
 				importCommand =(Import)element;
 				importString = parseImport(importCommand,importName,absoluteParentPath);
 				modelDefKind=ModelDefKind.IMPORT;
+				synchEditor=false;//synchEditor=importCommand.getParams().isSynchEditor();
+			}
+			else if(element instanceof ProbImport){
+				importName = element.toString();
+				importName = importName.substring(importName.lastIndexOf(".impl.")+6);
+				importName = importName.substring(0,importName.lastIndexOf("Impl"));
+				probImportCommand =(ProbImport)element;
+				importString = parseImportProbProg(probImportCommand,importName,absoluteParentPath);
+				modelDefKind=ModelDefKind.PROBPROGIMPORT;
 				synchEditor=false;//synchEditor=importCommand.getParams().isSynchEditor();
 			}
 			else if(element instanceof ImportBoolean){
@@ -545,6 +571,15 @@ public class MyParserUtil {
 					//String val = MyParserUtil.visitExpr(param.getParamValue().getValue());
 					String val = MyParserUtil.visitExpr(param.getParamValue());
 					par.add(val);
+				}
+			}
+			else if(element instanceof ProbParametersList){
+				EList<ProbParameter> parametersList = ((ProbParametersList)element).getParameters();
+				for (ProbParameter param : parametersList) {
+					//name,value
+					String par = param.getName();
+					//TODO: for now I ignore the distribution (the value of the param)
+					probParameters.add(par);
 				}
 			}
 			else if(element instanceof InitPartition){
@@ -610,31 +645,45 @@ public class MyParserUtil {
 			}
 			else if(element instanceof ODEsList){
 				modelDefKind=ModelDefKind.ODE;
-				EList<ODE> odes = ((ODEsList)element).getOdes();
-				reactions = new ArrayList<>(odes.size());
-				for(ODE ode : odes){
-					//Species speciesOfOde = ode.getName().getAllSpecies().get(0); AAA
-					Species speciesOfOde = ode.getName();
-					Expression drift = ode.getDrift();
-					String driftString = MyParserUtil.visitExpr(drift);
-					//IComposite products = new Composite(speciesOfODE,speciesOfODE);
-					//ICRNReaction reaction = new CRNReactionArbitrary((IComposite)speciesOfODE, products, body,varsName);
-					//speciesOfTheODE,arbitrary,rate
-					//ArrayList<String> r = new ArrayList<>(4);
-					LinkedHashMap<String, String> r = new LinkedHashMap<String, String>(5);
-					reactions.add(r);
-					r.put("reagents",speciesOfOde.getName());//r.add(2*speciesOfOde.getName());
-					r.put("products",speciesOfOde.getName()+"+"+speciesOfOde.getName());
-					r.put("rate",driftString);
-					r.put("kind","ode");
-					/*
-					 * It would make sense to assign 'd(s)' as id of the ODE of species 's'. 
-					 * We have to decide if we want this or not  
-					if(ode.getName()!=null){
-						r.put("id", "d("+ode.getName()+")");
+				EList<ODE> odes= ((ODEsList)element).getOdes();
+				reactions = parseODEs(odes);
+			}
+			else if(element instanceof IfClause) {
+				
+				//handle IF
+				//	handle condition of IF
+				Condition condition = ((IfClause) element).getCondition();
+				
+				parseIfElifGuards(parsedConditionsOfAllClauses, condition);
+				
+				//	handle body of IF
+				StateBlock thenBranch = ((IfClause) element).getThen();	
+				modelDefKind=ModelDefKind.ProbProg;
+				parseIfElifBody(reactionsOfAllClauses, thenBranch);
+				//reactions = parseODEs(thenBranch.getOdes());
+				
+				
+				//handle all elifs
+				EList<ElseBranch> allElifs = ((IfClause) element).getElseBranches();
+				if(allElifs!=null) {
+					for(ElseBranch elif : allElifs) {
+						condition=elif.getCondition();
+						parseIfElifGuards(parsedConditionsOfAllClauses, condition);
+						
+						StateBlock branch = elif.getThen();
+						parseIfElifBody(reactionsOfAllClauses, branch);
 					}
-					*/
 				}
+				
+				
+				//handle final ELSE
+				if(((IfClause) element).getElseFinal()!=null) {
+					ElseFinal finalElse = ((IfClause) element).getElseFinal();
+					StateBlock elseBranch=finalElse.getThen();
+					
+					parseIfElifBody(reactionsOfAllClauses, elseBranch);
+				}
+				
 			}
 			else if(element instanceof AlgebraicList){
 				//modelDefKind=ModelDefKind.DAE;
@@ -815,13 +864,66 @@ public class MyParserUtil {
 			
 		}
 	
-		ModelElementsCollector mec = new ModelElementsCollector(modelName,symbolicParameters,constraintsList,parameters, reactions, algebraicConstraints,views, initialConcentrations, initialAlgConcentrations,
-				initialPartition, commandsList, booleanCommandsList, importString, 
+		ModelElementsCollector mec = new ModelElementsCollector(modelName,
+				symbolicParameters,probParameters,
+				constraintsList,parameters, reactions, algebraicConstraints,views, initialConcentrations, initialAlgConcentrations,
+				initialPartition, commandsList, booleanCommandsList, probCommandsList, 
+				importString, 
 				importCommand, importBooleanCommand, importFolderString, importFolderCommand,booleanImportFolderCommand,importName, modelDefKind,
+				parsedConditionsOfAllClauses,reactionsOfAllClauses,
 				nodeDefinitions,mvNodeDefinitions,
 				synchEditor,absolutePath);
 		return mec;
 	
+	}
+
+	public static void parseIfElifBody(ArrayList<ArrayList<LinkedHashMap<String, String>>> reactionsOfAllClauses,
+			StateBlock thenBranch) {
+		ArrayList<LinkedHashMap<String, String>> reactionsOfCurrentClause=parseODEs(thenBranch.getOdes());
+		reactionsOfAllClauses.add(reactionsOfCurrentClause);
+	}
+
+	public static void parseIfElifGuards(ArrayList<ArrayList<String>> parsedConditionsOfAllClauses, Condition condition) {
+		EList<ExpressionOfCondition> conditions = condition.getExpressions();
+		ArrayList<String> parsedConditionsOfCurrentClause = new ArrayList<>(conditions.size());
+		//ArrayList<ArrayList<String>> parsedConditionsOfAllClauses=new ArrayList<>(10);
+		//ArrayList<ArrayList<LinkedHashMap<String, String>>> reactionsOfAllClauses = new ArrayList<>(10);
+		
+		parsedConditionsOfAllClauses.add(parsedConditionsOfCurrentClause);
+		for(ExpressionOfCondition expression : conditions) {
+			Expression actualExpr=expression.getExpr();
+			String driftString = MyParserUtil.visitExpr(actualExpr);
+			parsedConditionsOfCurrentClause.add(driftString);
+		}
+	}
+
+	public static ArrayList<LinkedHashMap<String, String>> parseODEs(EList<ODE> odes) {
+		ArrayList<LinkedHashMap<String, String>> reactions;
+		reactions = new ArrayList<>(odes.size());
+		for(ODE ode : odes){
+			//Species speciesOfOde = ode.getName().getAllSpecies().get(0); AAA
+			Species speciesOfOde = ode.getName();
+			Expression drift = ode.getDrift();
+			String driftString = MyParserUtil.visitExpr(drift);
+			//IComposite products = new Composite(speciesOfODE,speciesOfODE);
+			//ICRNReaction reaction = new CRNReactionArbitrary((IComposite)speciesOfODE, products, body,varsName);
+			//speciesOfTheODE,arbitrary,rate
+			//ArrayList<String> r = new ArrayList<>(4);
+			LinkedHashMap<String, String> r = new LinkedHashMap<String, String>(5);
+			reactions.add(r);
+			r.put("reagents",speciesOfOde.getName());//r.add(2*speciesOfOde.getName());
+			r.put("products",speciesOfOde.getName()+"+"+speciesOfOde.getName());
+			r.put("rate",driftString);
+			r.put("kind","ode");
+			/*
+			 * It would make sense to assign 'd(s)' as id of the ODE of species 's'. 
+			 * We have to decide if we want this or not  
+			if(ode.getName()!=null){
+				r.put("id", "d("+ode.getName()+")");
+			}
+			*/
+		}
+		return reactions;
 	}
 
 	
@@ -841,9 +943,7 @@ public class MyParserUtil {
 		List<String> commands = new ArrayList<String>();
 		commands.add("newline");
 		for(BooleanCommand command : mec.getBooleanCommandsList()){
-			String commandName = command.toString();
-			commandName = commandName.substring(commandName.lastIndexOf(".impl.")+6);
-			commandName = commandName.substring(0,commandName.lastIndexOf("Impl"));
+			String commandName = extractCommandName(command.toString());
 			if(command instanceof BooleanReduction){
 				String red = parseBooleanReduce((BooleanReduction)command,commandName,absoluteParentPath,false);
 				commands.add(red);
@@ -874,10 +974,18 @@ public class MyParserUtil {
 			}
 			commands.add("newline");
 		}
+		for(ProbCommand command : mec.getProbCommandsList()) {
+			String commandName = extractCommandName(command.toString());
+			
+			if(command instanceof ProbReduction){
+				String red = parseReduce((ProbReduction)command,commandName,absoluteParentPath,false);
+				commands.add(red);
+			}
+			commands.add("newline");
+			
+		}
 		for(Command command : mec.getCommandsList()){
-			String commandName = command.toString();
-			commandName = commandName.substring(commandName.lastIndexOf(".impl.")+6);
-			commandName = commandName.substring(0,commandName.lastIndexOf("Impl"));
+			String commandName = extractCommandName(command.toString());
 			//commandName = commandName.substring(commandName.lastIndexOf('.')+1,commandName.lastIndexOf("Impl"));
 			//commands.add(commandName+"({})");
 
@@ -1001,6 +1109,15 @@ public class MyParserUtil {
 		
 		//empty commands
 		//commands.clear();
+		
+		//reduceFPE(csvFile="cnf/randomlygenerated_quantumized2/FPE.csv",fileWhereToStorePartition="cnf/randomlygenerated_quantumized2/cnf_1rnd_V10_C300_MinCS3_MaxCS3_part.txt",prePartition=USER)
+		
+		/*
+		//Write new file resetting the parameters
+		String outFile=computeFileName("resetParams/"+mec.getModelName()+".ode",absoluteParentPath);
+		String com ="write({fileOut=>"+outFile+",resetParameters=>true})";
+		commands.add(com);
+		*/
 		//exportSBML
 //		String sbmlFile=computeFileName(mec.getModelName()+".sbml",absoluteParentPath);
 //		String exportSBML="exportSBMLQual({fileOut=>"+sbmlFile+"})";
@@ -1017,30 +1134,34 @@ public class MyParserUtil {
 		
 		/*
 		boolean applyCurrying=false;
+		boolean forceIConBE=false;
 		//String [] reductions= {"FE","BE", "SMB"};	//MRN
 		//String [] reductions= {"FE","BE"};		//PRN
+		//String [] reductions= {"FE","BE"};		
 		//String [] reductions= {"BDE","FDE"};		//NRN
 		//String [] reductions= {"BDE"};		//NRN
 		//String [] reductions= {"FDE"};		//NRN
 		
-		
 		//String [] reductions= {"FE"};
-		String [] reductions= {"FE","BE"};
-		//String [] reductions= {"BE"};
+		//String [] reductions= {"FE","BE"};
+		String [] reductions= {"BE"};
 		//String [] reductions= {"FE","BE","SE"};
 		//String [] reductions= {"BDE"};
 		//String [] reductions= {"SMB"}; applyCurrying=false;
 		//String [] reductions= {"FDE"};
 		//reduceSMB(reducedFile= "./reductionThesisExtra/MODEL8262229752.SMB.ode", addSelfLoops = true) why true? With true it becomes as SE
 		//String [] reductions= {"FDE"};
-		generateCommands(mec, absoluteParentPath, commands, reductions,applyCurrying);
+		generateCommands(mec, absoluteParentPath, commands, reductions,applyCurrying,forceIConBE);
 		
-		String folder = "ODEs";
-		String outFile = computeFileName(folder+File.separator+mec.getModelName()+"_ode._ode",absoluteParentPath);
-		String com ="write({fileOut=>"+outFile+",format=>ODE})";
-		commands.add(com);
+//		String folder = "ODEs";
+//		String outFile = computeFileName(folder+File.separator+mec.getModelName()+"_ode._ode",absoluteParentPath);
+//		String com ="write({fileOut=>"+outFile+",format=>ODE})";
+//		commands.add(com);
+		
 		*/
 		
+		
+		//*/
 		
 		/*
 		//String folder = "curated_erode_mass_action";
@@ -1070,37 +1191,49 @@ public class MyParserUtil {
 		return commands;
 	}
 
+public static String extractCommandName(String commandToString) {
+	String commandName = commandToString;
+	commandName = commandName.substring(commandName.lastIndexOf(".impl.")+6);
+	commandName = commandName.substring(0,commandName.lastIndexOf("Impl"));
+	return commandName;
+}
+
 	@SuppressWarnings("unused")
 	private static void generateCommands(final ModelElementsCollector mec, final String absoluteParentPath, final List<String> commands,
-			final String[] reductions,final boolean applyCurrying) {
+			final String[] reductions,final boolean applyCurrying, boolean forceIConBE) {
 		
-		generateCommands(mec, absoluteParentPath, commands,reductions,false,"");
+		generateCommands(mec, absoluteParentPath, commands,reductions,false,"",forceIConBE);
 		
 		if(applyCurrying) {
 			String com ="this=curry({paramsToCurry=>ALL,singleoutParams=>true,preserveUserPartion=>false})";
 			commands.add(com);
 			commands.add("newline");
 			String suffix="Curried";
-			generateCommands(mec, absoluteParentPath, commands,reductions,applyCurrying,suffix);
+			generateCommands(mec, absoluteParentPath, commands,reductions,applyCurrying,suffix,forceIConBE);
 		}
 	}
 	
 	private static void generateCommands(ModelElementsCollector mec, String absoluteParentPath, List<String> commands,
-			String[] reductions,boolean applyCurrying,String suffix) {
+			String[] reductions,boolean applyCurrying,String suffix, boolean forceIConBE) {
 		for(String red : reductions ) {
-			String redFile = computeFileName(red+suffix+File.separator+mec.getModelName()+"._ode",absoluteParentPath);
+			String redFile = computeFileName(red+suffix+File.separator+mec.getModelName()+".ode",absoluteParentPath);
 			String com ="reduce"+red+"({reducedFile=>"+redFile;
 			// reduceFE(reducedFile="fe/aaa.ode",csvFile="fe.csv")
 			String csvFile = computeFileName("reductionsInfo"+File.separator+red+suffix+".csv",absoluteParentPath);
 			com+= ",csvFile=>"+csvFile;
 			if(red.equals("BE") ||red.equals("BDE")) {
-				if(applyCurrying) {
-					//I have to prepartition according to the IC, but also according to the user-defined partition.
-					//	In fact, the user-defined partition has been created by the currying so that it contains one block per curried parameter.
-					com+=", prePartition=>USER_and_IC})";
+				if(forceIConBE) {
+					if(applyCurrying) {
+						//I have to prepartition according to the IC, but also according to the user-defined partition.
+						//	In fact, the user-defined partition has been created by the currying so that it contains one block per curried parameter.
+						com+=", prePartition=>USER_and_IC})";
+					}
+					else {
+						com+=", prePartition=>IC})";
+					}
 				}
 				else {
-					com+=", prePartition=>IC})";
+					com+="})";
 				}
 			}
 			else if(red.equals("SMB")) {
@@ -1146,6 +1279,7 @@ public class MyParserUtil {
 			}
 		}
 		//importAndPolyCNFFolder
+		//importCNFFolderAsQuantumOpt
 		
 		sb.deleteCharAt(sb.length()-1);
 		sb.append("})");
@@ -1193,6 +1327,21 @@ public class MyParserUtil {
 		sb.append("guessPrep=>");
 		sb.append(((importBNet)imp).getGuessPrep());
 		sb.append(',');
+		
+		sb.deleteCharAt(sb.length()-1);
+		sb.append("})");
+		return sb.toString();
+	}
+	
+	private static String parseImportProbProg(ProbImport imp, String commandName, String absoluteParentPath) {
+		StringBuilder sb = new StringBuilder(commandName);
+		sb.append("({");
+		sb.append("fileIn=>");
+		sb.append(computeFileName(imp.getParams().getFileIn(), absoluteParentPath,false));
+		//sb.append(imp.getParams().getFileIn());
+		sb.append(',');
+		
+		//if special cases..
 		
 		sb.deleteCharAt(sb.length()-1);
 		sb.append("})");
@@ -1650,6 +1799,10 @@ public class MyParserUtil {
 			boolean originalNames = (((write) exp).isOriginalNames());
 			if(originalNames) {
 				sb.append("originalNames=>true,");
+			}
+			boolean resetParameters = (((write) exp).isResetParameters());
+			if(resetParameters) {
+				sb.append("resetParameters=>"+resetParameters+",");
 			}
 		}
 		else if(exp instanceof exportModelica){
@@ -2814,6 +2967,16 @@ public class MyParserUtil {
 //			sb.append("simplify=>"+simplify);
 //			sb.append(',');
 		}
+		if(red instanceof reduceRndFBE) {
+			String aggrFunc=((reduceRndFBE) red).getAggregationFunction();
+			sb.append("aggregationFunction=>");
+			sb.append(aggrFunc);
+			sb.append(',');
+			
+//			boolean simplify=((reduceFBE) red).isSimplify();
+//			sb.append("simplify=>"+simplify);
+//			sb.append(',');
+		}
 		else if(red instanceof reduceFME) {
 			String aggrFunc=((reduceFME) red).getAggregationFunction();
 			sb.append("aggregationFunction=>");
@@ -2848,18 +3011,128 @@ public class MyParserUtil {
 		return sb.toString();
 	}
 	
+	private static String parseReduce(ProbReduction red, String commandName, String absoluteParentPath,boolean isUpdate) {
+		boolean hasToReduce=isUpdate;
+		StringBuilder sb = new StringBuilder(commandName);
+		sb.append("({");
+		
+		FormattedOptionalParametersReductions app = ((reduceFPE)red).getOptionalParametersFormatted();
+		hasToReduce = parseCommonReductionParameters(absoluteParentPath, hasToReduce, sb, app);
+		
+		if(!hasToReduce){
+			sb.append("computeOnlyPartition=>true,");
+		}
+		
+		if(sb.charAt(sb.length()-1)==','){
+			sb.deleteCharAt(sb.length()-1);
+		}
+		sb.append("})");
+		//System.out.println(sb.toString());
+		
+		return sb.toString();
+	}
 	private static String parseReduce(Reduction red, String commandName, String absoluteParentPath,boolean isUpdate) {
 		boolean hasToReduce=isUpdate;
 		StringBuilder sb = new StringBuilder(commandName);
 		sb.append("({");
 		//EList<OptionalParametersReductionsWithComma> a = red.getOptionalParametersFormatted().getOptionalParameters();
-		EList<OptionalParametersReductions> optinalPars=null;
-		if(red.getOptionalParametersFormatted()!=null){
-			optinalPars = red.getOptionalParametersFormatted().getOptionalParameters();
+		FormattedOptionalParametersReductions app = red.getOptionalParametersFormatted();
+		hasToReduce = parseCommonReductionParameters(absoluteParentPath, hasToReduce, sb, app);
+		//		sb.append("computeOnlyPartition=>true");
+		//		if(optinalPars!=null && optinalPars.size()>0){
+		//			sb.append(",");
+		//		}
+		if(!hasToReduce){
+			sb.append("computeOnlyPartition=>true,");
+		}
+		if(red instanceof reduceSMB){
+			if(((reduceSMB) red).isHalveRatesOfHomeoReactions()) {
+				sb.append("halveRatesOfHomeoReactions=>true,");
+			}
+		}
+		if(red instanceof reduceCoRNFE) {
+			sb.append("computeOnlyPartition=>true,");
+			CoRNParams cornParams = ((reduceCoRNFE)red).getCornParams();
+			if(cornParams.getPercentagePert()>0) {
+				sb.append("percentagePerturbation=>"+cornParams.getPercentagePert());
+			}
+			else if(cornParams.getAbsolutePert()>0){
+				sb.append("absolutePerturbation=>"+cornParams.getAbsolutePert());
+			}
+			else if(cornParams.getPercentageClos()>0) {
+				sb.append("percentageClosure=>"+cornParams.getPercentageClos());
+			}
+			else if(cornParams.getAbsoluteClos()>0){
+				sb.append("absoluteClosure=>"+cornParams.getAbsoluteClos());
+			}
+			else if(cornParams.getLowerFactor()>0) {
+				sb.append("lowerFactor=>"+cornParams.getLowerFactor());
+				sb.append(",");
+				sb.append("upperFactor=>"+cornParams.getUpperFactor());
+			}
+			sb.append(",");
+			sb.append("certainConstants=>"+cornParams.isCertainConstants());
+			sb.append(",");
+			
+			sb.append("onlyFEonCentreBounds=>"+cornParams.isOnlyFEOnCentreBounds());
+			sb.append(",");
+			
+		}
+		if(red instanceof reduceUCTMCFE){
+			String modelWithBigM = ((reduceUCTMCFE)red).getModelWithBigM();
+			if(modelWithBigM!=null){
+				sb.append("modelWithBigM=>");
+				sb.append(computeFileName(modelWithBigM, absoluteParentPath,false));
+				sb.append(',');
+			}
+			else {
+				String delta = visitExpr(((reduceUCTMCFE) red).getDelta()); 
+				sb.append("delta=>"+delta+",");
+			}
+		}
+		if(red instanceof reduceUSE){
+			reduceUSE redUSE = (reduceUSE)red;
+			String modelWithBigM = redUSE.getModelWithBigM();
+			if(modelWithBigM!=null){
+				sb.append("modelWithBigM=>");
+				sb.append(computeFileName(modelWithBigM, absoluteParentPath,false));
+				sb.append(',');
+			}
+			else if(redUSE.getDelta()!=null){
+				String delta = visitExpr(redUSE.getDelta()); 
+				sb.append("delta=>"+delta+",");
+			}
+			else {
+				String delta = visitExpr(redUSE.getDeltaPercentage()); 
+				sb.append("deltaPercentage=>"+delta+",");
+			}
+			boolean doNotAddDeltaToRawConstants = ((reduceUSE) red).isDoNotAddDeltaToRawConstants(); 
+			sb.append("doNotAddDeltaToRawConstants=>"+doNotAddDeltaToRawConstants+",");
+		}
+		/*if(red instanceof MassActionEpsilonReduction){
+			sb.append("epsilon=>");
+			sb.append(MyParserUtil.visitExpr(((MassActionEpsilonReduction) red).getEpsilon()));
+		}*/
+		/*else if(optinalPars!=null && optinalPars.size()>0){
+				sb.deleteCharAt(sb.length()-1);
+		}*/
+		if(sb.charAt(sb.length()-1)==','){
+			sb.deleteCharAt(sb.length()-1);
+		}
+		sb.append("})");
+		//System.out.println(sb.toString());
+		return sb.toString();
+	}
+
+	public static boolean parseCommonReductionParameters(String absoluteParentPath, boolean hasToReduce,
+			StringBuilder sb, FormattedOptionalParametersReductions app) {
+		EList<OptionalParametersReductions> optionalPars;
+		if(app!=null){
+			optionalPars = app.getOptionalParameters();
 			/*sb.append("groupedFile=>"+computeFileName("z3Question.smt2",projectPath)+",");
 		sb.append("typeOfGroupedFile=>z3,");*/
-			if(optinalPars!=null){
-				for (OptionalParametersReductions par : optinalPars) {
+			if(optionalPars!=null){
+				for (OptionalParametersReductions par : optionalPars) {
 					//fileIn=>inputfileName.crn,prePartition=>NONE,reducedFile=>outputFileNameOfReducedCRN.crn,
 					//groupedFile=>outputFileNameOfGroupedCRN.crn,sameICFile=>outputFileNameOfCRNWithSameICPerBlock.crn,
 					//computeOnlyPartition=>false,fileWhereToStorePartition=>outputFileToStorePartition.txt,print=>true,print=>true
@@ -2914,6 +3187,11 @@ public class MyParserUtil {
 						String fileName = computeFileName(((SMTTimesCSVFile) par).getCsv(),absoluteParentPath);
 						p = fileName;
 					}
+					else if(par instanceof FilePart){
+						sb.append("fileWhereToStorePartition=>");
+						String fileName = computeFileName(((FilePart) par).getFilePartition(),absoluteParentPath);
+						p = fileName;
+					}
 					/*else if(par instanceof FileIn){
 				sb.append("fileIn=>");
 				p = ((FileIn) par).getFileIn();
@@ -2943,86 +3221,7 @@ public class MyParserUtil {
 				}
 			}
 		}
-		//		sb.append("computeOnlyPartition=>true");
-		//		if(optinalPars!=null && optinalPars.size()>0){
-		//			sb.append(",");
-		//		}
-		if(!hasToReduce){
-			sb.append("computeOnlyPartition=>true,");
-		}
-		if(red instanceof reduceSMB){
-			if(((reduceSMB) red).isHalveRatesOfHomeoReactions()) {
-				sb.append("halveRatesOfHomeoReactions=>true,");
-			}
-		}
-		if(red instanceof reduceCoRNFE) {
-			sb.append("computeOnlyPartition=>true,");
-			CoRNParams cornParams = ((reduceCoRNFE)red).getCornParams();
-			if(cornParams.getPercentagePert()>0) {
-				sb.append("percentagePerturbation=>"+cornParams.getPercentagePert());
-			}
-			else if(cornParams.getAbsolutePert()>0){
-				sb.append("absolutePerturbation=>"+cornParams.getAbsolutePert());
-			}
-			else if(cornParams.getPercentageClos()>0) {
-				sb.append("percentageClosure=>"+cornParams.getPercentageClos());
-			}
-			else if(cornParams.getAbsoluteClos()>0){
-				sb.append("absoluteClosure=>"+cornParams.getAbsoluteClos());
-			}
-			else if(cornParams.getLowerFactor()>0) {
-				sb.append("lowerFactor=>"+cornParams.getLowerFactor());
-				sb.append(",");
-				sb.append("upperFactor=>"+cornParams.getUpperFactor());
-			}
-			sb.append(",");
-			sb.append("certainConstants=>"+cornParams.isCertainConstants());
-			sb.append(",");
-		}
-		if(red instanceof reduceUCTMCFE){
-			String modelWithBigM = ((reduceUCTMCFE)red).getModelWithBigM();
-			if(modelWithBigM!=null){
-				sb.append("modelWithBigM=>");
-				sb.append(computeFileName(modelWithBigM, absoluteParentPath,false));
-				sb.append(',');
-			}
-			else {
-				String delta = visitExpr(((reduceUCTMCFE) red).getDelta()); 
-				sb.append("delta=>"+delta+",");
-			}
-		}
-		if(red instanceof reduceUSE){
-			reduceUSE redUSE = (reduceUSE)red;
-			String modelWithBigM = redUSE.getModelWithBigM();
-			if(modelWithBigM!=null){
-				sb.append("modelWithBigM=>");
-				sb.append(computeFileName(modelWithBigM, absoluteParentPath,false));
-				sb.append(',');
-			}
-			else if(redUSE.getDelta()!=null){
-				String delta = visitExpr(redUSE.getDelta()); 
-				sb.append("delta=>"+delta+",");
-			}
-			else {
-				String delta = visitExpr(redUSE.getDeltaPercentage()); 
-				sb.append("deltaPercentage=>"+delta+",");
-			}
-			boolean doNotAddDeltaToRawConstants = ((reduceUSE) red).isDoNotAddDeltaToRawConstants(); 
-			sb.append("doNotAddDeltaToRawConstants=>"+doNotAddDeltaToRawConstants+",");
-		}
-		/*if(red instanceof MassActionEpsilonReduction){
-			sb.append("epsilon=>");
-			sb.append(MyParserUtil.visitExpr(((MassActionEpsilonReduction) red).getEpsilon()));
-		}*/
-		/*else if(optinalPars!=null && optinalPars.size()>0){
-				sb.deleteCharAt(sb.length()-1);
-		}*/
-		if(sb.charAt(sb.length()-1)==','){
-			sb.deleteCharAt(sb.length()-1);
-		}
-		sb.append("})");
-		//System.out.println(sb.toString());
-		return sb.toString();
+		return hasToReduce;
 	}
 
 	private static String setPrep(String p, String prep) {

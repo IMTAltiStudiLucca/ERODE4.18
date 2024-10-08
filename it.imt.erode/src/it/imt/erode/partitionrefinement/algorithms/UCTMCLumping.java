@@ -239,7 +239,7 @@ public class UCTMCLumping {
 			}
 			else {
 				//Here I know that delta is absolute
-				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,minusDeltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients,null);
+				CRNBisimulationsNAry.refine(Reduction.FE,  crn, crn.getReactions(), obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,minusDeltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients,null);
 			}
 			long endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
@@ -255,7 +255,7 @@ public class UCTMCLumping {
 				obtainedPartition=obtainedPartitionAndBool.getPartition();
 			}
 			else {
-				CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,deltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients,null);
+				CRNBisimulationsNAry.refine(Reduction.FE,  crn,crn.getReactions(), obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,deltaAbsOrPercHalf,null,reactionsToConsiderForEachSpecies,multisetCoefficients,null);
 			}
 			endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
@@ -353,7 +353,7 @@ public class UCTMCLumping {
 			CRNReducerCommandLine.print(out,bwOut,"\n\tComputing FE for lower bounds...");
 			long beginfe=System.currentTimeMillis();
 			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM=new HashMap<>();
-			CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,null);
+			CRNBisimulationsNAry.refine(Reduction.FE,  crn,crn.getReactions(), obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,null);
 			long endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
 
@@ -362,7 +362,7 @@ public class UCTMCLumping {
 			CRNReducerCommandLine.print(out,bwOut,"\tComputing FE for upper bounds...");
 			beginfe=System.currentTimeMillis();
 			speciesCountersHM=new HashMap<>();
-			CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,null,reactionToRateInModelBigM);
+			CRNBisimulationsNAry.refine(Reduction.FE,  crn,crn.getReactions(), obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,null,reactionToRateInModelBigM);
 			endfe=System.currentTimeMillis();
 			CRNReducerCommandLine.println(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s).");
 

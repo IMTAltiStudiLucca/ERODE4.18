@@ -94,4 +94,41 @@ public class SpeciesMonomial extends Monomial {
 		throw new UnsupportedOperationException("No ODE variables can appear in the equations of the parameters.");
 	}
 
+	@Override
+	public double eval(HashMap<ISpecies, Double> speciesToValue, HashMap<ISpecies, Double> forceReplacement) {
+		//By default, a non-def variable has value zero
+		Double val = speciesToValue.get(species);
+		if(val==null) {
+			val=0.0;
+		}
+		
+		//I replace the value with the forced one, if any
+		if(forceReplacement!=null) {
+			Double forcedValue=forceReplacement.get(species);
+			if(forcedValue!=null) {
+				val=forcedValue;
+			}
+		}
+		
+		return val;
+		
+//		if(forcedReplacement==null) {
+//			Double val = speciesToValue.get(species);
+//			if(val==0) {
+//				//By detault, a non-def variable has value zero
+//				return 0;
+//			}
+//			else {
+//				return val;
+//			}
+//		}
+//		else {
+//			double val = 0.0;
+//			for(IMonomial mon : forcedReplacement) {
+//				val += mon.eval(speciesToValue, null);
+//			}
+//			return val;
+//		}
+	}
+
 }

@@ -36,4 +36,6 @@ public interface IMonomial {
 
 	boolean needsI();
 	
+	double eval(HashMap<ISpecies, Double> speciesToValue, HashMap<ISpecies,Double> forceReplacement);
+	
 }

@@ -59,16 +59,23 @@ public class CRNBisimulationsNAry {
 
 	public static final RoundingMode RM = RoundingMode.HALF_DOWN;//if changed, update also copy in matheval
 	//public static final RoundingMode RM = RoundingMode.DOWN;
-	private static int SCALE = 20;
 	public static final int SCALEDefault = 20;
+	private static int SCALE = SCALEDefault;
 	private static BigDecimal TOLERANCE = new BigDecimal("1E-"+(SCALE));
 	public static int getSCALE() {
 		return SCALE;
+	}
+	public static void setSCALEandSpecificTolerance(int s, double t) {
+		setSCALE(s);
+		TOLERANCE = new BigDecimal(t);
 	}
 	public static void setSCALE(int s) {
 		SCALE = s;
 		TOLERANCE = new BigDecimal("1E-"+(SCALE));
 		MathEval.setSCALE(s);
+		
+		//AAAAAAAAAAAAAAAAAAAAAAAAAAA
+		//TOLERANCE = new BigDecimal(1000.0);
 	}
 	public static BigDecimal getTolerance() {
 		return TOLERANCE;
@@ -89,8 +96,12 @@ public class CRNBisimulationsNAry {
 //public static final BigDecimal EPSILON = BigDecimal.valueOf(0.001);
 	
 	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower){
-		return computeCoarsest(red,crn, partition, verbose, out, bwOut, terminator, msgDialogShower, null);
+		return computeCoarsest(red,crn, crn.getReactions(), partition, verbose, out, bwOut, terminator, msgDialogShower, null);
 	}
+	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, List<ICRNReaction> reactionsToConsider, IPartition partition, boolean verbose,MessageConsoleStream out, BufferedWriter bwOut, Terminator terminator, IMessageDialogShower msgDialogShower){
+		return computeCoarsest(red,crn, reactionsToConsider, partition, verbose, out, bwOut, terminator, msgDialogShower, null);
+	}
+
 	
 	/**
 	 * 
@@ -102,7 +113,7 @@ public class CRNBisimulationsNAry {
 	 * @param terminator 
 	 * @return
 	 */
-	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, IPartition partition, boolean verbose,MessageConsoleStream out, 
+	public static IPartitionAndBoolean computeCoarsest(Reduction red,ICRN crn, List<ICRNReaction> reactionsToConsider, IPartition partition, boolean verbose,MessageConsoleStream out, 
 			BufferedWriter bwOut, 
 			Terminator terminator, IMessageDialogShower msgDialogShower, BigDecimal epsForFastOneDegreeEpsBE){
 
@@ -120,7 +131,7 @@ public class CRNBisimulationsNAry {
 			return new IPartitionAndBoolean(obtainedPartition, false);
 		}*/
 		if(!crn.isMassAction()){
-			CRNandPartition crnAndSpeciesAndPartition=MatlabODEPontryaginExporter.computeRNEncoding(crn, out, bwOut, partition,true);
+			CRNandPartition crnAndSpeciesAndPartition=MatlabODEPontryaginExporter.computeRNEncoding(crn,reactionsToConsider, out, bwOut, partition,true);
 			if(crnAndSpeciesAndPartition==null){
 				CRNReducerCommandLine.printWarning(out,bwOut,"The model is not supported because it is not a mass action CRN (i.e., it has reactions with arbitrary rates). I terminate.");
 				return new IPartitionAndBoolean(obtainedPartition, false);
@@ -183,7 +194,7 @@ public class CRNBisimulationsNAry {
 //			multisetCoefficients = computeMultisetCoefficients(crn, terminator, crn.getMaxArity());
 //		}
 
-		refine(red,crn,obtainedPartition,/*multisetCoefficients,*/speciesCounters,speciesCountersHM,terminator,out,bwOut,epsForFastOneDegreeEpsBE);
+		refine(red,crn,reactionsToConsider, obtainedPartition,/*multisetCoefficients,*/speciesCounters,speciesCountersHM,terminator,out,bwOut,epsForFastOneDegreeEpsBE);
 
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,"The final partition:");
@@ -210,31 +221,32 @@ public class CRNBisimulationsNAry {
 		}
 	}*/
 	
-	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, BigDecimal epsForFastOneDegreeEpsBE) {
-		refine(red, crn, partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, speciesCountersHM,terminator,  out, bwOut,false,epsForFastOneDegreeEpsBE);
+	//
+	protected static void refine(Reduction red, ICRN crn,List<ICRNReaction> reactionsToConsider, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, BigDecimal epsForFastOneDegreeEpsBE) {
+		refine(red, crn, reactionsToConsider, partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, speciesCountersHM,terminator,  out, bwOut,false,epsForFastOneDegreeEpsBE);
 	}
 	
 	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut) {
-		refine(red, crn, partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, null,terminator,  out, bwOut,false,null);
+		refine(red, crn, crn.getReactions(), partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ speciesCounters, null,terminator,  out, bwOut,false,null);
 	}
 	
 	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, boolean extraTab) {
-		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, extraTab,true,null,null,null);
+		refine(red, crn, crn.getReactions(),partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, extraTab,true,null,null,null);
 	}
-	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, boolean extraTab, BigDecimal epsForFastOneDegreeEpsBE) {
-		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, extraTab,true,null,null,epsForFastOneDegreeEpsBE);
+	protected static void refine(Reduction red, ICRN crn, List<ICRNReaction> reactionsToConsider, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, boolean extraTab, BigDecimal epsForFastOneDegreeEpsBE) {
+		refine(red, crn, reactionsToConsider, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, extraTab,true,null,null,epsForFastOneDegreeEpsBE);
 	}
 	
 	
 	
-	public static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
+	public static void refine(Reduction red, ICRN crn, List<ICRNReaction> reactionsToConsider, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
 			boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
-		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, 
+		refine(red, crn, reactionsToConsider, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, 
 				extraTab, print, deltaHalf,reactionToRateToConsider,null,null,null);
 	}
-	public static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
+	public static void refine(Reduction red, ICRN crn, List<ICRNReaction> reactionsToConsider,IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
 			boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider, BigDecimal epsForFastOneDegreeEpsBE) {
-		refine(red, crn, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, 
+		refine(red, crn, reactionsToConsider, partition, speciesCounters, speciesCountersHM, terminator, out, bwOut, 
 				extraTab, print, deltaHalf,reactionToRateToConsider,null,null,epsForFastOneDegreeEpsBE);
 	}
 	
@@ -250,7 +262,7 @@ public class CRNBisimulationsNAry {
 	 * @param bwOut 
 	 * @param out 
 	 */
-	protected static void refine(Reduction red, ICRN crn, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
+	protected static void refine(Reduction red, ICRN crn, List<ICRNReaction> reactionsToConsider, IPartition partition, /*HashMap<IComposite, BigDecimal> multisetCoefficients,*/ ISpeciesCounterHandler[] speciesCounters, HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, Terminator terminator, MessageConsoleStream out, BufferedWriter bwOut, 
 			boolean extraTab, boolean print, BigDecimal deltaHalf,HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider,
 			ArrayListOfReactions[] reactionsToConsiderForEachSpecies, HashMap<IComposite, BigDecimal> multisetCoefficients
 			, BigDecimal epsForFastOneDegreeEpsBE
@@ -293,20 +305,21 @@ public class CRNBisimulationsNAry {
 //		if(red.equals(Reduction.FE)) {
 //			addToReactionsWithNonZeroStoichiometry(crn, reactionsToConsiderForEachSpecies);
 //		}
+		int maxArity= getMaxArity(reactionsToConsider);
 		//HashMap<IComposite, BigDecimal> multisetCoefficients = null;
 		if(reactionsToConsiderForEachSpecies==null) {
 			reactionsToConsiderForEachSpecies =  new ArrayListOfReactions[crn.getSpeciesSize()];
 			if(red.equals(Reduction.FE)) {
 				multisetCoefficients = new HashMap<IComposite, BigDecimal>();
-				addToReactionsWithNonZeroStoichiometryAndComputeMultisetCoefficients(crn.getReactions(), terminator, reactionsToConsiderForEachSpecies, multisetCoefficients, crn.getMaxArity());
+				addToReactionsWithNonZeroStoichiometryAndComputeMultisetCoefficients(reactionsToConsider, terminator, reactionsToConsiderForEachSpecies, multisetCoefficients, maxArity);
 			}
 			else if(red.equals(Reduction.BE)) {
-				CRNBisimulations.addToOutgoingReactionsOfReagents(crn.getReactions(), reactionsToConsiderForEachSpecies);
-				consideredAtIteration = new HashMap<>(crn.getReactions().size());
+				CRNBisimulations.addToOutgoingReactionsOfReagents(reactionsToConsider, reactionsToConsiderForEachSpecies);
+				consideredAtIteration = new HashMap<>(reactionsToConsider.size());
 			}
 		}
 		if(red.equals(Reduction.BE)) {
-			consideredAtIteration = new HashMap<>(crn.getReactions().size());
+			consideredAtIteration = new HashMap<>(reactionsToConsider.size());
 		}
 		long end = System.currentTimeMillis();
 		if(print  && computeReactions) {
@@ -356,8 +369,8 @@ public class CRNBisimulationsNAry {
 				break;
 			}
 			//System.out.println(" "+iteration);
-			split(red,crn,partition,splittersGenerator,multisetCoefficients,iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider,
-					epsForFastOneDegreeEpsBE);
+			split(red,crn, reactionsToConsider, partition,splittersGenerator,multisetCoefficients,iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider,
+					epsForFastOneDegreeEpsBE,maxArity);
 			if(speciesCountersHM!=null) {
 				speciesCountersHM=new HashMap<>();
 			}
@@ -382,6 +395,15 @@ public class CRNBisimulationsNAry {
 
 	}
 	
+	private static int getMaxArity(List<ICRNReaction> reactionsToConsider) {
+		int maxArity=0;
+		for (ICRNReaction reaction:reactionsToConsider) {
+			if(reaction.getArity()>maxArity){
+				maxArity=reaction.getArity();
+			}
+		}
+		return maxArity;
+	}
 	/*
 	private static HashMap<IComposite, BigDecimal> computeMultisetCoefficients(ICRN crn, Terminator terminator,
 			int maxArity) {
@@ -480,6 +502,7 @@ public class CRNBisimulationsNAry {
 	 * 
 	 * @param red 
 	 * @param crn
+	 * @param reactionsToConsider 
 	 * @param partition the partition to be refined. Note that the partition is modified, thus first invoke copy if you want to preserve it.
 	 * @param splittersGenerator
 	 * @param labels 
@@ -490,12 +513,12 @@ public class CRNBisimulationsNAry {
 	 * @param reactionsToConsiderForEachSpecies 
 	 * @param reactionToRateToConsider 
 	 */
-	private static void split(Reduction red, ICRN crn, IPartition partition, SplittersGenerator splittersGenerator, 
+	private static void split(Reduction red, ICRN crn, List<ICRNReaction> reactionsToConsider, IPartition partition, SplittersGenerator splittersGenerator, 
 			HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction,Integer> consideredAtIteration, 
 			ISpeciesCounterHandler[] speciesCounters,
 			HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM,ArrayListOfReactions[] reactionsToConsiderForEachSpecies, 
 			BigDecimal deltaHalf, HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider
-			, BigDecimal epsForFastOneDegreeEpsBE) {
+			, BigDecimal epsForFastOneDegreeEpsBE,int maxArity) {
 		
 		IBlock blockSPL = splittersGenerator.getBlockSpl();
 		//ILabel labelSPL = splittersGenerator.getLabelSpl();
@@ -510,8 +533,8 @@ public class CRNBisimulationsNAry {
 
 		//If FB compute pr[X,partnerLabel,blockSPL] for all species X having at least a reaction with at least a partner partnerLabel (for all partnerLabels) towards blockSPL (and build the list of such species. Only their blocks can get split)
 		//If BB compute fr[X,blockLabel,blockSPL] for all species X and all blocks blockLabel  (and build the list of species having it positive. Only their blocks can get split)
-		anyReactionFound = computeMeasuresUsedToSplitWithRespectToTheSplitter(red,crn,  blockSPL,splitterGenerators,partition,multisetCoefficients,
-				iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider);
+		anyReactionFound = computeMeasuresUsedToSplitWithRespectToTheSplitter(red,/*crn, reactionsToConsider,*/ blockSPL,splitterGenerators,partition,multisetCoefficients,
+				iteration,consideredAtIteration,speciesCounters,speciesCountersHM,reactionsToConsiderForEachSpecies,deltaHalf,reactionToRateToConsider,maxArity);
 		
 		if(!anyReactionFound){
 			//CRNReducerCommandLine.println(out,bwOut,"No reactions considered at this iteration. I can skip this split iteration");
@@ -525,8 +548,9 @@ public class CRNBisimulationsNAry {
 			i++;
 		}*/
 		
+		
 
-		boolean hasOnlyUnaryReactions = crn.getMaxArity()==1; 
+		boolean hasOnlyUnaryReactions = maxArity==1;//crn.getMaxArity()==1; 
 		
 		//Set of blocks to be considered for splitting (blocks where at least a species performs a reaction with partners label towards species of blockSPL)
 		LinkedHashSet<IBlock> splittedBlocks = new LinkedHashSet<IBlock>();
@@ -1153,13 +1177,14 @@ private static boolean partitionBlocksOfGivenSpeciesEpsilonCheckingThatEachCoeff
 	}
 
 	private static boolean computeMeasuresUsedToSplitWithRespectToTheSplitter(
-			Reduction red, ICRN crn, IBlock blockSPL, HashSet<ISpecies> splitterGenerators,IPartition partition, 
+			Reduction red, /*ICRN crn, List<ICRNReaction> reactionsToConsider,*/ IBlock blockSPL, HashSet<ISpecies> splitterGenerators,IPartition partition, 
 			HashMap<IComposite, BigDecimal> multisetCoefficients, Integer iteration, HashMap<ICRNReaction, Integer> consideredAtIteration, 
 			ISpeciesCounterHandler[] speciesCounters,HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM, 
 			ArrayListOfReactions[] reactionsToConsiderForEachSpecies, BigDecimal deltaHalf, 
-			HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider) {
+			HashMap<ICRNReaction, BigDecimal> reactionToRateToConsider,int maxArity) {
 		
-		boolean hasOneLabelOnly = crn.getMaxArity()==1;
+		
+		boolean hasOneLabelOnly = maxArity==1;//crn.getMaxArity()==1;
 		boolean anyReactionConsidered = false;
 		//Collection<ICRNReaction> consideredReactions=null;
 		for (ISpecies aSpeciesOfSplitter : blockSPL.getSpecies()) {

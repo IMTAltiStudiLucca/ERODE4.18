@@ -1,8 +1,11 @@
 package it.imt.erode.booleannetwork.updatefunctions;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 import com.microsoft.z3.BoolExpr;
 import com.microsoft.z3.Context;
@@ -11,6 +14,8 @@ import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
+import it.imt.erode.expression.parser.IMonomial;
+import it.imt.erode.expression.parser.NumberMonomial;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
@@ -54,5 +59,14 @@ public class FalseUpdateFunction implements IUpdateFunction {
 	public void dropNonOutputSpecies(String sp, HashSet<String> guessedOutputs) {
 		//do nothing
 	}
+
+	@Override
+	public List<IMonomial> toPolynomial(HashMap<String, ISpecies> speciesNameToSpecies) throws Z3Exception {
+		IMonomial zero = new NumberMonomial(BigDecimal.ZERO, "0");
+		List<IMonomial> monomials = new ArrayList<>(1);
+		monomials.add(zero);
+		return monomials;
+	}
+	
 		
 }

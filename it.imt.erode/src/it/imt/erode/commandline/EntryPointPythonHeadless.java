@@ -4,7 +4,9 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 
 import org.eclipse.ui.console.MessageConsoleStream;
 
@@ -15,6 +17,8 @@ import it.imt.erode.crn.interfaces.ICRN;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.partition.interfaces.IPartition;
+import it.imt.erode.partitionrefinement.algorithms.AXB;
+import it.imt.erode.partitionrefinement.algorithms.CRNBisimulationsNAry;
 import py4j.GatewayServer;
 
 public class EntryPointPythonHeadless {
@@ -30,9 +34,14 @@ public class EntryPointPythonHeadless {
 	private String[] idToSpeciesNames;
 	private boolean modelLoaded=false;
 	private IPartition defaultPartition;
+	private IPartition userDef;
+	private AXB latest_AxB;
+	private double[] latest_p0;
 	
 	public static void main(String[] args) {
 		EntryPointPythonHeadless entry = new EntryPointPythonHeadless(false, false);
+		
+		
 		
 		if(args.length >0 ) {
 			int port=-1;
@@ -54,6 +63,39 @@ public class EntryPointPythonHeadless {
 		}
 		else {
 			CRNReducerCommandLine.println(entry.out,entry.bwOut,"No arguments/input provided. ERODE terminates.");
+
+			
+			//entry.loadModel("/Users/andrea/Library/CloudStorage/OneDrive-ScuolaSuperioreSant'Anna/runtimes/runtime-ERODE.product(9)/bugImportPartition/test_graph_2.ode");
+			//entry.loadModel("/Users/andrea/Documents/erode-python/test_graph_2.ode");
+			entry.importAffine("/Users/andrea/Documents/erode-python/test2_pert2.csv","/Users/andrea/Documents/erode-python/test2B.csv",true);
+			
+//			try {
+//				int[] a = entry.getUserDefinedPartition();
+//				System.out.println(a);
+//			} catch (Z3Exception | UnsupportedFormatException | IOException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+			
+			try {
+				//String[] paramsToPerturb= new String[0];
+				String pToPert= "NONE";//p0;p1
+				int[] ret = entry.approxBE(1.0,pToPert);
+				if(entry.hasAxB()) {
+					double[][] A = entry.getLatestAxB_A();
+					double[] B = entry.getLatestAxB_B();
+					double[] P0= entry.getLatestAxB_p0();
+					System.out.println(Arrays.toString(ret));
+					System.out.println(Arrays.toString(A));
+					System.out.println(Arrays.toString(B));
+					System.out.println(Arrays.toString(P0));
+				}
+				
+			} catch (UnsupportedFormatException | IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
 //			boolean upperDiag=false;
 //			double time=0;
 //			if(upperDiag)
@@ -118,6 +160,10 @@ public class EntryPointPythonHeadless {
 		}
 	}
 	
+	public boolean hasAxB() {
+		return latest_AxB!=null && latest_AxB.getA()!=null && latest_AxB.getB()!=null;
+	}
+
 	private void checkModelLoaded() throws UnsupportedOperationException {
 		if(!modelLoaded) {
 			CRNReducerCommandLine.println(out,bwOut,"Please first load a model.");
@@ -133,6 +179,13 @@ public class EntryPointPythonHeadless {
 		CRNReducerCommandLine.println(out,bwOut,"ERODE instantiated");
 	}
 	
+	public void setScaleAndSpecificTolerance(int scale, double tolerance) {
+		CRNBisimulationsNAry.setSCALEandSpecificTolerance(scale, tolerance);
+	}
+	public void setScaleAndTolerance(int scale) {
+		CRNBisimulationsNAry.setSCALE(scale);
+	}
+	
 	public String getModelString() {
 		checkModelLoaded();
 		return erode.getCRN().toString();
@@ -140,6 +193,38 @@ public class EntryPointPythonHeadless {
 	public String getModelName() {
 		checkModelLoaded();
 		return erode.getCRN().getName();
+	}
+	public String[] getVariables() {
+		String[] vars=new String[erode.getCRN().getSpecies().size()];
+		int i=0;
+		for(ISpecies sp : erode.getCRN().getSpecies()) {
+			vars[i]=sp.getName();
+			i++;
+		}
+		return vars;
+	}
+	public String[] getParameters() {
+		String[] params=new String[erode.getCRN().getParameters().size()];
+		int i=0;
+		for(String param : erode.getCRN().getParameters()) {
+			int space = param.indexOf(' ');
+			String parName=param.substring(0,space).trim();
+			params[i]=parName;
+			i++;
+		}
+		return params;
+	}
+	
+	public int getNumberOfBlocks(int[] partitionArray){
+		int nBlocks=0;
+		HashSet<Integer> blockIds=new LinkedHashSet<Integer>();
+		for(int i : partitionArray) {
+			if(!blockIds.contains(i)) {
+				nBlocks++;
+				blockIds.add(i);
+			}
+		}
+		return nBlocks;
 	}
 	
 	public void printPartition(int[] partitionArray){
@@ -232,10 +317,10 @@ public class EntryPointPythonHeadless {
 	
 	public int importAffine(String fileName){
 		String bFile = fileName.replace(".csv", "B.csv");
-		return importAffine(fileName, bFile);
+		return importAffine(fileName, bFile,false);
 	}
-	public int importAffine(String fileName, String bFile){
-		String command="importAffineSystem({fileIn=>"+fileName+",bFile=>"+bFile+",icFile=>"+bFile+",addReverseEdges=>false,createParams=>false})";
+	public int importAffine(String fileName, String bFile,boolean makeEachEntryAParameter){
+		String command="importAffineSystem({fileIn=>"+fileName+",bFile=>"+bFile+",icFile=>"+bFile+",addReverseEdges=>false,createParams=>"+makeEachEntryAParameter+"})";
 		erode.handleImportAffineSystem(command, out, bwOut);
 		//erode.handleImportBNGCommand("importBNG({fileIn=>"+fileName+"})",out,bwOut);
 		int ret=completeImporting();
@@ -321,6 +406,86 @@ public class EntryPointPythonHeadless {
 		return obtainedPartitionToExport;
 	}
 	
+	public int[] approxBE(Double eps,String paramsToPerturb) throws UnsupportedFormatException, IOException{
+		int[] initialPartitionArray = new int[idToSpecies.length];
+		Arrays.fill(initialPartitionArray, 1);
+		return approxBE(eps,initialPartitionArray,false,paramsToPerturb);
+	}
+	
+	public int[] approxBE(Double eps,int[] initialPartitionArray,String paramsToPerturb) throws UnsupportedFormatException, IOException{
+		return approxBE(eps,initialPartitionArray,false,paramsToPerturb);
+	}
+	public int[] approxBE(Double eps,int[] initialPartitionArray, boolean numbersAreIDOfRepresentativeSpecies,String paramsToPerturb) throws UnsupportedFormatException, Z3Exception, IOException{
+		this.latest_AxB=null;
+		this.latest_p0=null;
+		
+		checkModelLoaded();
+		CRNReducerCommandLine.println(out,bwOut,"Computing eps-BE reduction");
+		
+		IPartition initialPartition = EntryPointForPython.importPartition(idToSpecies, initialPartitionArray,numbersAreIDOfRepresentativeSpecies);
+		erode.setPartition(initialPartition);
+		if(printPartitions){
+			CRNReducerCommandLine.println(out,bwOut,"Initial partition:\n"+initialPartition);
+		}
+		
+		
+
+
+		//handleApproximationCommand(command, "backward", out, bwOut);
+//		String pToPert="NONE";
+//		if(paramsToPerturb!=null&& paramsToPerturb.length>0) {
+//			//paramsToPerturb=>
+//			pToPert="";
+//			for(int p=0;p<paramsToPerturb.length;p++) {
+//				pToPert+=paramsToPerturb[p];
+//				pToPert+=";";
+//			}
+//		}
+		IPartitionAndBooleanAndAxB obtainedPartitionAndBoolAndAxB = erode.handleApproximationCommand("approxBDE({computeOnlyPartition=>true,print=>false,fastDegreeOne=>false,epsilon=>"+eps+",paramsToPerturb=>"+paramsToPerturb+"})","backward",out,bwOut);
+		IPartition obtainedPartition = obtainedPartitionAndBoolAndAxB.getPartition();
+		int[] obtainedPartitionToExport=null;
+		try {
+		//IPartition obtainedPartition = crnreducer.handleReduceCommand("reduceEFL({computeOnlyPartition=>true,print=>false})",false,"EFL");
+		if(printPartitions){
+			CRNReducerCommandLine.println(out,bwOut,"Obtained partition:\n"+obtainedPartition);
+		}
+	
+		obtainedPartitionToExport = EntryPointForPython.exportPartition(idToSpecies,obtainedPartition);
+		CRNReducerCommandLine.println(out,bwOut,eps+"-BE reduction completed");
+		}finally {
+			erode.setPartition(defaultPartition);
+		}
+		
+		this.latest_AxB=obtainedPartitionAndBoolAndAxB.getAxb();
+		this.latest_p0=obtainedPartitionAndBoolAndAxB.getP0();
+		
+		return obtainedPartitionToExport;
+	}
+	
+	public boolean hasLatestAxB() {
+		return latest_AxB!=null && latest_AxB.getA()!=null && latest_AxB.getB()!=null && latest_p0!=null;
+	}
+	
+	
+	public double[][] getLatestAxB_A() {
+		if(latest_AxB==null) {
+			return null;
+		}
+		return latest_AxB.getA();
+	}
+	public double[] getLatestAxB_B() {
+		if(latest_AxB==null) {
+			return null;
+		}
+		return latest_AxB.getB();
+	}
+	public double[] getLatestAxB_p0() {
+		if(latest_AxB==null||latest_p0==null) {
+			return null;
+		}
+		return latest_p0;
+	}
+	
 	public int[] computeFE() throws UnsupportedFormatException, Z3Exception, IOException{
 		int[] initialPartitionArray = new int[idToSpecies.length];
 		Arrays.fill(initialPartitionArray, 1);
@@ -363,6 +528,16 @@ public class EntryPointPythonHeadless {
 	
 	public int getVariablesNum() {
 		return erode.getCRN().getSpeciesSize();
+	}
+	
+	public int[] getUserDefinedPartition() throws UnsupportedFormatException, Z3Exception, IOException{
+		
+		if(userDef==null) {
+			userDef = CRNBisimulationsNAry.prepartitionUserDefined(erode.getCRN(),false,null,null,new Terminator());
+		}
+		
+		int[] userDefArray = EntryPointForPython.exportPartition(idToSpecies,userDef);
+		return userDefArray;
 	}
 	
 	public void simulateODE(double tEnd, int steps, String csvFile) {

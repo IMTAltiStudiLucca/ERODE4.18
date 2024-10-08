@@ -3,6 +3,7 @@ package it.imt.erode.booleannetwork.updatefunctions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 import com.microsoft.z3.ArithExpr;
 import com.microsoft.z3.BoolExpr;
@@ -14,6 +15,7 @@ import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
 import it.imt.erode.crn.symbolic.constraints.BasicConstraint;
 import it.imt.erode.crn.symbolic.constraints.BasicConstraintComparator;
+import it.imt.erode.expression.parser.IMonomial;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
@@ -97,6 +99,10 @@ public class MVComparison implements IUpdateFunction {
 	public void dropNonOutputSpecies(String sp, HashSet<String> guessedOutputs) {
 		left.dropNonOutputSpecies(sp, guessedOutputs);
 		right.dropNonOutputSpecies(sp, guessedOutputs);
+	}
+	@Override
+	public List<IMonomial> toPolynomial(HashMap<String, ISpecies> speciesNameToSpecies) throws Z3Exception {
+		throw new UnsupportedOperationException("Only supported for Boolean BNs");
 	}
 
 }

@@ -531,7 +531,8 @@ public class EpsilonDifferentialEquivalences {
 
 		
 		speciesToMonomialODE = new HashMap<ISpecies, ArrayList<IMonomial>>(crn.getSpecies().size());
-		boolean keepExpressionInMA=false;
+		//boolean keepExpressionInMA=false;DOES NOT WORK WITH AxB of eps-BDE!!!! Becuase parameters are lost from the expressions
+		boolean keepExpressionInMA=true;
 		computeMonomialsOfAllSpecies(crn,speciesToMonomialODE,speciesNameToSpecies,keepExpressionInMA);
 	}
 	
@@ -545,7 +546,8 @@ public class EpsilonDifferentialEquivalences {
 		boolean ignoreI=false;
 		for(ICRNReaction reaction : crn.getReactions()) {
 			//If the reaction is MA, and I don't need to keep track of the parameters (e.g. the parameters to do Ax=b for eps-DE), I can do this faster computation. 
-			if(!reaction.hasArbitraryKinetics() && !keepExpressionInMA) {
+			if((!reaction.hasArbitraryKinetics()) && !keepExpressionInMA) {
+			//if(reaction.hasArbitraryKinetics() && !keepExpressionInMA) {
 				IMonomial ma = reaction.getReagents().toMonomials();
 				if(reaction.getRate().compareTo(BigDecimal.ONE)!=0) {
 					ma=new ProductMonomial(new NumberMonomial(reaction.getRate(), reaction.getRate().toPlainString()), ma);

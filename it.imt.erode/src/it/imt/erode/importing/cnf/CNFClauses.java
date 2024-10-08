@@ -1,4 +1,4 @@
-package it.imt.erode.importing;
+package it.imt.erode.importing.cnf;
 
 import java.util.ArrayList;
 

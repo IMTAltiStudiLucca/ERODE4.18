@@ -81,7 +81,7 @@ public class CORN_LumpabilityForControlRN {
 			double percentagePertCoRN, double absolutePertCoRN, 
 			double percentageClosureCoRN, double absoluteClosureCoRN, 
 			double lowerBoundFactorCoRN, double upperBoundFactorCoRN, HowToComputeMm hotToComputeMm,
-			boolean certainConstants,LinkedHashMap<String, String> extraColumnsForCSV
+			boolean certainConstants,boolean onlyFEonCentreBounds,LinkedHashMap<String, String> extraColumnsForCSV
 			){
 		Reduction red=Reduction.CoRN;
 		BigDecimal absolutePert=BigDecimal.valueOf(absolutePertCoRN/2);
@@ -92,7 +92,7 @@ public class CORN_LumpabilityForControlRN {
 		IPartition obtainedPartition = partition.copy();
 
 		if(!crn.isMassAction()){
-			CRNandPartition crnAndSpeciesAndPartition=MatlabODEPontryaginExporter.computeRNEncoding(crn, out, bwOut, partition,true);
+			CRNandPartition crnAndSpeciesAndPartition=MatlabODEPontryaginExporter.computeRNEncoding(crn, crn.getReactions(), out, bwOut, partition,true);
 			if(crnAndSpeciesAndPartition==null){
 				CRNReducerCommandLine.printWarning(out,bwOut,"The model is not supported because it is not a mass action CRN (i.e., it has reactions with arbitrary rates). I terminate.");
 				return new IPartitionAndBoolean(obtainedPartition, false);
@@ -204,25 +204,30 @@ public class CORN_LumpabilityForControlRN {
 			CRNReducerCommandLine.print(out,bwOut," completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".");
 		}
 		
+		begin = System.currentTimeMillis();
+		
 		CRNReducerCommandLine.print(out,bwOut,"\n\tComputing FE on the centers of the bounds...");
 		long beginfe=System.currentTimeMillis();
 		HashMap<ISpecies, ISpeciesCounterHandler> speciesCountersHM=new HashMap<>();
-		CRNBisimulationsNAry.refine(Reduction.FE,  crn, obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,null,mMcenter);
+		CRNBisimulationsNAry.refine(Reduction.FE,  crn,crn.getReactions(), obtainedPartition, null,speciesCountersHM, terminator,out,bwOut,false,false,null,mMcenter);
 		long endfe=System.currentTimeMillis();
 		CRNReducerCommandLine.print(out,bwOut," completed in: "+String.format( CRNReducerCommandLine.MSFORMAT, ((endfe-beginfe)/1000.0) )+ " (s) with "+obtainedPartition.size()+" blocks.");
 		
-		begin = System.currentTimeMillis();
-
-		boolean extraTab=false;
-		boolean print=true;
-		obtainedPartition=refine(red,crn,obtainedPartition,terminator,out,bwOut,extraTab,print
-				/*,
+		
+		if(!onlyFEonCentreBounds) {
+			boolean extraTab=false;
+			boolean print=true;
+			obtainedPartition=refine(red,crn,obtainedPartition,terminator,out,bwOut,extraTab,print
+					/*,
 				percentagePertCoRN, 
 				absolutePertCoRN,
 				m,M,
 				lowerBoundFactorCoRN,upperBoundFactorCoRN,
 				hotToComputeMm*/);
-
+		}
+		else {
+			CRNReducerCommandLine.print(out,bwOut," actually CoRN computation skipped. ");
+		}
 		if(verbose){
 			CRNReducerCommandLine.println(out,bwOut,"The final partition:");
 			CRNReducerCommandLine.println(out,bwOut,obtainedPartition);

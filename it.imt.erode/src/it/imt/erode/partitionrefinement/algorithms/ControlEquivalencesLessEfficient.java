@@ -334,7 +334,7 @@ public class ControlEquivalencesLessEfficient {
 			LinkedHashSet<String> representativeParams = computeSetOfRepresentativeParams(partitionOfParams);
 			ICRN curriedfG;
 			try {
-				curriedfG = MatlabODEsImporter.expandCRN(false,fG, representativeParams, speciesNameToSpeciesOfCurriedfG/*,false*/,true,true);
+				curriedfG = MatlabODEsImporter.expandCRN(false,fG, representativeParams, speciesNameToSpeciesOfCurriedfG/*,false*/,false,true,true);
 			} catch (UnsupportedFormatException e) {
 				CRNReducerCommandLine.printWarning(out,bwOut,"The model is not supported because an exception has been generated while currying it. I terminate.");
 				CRNReducerCommandLine.printStackTrace(out, bwOut, e);

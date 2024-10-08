@@ -203,6 +203,9 @@ public abstract class AbstractImporter {
 		return line;
 	}
 	
+	protected void loadParameters(BufferedReader br, boolean parametersHaveId, boolean hasEqual) throws IOException {
+		loadParameters(br, parametersHaveId, hasEqual,true);
+	}
 	
 	/**
 	 * 
@@ -212,7 +215,7 @@ public abstract class AbstractImporter {
 	 * @throws IOException
 	 * Assumnptions: the expression defining the value of a parameter contains only parameters defined in the previous lines of the file, and not in the following.    
 	 */
-	protected void loadParameters(BufferedReader br, boolean parametersHaveId, boolean hasEqual) throws IOException {
+	protected void loadParameters(BufferedReader br, boolean parametersHaveId, boolean hasEqual,boolean evaluate) throws IOException {
 		String line = br.readLine();
 
 		while ((line != null) && (!(line=line.trim()).startsWith("end parameters"))) {
@@ -271,13 +274,16 @@ public abstract class AbstractImporter {
 				double truncated=C2E2Exporter.setNumberOfDigits(parameterValue, 2);
 				parameterExpression=String.valueOf(truncated);*/
 
-				addParameter(parameterName, parameterExpression);
+				addParameter(parameterName, parameterExpression,evaluate);
 			}
 			line = br.readLine();
 		}
 		infoImporting.setReadParameters(crn.getParameters().size());
 	}
 
+	protected void addParameter(String parameterName, String parameterExpression, boolean evaluate) {
+		addParameter(parameterName, parameterExpression,evaluate,crn);
+	}
 	protected void addParameter(String parameterName, String parameterExpression) {
 		addParameter(parameterName, parameterExpression,true,crn);
 	}
@@ -431,7 +437,8 @@ public abstract class AbstractImporter {
 		}
 	}
 	
-	protected static HashMap<ISpecies, Integer> generateNewSpeciesAndBuildArrayOfNames(HashMap<String, ISpecies> speciesStoredInHashMap,String[] speciesNamesAndStochiometry, ICRN crn) {
+	protected static HashMap<ISpecies, Integer> generateNewSpeciesAndBuildArrayOfNames(HashMap<String, ISpecies> speciesStoredInHashMap,
+			String[] speciesNamesAndStochiometry, ICRN crn) {
 		HashMap<ISpecies, Integer> compositeHM = new LinkedHashMap<ISpecies, Integer>(speciesNamesAndStochiometry.length);
 		for(String nameAndStoc : speciesNamesAndStochiometry){
 			String s = nameAndStoc.trim();
@@ -449,6 +456,19 @@ public abstract class AbstractImporter {
 		return compositeHM;
 	}
 		
+	public HashMap<String, ISpecies> addAllSpecies(ArrayList<ArrayList<String>> initialConcentrations) {
+		HashMap<String, ISpecies> speciesStoredInHashMap = new HashMap<String, ISpecies>();
+		for (ArrayList<String> initialConcentration : initialConcentrations) {
+			if(initialConcentration.size()==3){
+				addSpecies(initialConcentration.get(0), initialConcentration.get(2),initialConcentration.get(1), speciesStoredInHashMap);
+			}
+			else{
+				addSpecies(initialConcentration.get(0), null,initialConcentration.get(1), speciesStoredInHashMap);
+			}
+			
+		}
+		return speciesStoredInHashMap;
+	}
 	
 	/*public static void addToIncomingReactionsOfProducts(int arity, IComposite compositeProducts, ICRNReaction reaction) {
 		addToIncomingReactionsOfProducts(arity, compositeProducts, reaction,true);

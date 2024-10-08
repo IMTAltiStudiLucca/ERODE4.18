@@ -1,11 +1,14 @@
-package it.imt.erode.importing;
+package it.imt.erode.importing.cnf;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,7 +36,11 @@ import it.imt.erode.expression.parser.NumberMonomial;
 import it.imt.erode.expression.parser.ParameterMonomial;
 import it.imt.erode.expression.parser.ProductMonomial;
 import it.imt.erode.expression.parser.SpeciesMonomial;
-import it.imt.erode.importing.cnf.PowerSet;
+import it.imt.erode.importing.AbstractImporter;
+import it.imt.erode.importing.GUICRNImporter;
+import it.imt.erode.importing.InfoCRNImporting;
+import it.imt.erode.importing.ODEorNET;
+import it.imt.erode.importing.UnsupportedFormatException;
 import it.imt.erode.partition.implementations.Block;
 import it.imt.erode.partition.implementations.Partition;
 import it.imt.erode.partition.interfaces.IBlock;
@@ -141,11 +148,16 @@ public class CNFImporter extends AbstractImporter{
 	}
 	
 	private CNFClauses readCnfClauses(ArrayList<String> comments) throws NumberFormatException, IOException, UnsupportedFormatException {
+		return readCnfClauses(comments,"x");
+	}
+	
+	private CNFClauses readCnfClauses(ArrayList<String> comments,String prefixSpeciesName) throws NumberFormatException, IOException, UnsupportedFormatException {
 
 		//initCRNAndMath();
 		//initInfoImporting();
 		//getInfoImporting().setLoadedCRN(true);
 		//getInfoImporting().setLoadedCRN(false);
+		
 
 		BufferedReader br = getBufferedReader();
 		String line;
@@ -162,7 +174,7 @@ public class CNFImporter extends AbstractImporter{
 		//We first search for the preamble line
 		while ((line = br.readLine()) != null && !preambleFound) {
 			line=line.trim();
-			if(line.equals("c")||line.startsWith("c ")) {
+			if(line.equals("c")||line.startsWith("c ")||line.equals("%")||line.startsWith("% ")) {
 				if(keepComments)
 					comments.add(line);
 			}
@@ -243,12 +255,12 @@ public class CNFImporter extends AbstractImporter{
 								String spName=null;
 								if(leafStr.startsWith("-")) {
 									leafStr=leafStr.substring(1);
-									spName="x"+leafStr;
+									spName=prefixSpeciesName+leafStr;
 									leaf = getOrAddUpdateFunction(spName, true, spToUpd,spToNegatedUpd);
 									//leaf= new NotBooleanUpdateFunction(new ReferenceToNodeUpdateFunction(spName)); 
 								}
 								else {
-									spName="x"+leafStr;
+									spName=prefixSpeciesName+leafStr;
 									//leaf= new ReferenceToNodeUpdateFunction(spName);
 									leaf = getOrAddUpdateFunction(spName, false, spToUpd,spToNegatedUpd);
 								}
@@ -260,7 +272,7 @@ public class CNFImporter extends AbstractImporter{
 				}
 			}
 		}
-		CRNReducerCommandLine.println(out,bwOut,"");
+		//CRNReducerCommandLine.println(out,bwOut,"");
 		return cnfClauses;
 	}
 	
@@ -461,7 +473,702 @@ public class CNFImporter extends AbstractImporter{
 		return comments;
 	}
 	*/
+	
+	
+	public static byte[] makeZeroBinaryArray(int nBits)  {
+		byte[] A = new byte[nBits];
+		return A;
+	}
+//	public static void resetToZerBinaryArray(int[] A)  {
+//		Arrays.fill(A, 0);
+//	}
 
+	public static void addOneToBinaryArray(byte[] A) throws Exception {
+		//0 000
+		//1 001
+		//2 010
+		//3 011
+		//4 100
+		//5 101
+		//6 110
+		//7 111
+        for (int i = A.length - 1; i >= 0; i--) {
+            if (A[i] == 0) {
+                A[i] = 1;
+                return;
+            }
+            A[i] = 0;
+            if (i == 0) {
+                throw new Exception("Overflow");
+            }
+        }
+        return;
+    }
+
+	public InfoCRNImporting readCNFandMakeQuantumOptimization(boolean print,String fileOut) throws FileNotFoundException, IOException, UnsupportedFormatException{
+
+		if(print){
+			CRNReducerCommandLine.println(out,bwOut," Reading CNF file"+getFileName());
+			CRNReducerCommandLine.println(out,bwOut,"  to make quantum optimization");
+		}
+		
+		initCRNAndMath();
+		initInfoImporting();
+		getInfoImporting().setLoadedCRN(true);
+
+
+		createParentDirectories(fileOut);
+		BufferedWriter bw=null;
+		boolean failed=false;
+		try {
+			bw = new BufferedWriter(new FileWriter(fileOut));
+		} catch (IOException e) {
+			CRNReducerCommandLine.println(out,bwOut,"Problems in CNF 2 QuantumOptimization. Exception raised while creating the filewriter for file: "+fileOut);
+			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+			//return;
+			failed=true;
+		}
+
+		if(!failed) {
+			String name = overwriteExtensionIfEnabled(fileOut,"",true);
+			int i = name.lastIndexOf(File.separator);
+			if(i!=-1) {
+				name=name.substring(i+1);
+			}
+			String modelName=GUICRNImporter.getModelName(name); 
+			bw.write("begin Probabilistic Program "+modelName+"\n");
+
+
+			ArrayList<String> comments = new ArrayList<>();
+			long begin = System.currentTimeMillis();
+
+			//
+			CNFClauses cnfClausesOBJ = readCnfClauses(comments,"");
+
+			//Each internal array is a CNF clause
+			ArrayList<ArrayList<IUpdateFunction>> cnfClauses=cnfClausesOBJ.getCnfClauses();
+			int nvars=cnfClausesOBJ.getnVars();
+			int nClauses=cnfClausesOBJ.getnClauses();
+			
+			getInfoImporting().setReadSpecies(nvars);
+			getInfoImporting().setReadCRNReactions(-1);
+			long end=System.currentTimeMillis();
+			getInfoImporting().setRequiredMS(end -begin);
+			
+			
+			if(print){
+				CRNReducerCommandLine.println(out,bwOut," reading completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".");
+				CRNReducerCommandLine.println(out,bwOut," Making and writing the quantum SAT optimization encoding in file "+fileOut);
+			}
+
+			
+			
+			
+			begin=System.currentTimeMillis();
+
+			//I pre-compute the list of clauses where each variables appears with positive sign
+			LinkedHashMap<Integer, ArrayList<Integer>> variableToClausesWhereItAppears=new LinkedHashMap<>(nvars);
+			LinkedHashMap<Integer, ArrayList<Integer>> variableToClausesWhereItAppears_negated=new LinkedHashMap<>(nvars);
+			for(int clause=0;clause<cnfClauses.size();clause++) {
+				ArrayList<IUpdateFunction> cnfClause = cnfClauses.get(clause);
+				for(IUpdateFunction leaf:cnfClause) {
+					if(leaf instanceof ReferenceToNodeUpdateFunction) {
+						addClauseToList(variableToClausesWhereItAppears, clause, leaf);
+					}
+					else {
+						//it must be a negated
+						IUpdateFunction inner = ((NotBooleanUpdateFunction)leaf).getInnerUpdateFunction();
+						addClauseToList(variableToClausesWhereItAppears_negated, clause, inner);
+					}
+				}
+			}
+
+
+
+			double q=nvars;
+			int n=(int)Math.pow(2, q);// n=2^q, 	2^8=256, 2^10=1024
+			double tau=0.1;	//we must have q/tau a natural!
+			double q_over_tau_double=q/tau;
+			int q_over_tau=(int)q_over_tau_double;
+			if(q_over_tau!=q_over_tau_double) {
+				CRNReducerCommandLine.println(out,bwOut,"\nq over tau should be an int. I terminate");
+				failed=true;
+				return null;
+			}
+
+
+
+			double sqrtn=Math.sqrt(n);
+			double oneOverSqrtn=1.0/sqrtn;
+
+			ArrayList<Integer> iSatifsyingTheFormula=new ArrayList<Integer>();
+
+			double lambda=nClauses;		//initialized to the number of clauses in the formula
+			int[] H = new int[n+1];//H[0] won't be used
+			
+			if(print){
+				CRNReducerCommandLine.print(out,bwOut,"\tBuilding Hii for i in [1,"+n+"] ... ");
+			}
+			long beginH=System.currentTimeMillis();
+			
+			
+			byte[] iMinusOne = makeZeroBinaryArray(nvars);
+			
+			
+			for(i=1;i<=n;i++) {
+				/*
+				int iMinusOne=i-1;
+				String bitString=Integer.toBinaryString(iMinusOne);
+				while(bitString.length()<nvars) {
+					bitString="0"+bitString;
+				}
+				String[] bitStringArray=bitString.split("");
+				*/
+				
+				HashSet<Integer> clausesSatisfied=new LinkedHashSet<Integer>();
+				for(int b=0;b<iMinusOne.length;b++ ) {
+					byte bit=iMinusOne[b];
+
+
+					//100 is meant to be x3,x2,x1 rather than x1,x2,x3 (actually x2,x1,x0 rather than x0,x1,x2)
+					int bToVar=(iMinusOne.length-1) - b;
+					bToVar = bToVar + 1; //from 0;n-1, to 1;n
+
+					if(bit==1) {
+						ArrayList<Integer> clausesWherItAppears = variableToClausesWhereItAppears.get(bToVar);
+						if(clausesWherItAppears!=null && clausesWherItAppears.size()>0) {
+							clausesSatisfied.addAll(clausesWherItAppears);
+						}
+					}
+					else  {
+						//must be 0
+						ArrayList<Integer> clausesWherItAppearsNegated = variableToClausesWhereItAppears_negated.get(bToVar);
+						if(clausesWherItAppearsNegated!=null && clausesWherItAppearsNegated.size()>0) {
+							clausesSatisfied.addAll(clausesWherItAppearsNegated);
+						}
+					}
+				}
+
+				//Hi,i, (here H[i] denotes the number of clauses in the formula that are satisfied by the binary representation of i−1.
+				H[i]=clausesSatisfied.size();
+				if(H[i]==lambda) {
+					iSatifsyingTheFormula.add(i);
+				}
+				
+				if(i<n) {
+					try {
+						addOneToBinaryArray(iMinusOne);
+					} catch (Exception e) {
+						CRNReducerCommandLine.println(out,bwOut,"\nIssues in adding 1 to the byte array: overflow. I terminate");
+						failed=true;
+						return null;
+					}
+				}
+			}
+			long endH=System.currentTimeMillis();
+			if(print){
+				CRNReducerCommandLine.println(out,bwOut," Completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((endH-beginH)/1000.0) )+ " (s)"+".");
+			}
+
+			bw.write("//////////////////////////\n");
+			bw.write("//Internal parameters used\n");
+			bw.write("//tau="+tau+", q="+q+"\n");
+			if(n<20) {
+				bw.write("//H="+Arrays.toString(H)+"\n//\tH[0] shall be ignored\n");
+			}			
+			bw.write("//////////////////////////\n\n");
+
+
+			bw.write("begin init\n");
+			String commonString="="+oneOverSqrtn+"\n  b";
+			//for(String species : speciesToUpdateFunction.keySet()) {
+			for(i=1;i<=n;i++) {
+				bw.write("  a"+i+commonString+i+"=0\n");
+			}
+			bw.write("  c=1\t\t//The counter\n");
+			bw.write("  c_odd=1\t//Used to represent it the counter is odd (1) or even (0)\n");
+			bw.write("  r=0\t\t//The results\n");
+			bw.write("end init\n\n");
+
+			bw.write("begin partition\n");
+			bw.write(" {");
+			for(i=1;i<=n;i++) {
+				bw.write("a"+i);
+				if(i<n) {
+					bw.write(",");
+				}
+			}
+			bw.write("},\n");
+			bw.write(" {c,c_odd,r}\n");
+//			bw.write(" {");
+//			for(i=1;i<=n;i++) {
+//				bw.write("b"+i);
+//				if(i<n) {
+//					bw.write(",");
+//				}
+//			}
+//			bw.write("}\n");
+			bw.write("end partition\n\n");
+			
+
+			bw.write("while true do\n");
+			bw.write(" begin parameters\n");
+			bw.write("  p = Uniform(0,1)\n");
+			bw.write(" end parameters\n");
+
+			bw.write("\n");
+			bw.write(" //////////////////////////////////////////////////\n");
+			bw.write(" //First if: we still need to iterate and c is even\n");
+			bw.write(" //////////////////////////////////////////////////\n");
+			bw.write(" if c_odd = 0 and c - "+q+"/"+tau+" < 0 then\n");
+			for(i=1;i<=n;i++) {
+				bw.write("  upd(a"+i+") = a"+i+" + "+tau+"*"+H[i]+"*b"+i+"\n");
+			}
+			bw.write("\n");
+			for(i=1;i<=n;i++) {
+				bw.write("  upd(b"+i+") = b"+i+" - "+tau+"*"+H[i]+"*a"+i+"\n");
+			}
+			bw.write("  upd(c) = c+1\n");
+			bw.write("  upd(c_odd) = 1-c_odd\n");
+			bw.write("  upd(r) = 0\n");
+
+			bw.write("\n");
+
+			bw.write(" //////////////////////////////////////////////////\n");
+			bw.write(" //Second if: we still need to iterate and c is odd\n");
+			bw.write(" //////////////////////////////////////////////////\n");
+			bw.write(" elif c_odd > 0  and c - "+q+"/"+tau+" < 0 then\n");
+			
+
+			StringBuffer sum_aj=new StringBuffer("");
+			StringBuffer sum_bj=new StringBuffer("");
+			boolean first=true;
+			for(i=1;i<=n;i++) {
+				if(!first) {
+					sum_aj.append(" + ");
+					sum_bj.append(" + ");
+				}
+				first=false;
+				
+				sum_aj.append("a");
+				sum_aj.append(i);
+
+				sum_bj.append("b");
+				sum_bj.append(i);
+			}
+			String sum_a=sum_aj.toString();
+			String sum_b=sum_bj.toString();
+			for(i=1;i<=n;i++) {
+				bw.write("  upd(a"+i+") = a"+i+" + "+tau+"*(");
+				bw.write(sum_a);
+				bw.write(")\n");
+			}
+			bw.write("\n");
+			for(i=1;i<=n;i++) {
+				bw.write("  upd(b"+i+") = b"+i+" + "+tau+"*(");
+				bw.write(sum_b);
+				bw.write(")\n");
+			}
+			bw.write("  upd(c) = c+1\n");
+			bw.write("  upd(c_odd) = 1-c_odd\n");
+			bw.write("  upd(r) = 0\n");
+
+
+			bw.write("\n");
+			bw.write(" //////////////////////////////////////////////////\n");
+			bw.write(" //Last if: no more iterations necessary, we can compute r\n");
+			bw.write(" //////////////////////////////////////////////////\n");
+			bw.write(" //There are "+iSatifsyingTheFormula.size()+" i satisfying the formula\n");
+			if(iSatifsyingTheFormula.size()<15) {
+				bw.write(" //	"+iSatifsyingTheFormula+"\n");
+			}
+			
+			bw.write(" //////////////////////////////////////////////////\n");
+
+			if(iSatifsyingTheFormula.size()>0) {
+				StringBuffer iSatisfyingFormula_a = new StringBuffer("");
+				StringBuffer iSatisfyingFormula_b = new StringBuffer("");
+
+				first=true;
+				for(Integer iSat : iSatifsyingTheFormula) {
+					if(!first) {
+						iSatisfyingFormula_a.append(" + ");
+						iSatisfyingFormula_b.append(" + ");
+					}
+					first=false;
+					iSatisfyingFormula_a.append("a");
+					iSatisfyingFormula_a.append(iSat);
+
+					iSatisfyingFormula_b.append("b");
+					iSatisfyingFormula_b.append(iSat);
+				}
+				String iSatisfyingFormula_a_power=iSatisfyingFormula_a.toString();
+				iSatisfyingFormula_a_power="("+iSatisfyingFormula_a_power+")*("+iSatisfyingFormula_a_power+")";
+				String iSatisfyingFormula_b_power=iSatisfyingFormula_b.toString();
+				iSatisfyingFormula_b_power="("+iSatisfyingFormula_b_power+")*("+iSatisfyingFormula_b_power+")";
+
+				bw.write(" elif c - "+q+"/"+tau+" = 0 and "+"p - ("+iSatisfyingFormula_a_power+" + "//" + \n 							   "
+						+iSatisfyingFormula_b_power+")/"+iSatifsyingTheFormula.size()+" <= 0 then\n");
+			}
+			else {
+				bw.write(" elif c - "+q+"/"+tau+" = 0 and "+"p - 0 <= 0 then\n");
+			}
+			
+			for(i=1;i<=n;i++) {
+				bw.write("  upd(a"+i+") = a"+i+"\n");
+			}
+			for(i=1;i<=n;i++) {
+				bw.write("  upd(b"+i+") = b"+i+"\n");
+			}
+			bw.write("  upd(c) = c+1\n");
+			bw.write("  upd(c_odd) = 1-c_odd\n");
+			bw.write("  upd(r) = 1\n");
+
+			bw.write(" end if\n");
+
+			bw.write("end while\n");
+			
+			bw.write("\n");
+			bw.write("reduceFPE(csvFile=\"FPE.csv\",fileWhereToStorePartition=\"partitions/"+modelName+"_part.txt\",prePartition=USER)\n");
+			//
+			bw.write("\n");
+
+			bw.write("end Probabilistic Program\n");
+			bw.close();
+			
+			if(print){
+				end=System.currentTimeMillis();
+				CRNReducerCommandLine.println(out,bwOut," Completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".");
+			}
+		}
+		return getInfoImporting();
+	}
+
+
+	
+	
+//	public InfoCRNImporting readCNFandMakeQuantumOptimization_stringForBinary(boolean print,String fileOut) throws FileNotFoundException, IOException, UnsupportedFormatException{
+//
+//		if(print){
+//			CRNReducerCommandLine.println(out,bwOut," Reading CNF file"+getFileName());
+//			CRNReducerCommandLine.println(out,bwOut,"  to make quantum optimization");
+//		}
+//		
+//		initCRNAndMath();
+//		initInfoImporting();
+//		getInfoImporting().setLoadedCRN(true);
+//
+//
+//		createParentDirectories(fileOut);
+//		BufferedWriter bw=null;
+//		boolean failed=false;
+//		try {
+//			bw = new BufferedWriter(new FileWriter(fileOut));
+//		} catch (IOException e) {
+//			CRNReducerCommandLine.println(out,bwOut,"Problems in CNF 2 QuantumOptimization. Exception raised while creating the filewriter for file: "+fileOut);
+//			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+//			//return;
+//			failed=true;
+//		}
+//
+//		if(!failed) {
+//			String name = overwriteExtensionIfEnabled(fileOut,"",true);
+//			int i = name.lastIndexOf(File.separator);
+//			if(i!=-1) {
+//				name=name.substring(i+1);
+//			}
+//			String modelName=GUICRNImporter.getModelName(name); 
+//			bw.write("begin Probabilistic Program "+modelName+"\n");
+//
+//
+//			ArrayList<String> comments = new ArrayList<>();
+//			long begin = System.currentTimeMillis();
+//
+//			//
+//			CNFClauses cnfClausesOBJ = readCnfClauses(comments,"");
+//
+//			//Each internal array is a CNF clause
+//			ArrayList<ArrayList<IUpdateFunction>> cnfClauses=cnfClausesOBJ.getCnfClauses();
+//			int nvars=cnfClausesOBJ.getnVars();
+//			int nClauses=cnfClausesOBJ.getnClauses();
+//			
+//			getInfoImporting().setReadSpecies(nvars);
+//			getInfoImporting().setReadCRNReactions(-1);
+//			long end=System.currentTimeMillis();
+//			getInfoImporting().setRequiredMS(end -begin);
+//			
+//			
+//			if(print){
+//				CRNReducerCommandLine.println(out,bwOut," reading completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".");
+//				CRNReducerCommandLine.println(out,bwOut,"\nMaking and writing the quantum SAT optimization encoding in file "+fileOut);
+//			}
+//
+//			
+//			
+//			
+//			begin=System.currentTimeMillis();
+//
+//			//I pre-compute the list of clauses where each variables appears with positive sign
+//			LinkedHashMap<Integer, ArrayList<Integer>> variableToClausesWhereItAppears=new LinkedHashMap<>(nvars);
+//			LinkedHashMap<Integer, ArrayList<Integer>> variableToClausesWhereItAppears_negated=new LinkedHashMap<>(nvars);
+//			for(int clause=0;clause<cnfClauses.size();clause++) {
+//				ArrayList<IUpdateFunction> cnfClause = cnfClauses.get(clause);
+//				for(IUpdateFunction leaf:cnfClause) {
+//					if(leaf instanceof ReferenceToNodeUpdateFunction) {
+//						addClauseToList(variableToClausesWhereItAppears, clause, leaf);
+//					}
+//					else {
+//						//it must be a negated
+//						IUpdateFunction inner = ((NotBooleanUpdateFunction)leaf).getInnerUpdateFunction();
+//						addClauseToList(variableToClausesWhereItAppears_negated, clause, inner);
+//					}
+//				}
+//			}
+//
+//
+//
+//			double q=nvars;
+//			int n=(int)Math.pow(2, q);// n=2^q, 	2^8=256, 2^10=1024
+//			double tau=0.1;	//we must have q/tau a natural!
+//			double q_over_tau_double=q/tau;
+//			int q_over_tau=(int)q_over_tau_double;
+//			if(q_over_tau!=q_over_tau_double) {
+//				CRNReducerCommandLine.println(out,bwOut,"\nq over tau should be an int. I terminate");
+//				failed=true;
+//				return null;
+//			}
+//
+//
+//
+//			double sqrtn=Math.sqrt(n);
+//			double oneOverSqrtn=1.0/sqrtn;
+//
+//			ArrayList<Integer> iSatifsyingTheFormula=new ArrayList<Integer>();
+//
+//			double lambda=nClauses;		//initialized to the number of clauses in the formula
+//			double[] H = new double[n+1];//H[0] won't be used
+//			
+//			if(print){
+//				CRNReducerCommandLine.print(out,bwOut,"\n\tBuilding Hii for i in [1,"+n+"] ... ");
+//			}
+//			
+//			for(i=1;i<=n;i++) {
+//				int iMinusOne=i-1;
+//
+//				String bitString=Integer.toBinaryString(iMinusOne);
+//				while(bitString.length()<nvars) {
+//					bitString="0"+bitString;
+//				}
+//				String[] bitStringArray=bitString.split("");
+//
+//				HashSet<Integer> clausesSatisfied=new LinkedHashSet<Integer>();
+//				for(int b=0;b<bitStringArray.length;b++ ) {
+//					String bit=bitStringArray[b];
+//
+//
+//					//100 is meant to be x3,x2,x1 rather than x1,x2,x3 (actually x2,x1,x0 rather than x0,x1,x2)
+//					int bToVar=(bitStringArray.length-1) - b;
+//					bToVar = bToVar + 1; //from 0;n-1, to 1;n
+//
+//					if(bit.equals("1")) {
+//						ArrayList<Integer> clausesWherItAppears = variableToClausesWhereItAppears.get(bToVar);
+//						if(clausesWherItAppears!=null && clausesWherItAppears.size()>0) {
+//							clausesSatisfied.addAll(clausesWherItAppears);
+//						}
+//					}
+//					else  {
+//						//must be "0"
+//						ArrayList<Integer> clausesWherItAppearsNegated = variableToClausesWhereItAppears_negated.get(bToVar);
+//						if(clausesWherItAppearsNegated!=null && clausesWherItAppearsNegated.size()>0) {
+//							clausesSatisfied.addAll(clausesWherItAppearsNegated);
+//						}
+//					}
+//				}
+//
+//				//Hi,i, (here H[i] denotes the number of clauses in the formula that are satisfied by the binary representation of i−1.
+//				H[i]=clausesSatisfied.size();
+//				if(H[i]==lambda) {
+//					iSatifsyingTheFormula.add(i);
+//				}
+//			}
+//			if(print){
+//				CRNReducerCommandLine.println(out,bwOut," completed");
+//			}
+//
+//			bw.write("//////////////////////////\n");
+//			bw.write("//Internal parameters used\n");
+//			bw.write("//tau="+tau+", q="+q+"\n");
+//			bw.write("//H="+Arrays.toString(H)+"\n//\tH[0] shall be ignored\n");
+//			bw.write("//////////////////////////\n\n");
+//
+//
+//			bw.write("begin init\n");
+//			//for(String species : speciesToUpdateFunction.keySet()) {
+//			for(i=1;i<=n;i++) {
+//				bw.write("  a"+i+"="+oneOverSqrtn+"  b"+i+"=0\n");
+//			}
+//			bw.write("  c=1\t\t//The counter\n");
+//			bw.write("  c_odd=1\t//Used to represent it the counter is odd (1) or even (0)\n");
+//			bw.write("  r=0\t\t//The results\n");
+//			bw.write("end init\n\n");
+//
+//			bw.write("begin partition\n");
+//			bw.write(" {");
+//			for(i=1;i<=n;i++) {
+//				bw.write("a"+i);
+//				if(i<n) {
+//					bw.write(",");
+//				}
+//			}
+//			bw.write("},\n");
+//			bw.write(" {");
+//			for(i=1;i<=n;i++) {
+//				bw.write("b"+i);
+//				if(i<n) {
+//					bw.write(",");
+//				}
+//			}
+//			bw.write("}\n");
+//			bw.write("end partition\n\n");
+//			
+//
+//			bw.write("while true do\n");
+//			bw.write(" begin parameters\n");
+//			bw.write("  p = Uniform(0,1)\n");
+//			bw.write(" end parameters\n");
+//
+//			bw.write("\n");
+//			bw.write(" //////////////////////////////////////////////////\n");
+//			bw.write(" //First if: we still need to iterate and c is even\n");
+//			bw.write(" //////////////////////////////////////////////////\n");
+//			bw.write(" if c_odd = 0 and c - "+q+"/"+tau+" < 0 then\n");
+//			for(i=1;i<=n;i++) {
+//				bw.write("  upd(a"+i+") = a"+i+" + "+tau+"*"+H[i]+"*b"+i+"\n");
+//			}
+//			bw.write("\n");
+//			for(i=1;i<=n;i++) {
+//				bw.write("  upd(b"+i+") = b"+i+" - "+tau+"*"+H[i]+"*a"+i+"\n");
+//			}
+//			bw.write("  upd(c) = c+1\n");
+//			bw.write("  upd(c_odd) = 1-c_odd\n");
+//			bw.write("  upd(r) = 0\n");
+//
+//			bw.write("\n");
+//
+//			bw.write(" //////////////////////////////////////////////////\n");
+//			bw.write(" //Second if: we still need to iterate and c is odd\n");
+//			bw.write(" //////////////////////////////////////////////////\n");
+//			bw.write(" elif c_odd > 0  and c - "+q+"/"+tau+" < 0 then\n");
+//			
+//
+//			StringBuffer sum_aj=new StringBuffer("");
+//			StringBuffer sum_bj=new StringBuffer("");
+//			boolean first=true;
+//			for(i=1;i<=n;i++) {
+//				if(!first) {
+//					sum_aj.append(" + ");
+//					sum_bj.append(" + ");
+//				}
+//				first=false;
+//				
+//				sum_aj.append("a");
+//				sum_aj.append(i);
+//
+//				sum_bj.append("b");
+//				sum_bj.append(i);
+//			}
+//			String sum_a=sum_aj.toString();
+//			String sum_b=sum_bj.toString();
+//			for(i=1;i<=n;i++) {
+//				bw.write("  upd(a"+i+") = a"+i+" + "+tau+"*("+sum_a+")\n");
+//			}
+//			bw.write("\n");
+//			for(i=1;i<=n;i++) {
+//				bw.write("  upd(b"+i+") = b"+i+" + "+tau+"*("+sum_b+")\n");
+//			}
+//			bw.write("  upd(c) = c+1\n");
+//			bw.write("  upd(c_odd) = 1-c_odd\n");
+//			bw.write("  upd(r) = 0\n");
+//
+//
+//			bw.write("\n");
+//			bw.write(" //////////////////////////////////////////////////\n");
+//			bw.write(" //Last if: no more iterations necessary, we can compute r\n");
+//			bw.write(" //////////////////////////////////////////////////\n");
+//			bw.write(" //i satisfying the formula:"+iSatifsyingTheFormula+"\n");
+//			bw.write(" //////////////////////////////////////////////////\n");
+//
+//			StringBuffer iSatisfyingFormula_a = new StringBuffer("");
+//			StringBuffer iSatisfyingFormula_b = new StringBuffer("");
+//
+//			first=true;
+//			for(Integer iSat : iSatifsyingTheFormula) {
+//				if(!first) {
+//					iSatisfyingFormula_a.append(" + ");
+//					iSatisfyingFormula_b.append(" + ");
+//				}
+//				first=false;
+//				iSatisfyingFormula_a.append("a");
+//				iSatisfyingFormula_a.append(iSat);
+//
+//				iSatisfyingFormula_b.append("b");
+//				iSatisfyingFormula_b.append(iSat);
+//			}
+//			String iSatisfyingFormula_a_power=iSatisfyingFormula_a.toString();
+//			iSatisfyingFormula_a_power="("+iSatisfyingFormula_a_power+")*("+iSatisfyingFormula_a_power+")";
+//			String iSatisfyingFormula_b_power=iSatisfyingFormula_b.toString();
+//			iSatisfyingFormula_b_power="("+iSatisfyingFormula_b_power+")*("+iSatisfyingFormula_b_power+")";
+//
+//			bw.write(" elif c - "+q+"/"+tau+" = 0 and "+"p - ("+iSatisfyingFormula_a_power+" + \n 							   "+
+//																iSatisfyingFormula_b_power+")/"+iSatifsyingTheFormula.size()+" <= 0 then\n");
+//
+//			for(i=1;i<=n;i++) {
+//				bw.write("  upd(a"+i+") = a"+i+"\n");
+//			}
+//			for(i=1;i<=n;i++) {
+//				bw.write("  upd(b"+i+") = b"+i+"\n");
+//			}
+//			bw.write("  upd(c) = c+1\n");
+//			bw.write("  upd(c_odd) = 1-c_odd\n");
+//			bw.write("  upd(r) = 1\n");
+//
+//			bw.write(" end if\n");
+//
+//			bw.write("end while\n");
+//			
+//			bw.write("\n");
+//			bw.write("reduceFPE(csvFile=\"FPE.csv\",fileWhereToStorePartition=\"partitions/"+modelName+"_part.txt\",prePartition=USER)\n");
+//			//
+//			bw.write("\n");
+//
+//			bw.write("end Probabilistic Program\n");
+//			bw.close();
+//			
+//			if(print){
+//				end=System.currentTimeMillis();
+//				CRNReducerCommandLine.println(out,bwOut," Completed in "+String.format( CRNReducerCommandLine.MSFORMAT, ((end-begin)/1000.0) )+ " (s)"+".");
+//			}
+//		}
+//		return getInfoImporting();
+//	}
+
+
+	public void addClauseToList(LinkedHashMap<Integer, ArrayList<Integer>> variableToClausesWhereItAppears, int clause,
+			IUpdateFunction leaf) {
+		String spName=((ReferenceToNodeUpdateFunction)leaf).toString();
+		Integer spNameInt=Integer.parseInt(spName);
+		ArrayList<Integer> list = variableToClausesWhereItAppears.get(spNameInt);
+		if(list==null) {
+			list=new ArrayList<Integer>();
+			variableToClausesWhereItAppears.put(spNameInt, list);
+		}
+		list.add(clause);
+	}
+	
+	
+
+	
+	
 	
 	public void readCNFandPolynomiaze(boolean print) throws FileNotFoundException, IOException, UnsupportedFormatException{
 

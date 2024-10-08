@@ -147,5 +147,10 @@ public class DivisionMonomial extends Monomial {
 		}
 		return getCoefficientParam();
 	}
+	
+	@Override
+	public double eval(HashMap<ISpecies, Double> speciesToValue, HashMap<ISpecies, Double> forceReplacement) {
+		return left.eval(speciesToValue,forceReplacement)/right.eval(speciesToValue,forceReplacement);
+	}
 
 }

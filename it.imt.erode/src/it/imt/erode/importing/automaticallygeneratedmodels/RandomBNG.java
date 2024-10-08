@@ -207,14 +207,21 @@ public class RandomBNG {
 	 * 
 	 * @param randomGenerator
 	 * @param max
-	 * @return a number pseudo-uniformly distributed in the interval [0,max]
+	 * @return a number pseudo-uniformly distributed in the interval [0,max] 
 	 */
 	public static int nextInt(RandomEngine randomGenerator,int max) {
+		if(max==0) {
+			return 0;
+		}
 		//Sample from the open interval (0.0,1.0)
 		double next = randomGenerator.nextDouble();
-		double ret = next*(max+1);
+		double ret = next*max;
+		if(ret>max)
+			throw new UnsupportedOperationException("Problem: it has generated max+1");
 		return (int)Math.round(ret);
 	}
+	
+	
 	
 	/**
 	 * 

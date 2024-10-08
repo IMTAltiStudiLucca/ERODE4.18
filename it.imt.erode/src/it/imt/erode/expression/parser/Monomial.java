@@ -1,7 +1,9 @@
 package it.imt.erode.expression.parser;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 
 import it.imt.erode.crn.interfaces.ISpecies;
@@ -108,6 +110,7 @@ public abstract class Monomial implements IMonomial {
 		return mon;
 	}
 	public static final NumberMonomial minusOneMon=new NumberMonomial(new BigDecimal(-1), "-1");
+	public static final NumberMonomial oneMon=new NumberMonomial(new BigDecimal(1), "1");
 	public static ProductMonomial getNegatedAndAddIfNecessary(ISpecies sp,HashMap<ISpecies, SpeciesMonomial> spToMon,HashMap<ISpecies, ProductMonomial> spToNegMon) {
 		ProductMonomial mon= spToNegMon.get(sp);
 		if(mon==null) {
@@ -149,6 +152,18 @@ public abstract class Monomial implements IMonomial {
 
 			return derivedMon;
 		}
+	}
+	
+	public static List<IMonomial> multiplyMonomials(List<IMonomial> leftMonomials, List<IMonomial> rightMonomials) {
+		List<IMonomial> retMonomials;
+		retMonomials=new ArrayList<>(leftMonomials.size()*rightMonomials.size());
+		for(IMonomial left : leftMonomials) {
+			for(IMonomial right : rightMonomials) {
+				IMonomial prod = new ProductMonomial(left, right);
+				retMonomials.add(prod);
+			}
+		}
+		return retMonomials;
 	}
 	
 

@@ -29,12 +29,16 @@ public abstract class InfoReduction {
 		this.reducedSpecies = reducedSpecies;
 		this.parameters=parameters;
 		this.redSizeOverOrigSize=redSizeOverOrigSize;
-		percRedSizeOverOrigSize = String.format( "%.2f", ((redSizeOverOrigSize*100.0)) );
+		percRedSizeOverOrigSize = percRedSizeOverOrigSize(redSizeOverOrigSize);
 		
 		this.timeInMS = timeInMS;
 		this.initPartitionSize=initPartitionSize;
 		this.partitionSize = obtainedPartition.size();
 		this.nonSingletonBlocks= nonSingletonBlocks(obtainedPartition);
+	}
+
+	public static String percRedSizeOverOrigSize(double redSizeOverOrigSize) {
+		return String.format( "%.2f", ((redSizeOverOrigSize*100.0)) );
 	}
 	
 	public int getInitPartitionSize() {

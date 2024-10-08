@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map.Entry;
 
 import com.microsoft.z3.BoolExpr;
@@ -13,6 +14,7 @@ import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
+import it.imt.erode.expression.parser.IMonomial;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
@@ -206,6 +208,10 @@ public class MVUpdateFunctionByCases implements IUpdateFunction {
 	}
 	public int getOtherwiseVal() {
 		return otherwiseVal;
+	}
+	@Override
+	public List<IMonomial> toPolynomial(HashMap<String, ISpecies> speciesNameToSpecies) throws Z3Exception {
+		throw new UnsupportedOperationException("Only supported for Boolean BNs");
 	}
 
 }

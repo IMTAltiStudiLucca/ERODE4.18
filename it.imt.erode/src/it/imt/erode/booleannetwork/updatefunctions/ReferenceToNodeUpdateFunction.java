@@ -1,9 +1,11 @@
 package it.imt.erode.booleannetwork.updatefunctions;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 import com.microsoft.z3.Context;
 import com.microsoft.z3.Expr;
@@ -11,6 +13,8 @@ import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.booleannetwork.interfaces.IBooleanNetwork;
 import it.imt.erode.crn.interfaces.ISpecies;
+import it.imt.erode.expression.parser.IMonomial;
+import it.imt.erode.expression.parser.SpeciesMonomial;
 import it.imt.erode.partition.interfaces.IBlock;
 import it.imt.erode.partition.interfaces.IPartition;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
@@ -27,8 +31,7 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction/*_ArithExp
 	@Override
 	public String toString() {
 		return name;
-	}
-	
+	}	
 	
 	@Override
 	public Expr toZ3(Context ctx, /*IBooleanNetwork booleanNetwork,*/ HashMap<String, ISpecies> nodeNameToNode,
@@ -36,6 +39,15 @@ public class ReferenceToNodeUpdateFunction implements IUpdateFunction/*_ArithExp
 		//return ctx.mkTrue();
 		ISpecies referredNode = nodeNameToNode.get(name);
 		return nodeToTruthValue.get(referredNode);
+	}
+	
+	@Override
+	public List<IMonomial> toPolynomial(HashMap<String, ISpecies> speciesNameToSpecies) throws Z3Exception {
+		ISpecies referredNode = speciesNameToSpecies.get(name);
+		IMonomial mon = new SpeciesMonomial(referredNode);
+		List<IMonomial> monomials = new ArrayList<>(1);
+		monomials.add(mon);
+		return monomials;
 	}
 
 	@Override

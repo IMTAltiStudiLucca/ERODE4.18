@@ -374,7 +374,7 @@ public class CRNImporter extends AbstractImporter {
 					speciesNameToSpecies = loadAlgSpecies(br,line.startsWith("begin alginit"),speciesNameToSpecies);      // forse c'è da metterle in algebraic? 
 				}
 				else if(line.startsWith("begin partition")){
-					loadPartition(br,speciesNameToSpecies);
+					loadPartition(br,speciesNameToSpecies,getCRN());
 				}
 				else if(reactionsLoaded && (!viewsLoaded) && line.startsWith("begin views")){
 					//The views must be specified after the reactions
@@ -420,7 +420,7 @@ public class CRNImporter extends AbstractImporter {
 		return getInfoImporting();
 	}
 
-	private void loadPartition(BufferedReader br, HashMap<String, ISpecies> speciesNameToSpecies) throws IOException {
+	public static ArrayList<ArrayList<String>> loadPartition(BufferedReader br, HashMap<String, ISpecies> speciesNameToSpecies, ICRN crn) throws IOException {
 		ArrayList<ArrayList<String>> initialPartition=new ArrayList<>();
 		String line=br.readLine();
 		line=line.trim();
@@ -432,8 +432,13 @@ public class CRNImporter extends AbstractImporter {
 				while(line.indexOf('}')>0){
 					int firstClosedPar = line.indexOf('}');
 					String block;
-					if(firstClosedPar<line.length()){
+					int len=line.length();
+					//if(firstClosedPar<len-1){
+					if(firstClosedPar<len ){
 						block=line.substring(0,firstClosedPar+1).trim();
+						if(block.startsWith(",")){
+							block=block.substring(1,block.length()).trim();
+						}
 						line=line.substring(firstClosedPar+1).trim();
 						//remove comma
 						if(line.startsWith(",")){
@@ -463,7 +468,8 @@ public class CRNImporter extends AbstractImporter {
 			line=line.trim();
 		}
 
-		GUICRNImporter.readPartition(initialPartition, speciesNameToSpecies, getCRN());
+		GUICRNImporter.readPartition(initialPartition, speciesNameToSpecies, crn);
+		return initialPartition;
 	}
 
 
@@ -475,7 +481,7 @@ public class CRNImporter extends AbstractImporter {
 	 * @return
 	 * @throws IOException
 	 */
-	private HashMap<String, ISpecies> loadSpecies(BufferedReader br/*, boolean erodeFormat*/)  throws IOException {
+	public HashMap<String, ISpecies> loadSpecies(BufferedReader br/*, boolean erodeFormat*/)  throws IOException {
 
 		HashMap<String, ISpecies> speciesNameToSpecies = new HashMap<String, ISpecies>();
 		
@@ -581,7 +587,6 @@ public class CRNImporter extends AbstractImporter {
 			}
 			line = br.readLine();
 		}
-		
 		
 		return speciesNameToSpecies;
 	}
@@ -1126,7 +1131,21 @@ public class CRNImporter extends AbstractImporter {
 			//HashMap<IComposite,IComposite> reagentsStoredInHashMap = new HashMap<IComposite, IComposite>();
 		}
 		
+		ICRN crn = getCRN();
 		String line = br.readLine();
+		parseODEs(br, speciesStoredInHashMap, crn, line);
+		getInfoImporting().setReadCRNReactions(getCRN().getReactions().size());
+		//getInfoImporting().setReadProducts(getCRN().getProducts().size());
+		//getInfoImporting().setReadReagents(getCRN().getReagents().size());
+		getInfoImporting().setReadSpecies(getCRN().getSpecies().size());
+		getInfoImporting().setReadParameters(getCRN().getParameters().size());
+		return speciesStoredInHashMap;
+	}
+
+
+
+	public static void parseODEs(BufferedReader br, HashMap<String, ISpecies> speciesStoredInHashMap, ICRN crn, String line)
+			throws IOException {
 		while ((line != null) && (!(line=line.trim()).startsWith("end ODE"))) {
 			//Skip comments or empty lines
 			if(!(line.equals("") || line.startsWith("#") || line.startsWith("//"))){
@@ -1145,16 +1164,10 @@ public class CRNImporter extends AbstractImporter {
 				String[] productsArray = new String[2];
 				productsArray[0]=species;
 				productsArray[1]=species;
-				storeArbitraryReaction(speciesStoredInHashMap, reagentsArray, productsArray, rateString,getCRN(),null,null);
+				storeArbitraryReaction(speciesStoredInHashMap, reagentsArray, productsArray, rateString,crn,null,null);
 			}
 			line = br.readLine();
 		}
-		getInfoImporting().setReadCRNReactions(getCRN().getReactions().size());
-		//getInfoImporting().setReadProducts(getCRN().getProducts().size());
-		//getInfoImporting().setReadReagents(getCRN().getReagents().size());
-		getInfoImporting().setReadSpecies(getCRN().getSpecies().size());
-		getInfoImporting().setReadParameters(getCRN().getParameters().size());
-		return speciesStoredInHashMap;
 	}
 	
 	private HashMap<String, ISpecies> loadAlgebraic(BufferedReader br,HashMap<String, ISpecies> speciesStoredInHashMap) throws IOException {

@@ -30,6 +30,7 @@ import it.imt.erode.partitionrefinement.algorithms.ExactFluidBisimilarity;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.FBEAggregationFunctions;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.RandomizedForwardBooleanEquivalence;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.RandomizedForwardBooleanEquivalenceTau;
+import it.imt.erode.partitionrefinement.algorithms.booleannetworks.RandomizedForwardBooleanEquivalence_SAT;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.RndFMETauMonomialException;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.SMTBackwardBooleanEquivalence;
 import it.imt.erode.partitionrefinement.algorithms.booleannetworks.SMTForwardBooleanEquivalence;
@@ -100,6 +101,9 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 				}
 				else if(command.startsWith("reduceFBE(")){//else if(command.startsWith("reduceOOBsmt(")){
 					handleReduceCommand(command,updateCRN,"FBE",out,bwOut);//handleReduceCommand(command,updateCRN,"oobsmt");
+				}
+				else if(command.startsWith("reduceRndFBE(")){//else if(command.startsWith("reduceOOBsmt(")){
+					handleReduceCommand(command,updateCRN,"rndFBE",out,bwOut);//handleReduceCommand(command,updateCRN,"oobsmt");
 				}
 				else if(command.startsWith("reduceFME(")){//else if(command.startsWith("reduceOOBsmt(")){
 					handleReduceCommand(command,updateCRN,"FME",out,bwOut);//handleReduceCommand(command,updateCRN,"oobsmt");
@@ -440,7 +444,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			return null;
 		}
 		FBEAggregationFunctions aggr=null;
-		if(reduction.equals("FBE") ||reduction.equals("FME") ||reduction.equals("rndFME") || needsAggregationFunctionSubClass(reduction)) {
+		if(reduction.equals("FBE") ||reduction.equals("FME") ||reduction.equals("rndFME") ||reduction.equals("rndFBE") || needsAggregationFunctionSubClass(reduction)) {
 			if(aggregationFunction==null || aggregationFunction.length()==0) {
 				CRNReducerCommandLine.println(out,bwOut,"Please, specify an aggregation function. ");
 				CRNReducerCommandLine.println(out,bwOut,"I skip this command: "+command);
@@ -541,6 +545,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 		SMTForwardBooleanEquivalence smtFBE =null;
 		SMTBackwardBooleanEquivalence smtBBE=null;
 		RandomizedForwardBooleanEquivalence smtRndFME=null;
+		RandomizedForwardBooleanEquivalence_SAT smtRndFBEsat=null;
 		//RandomizedForwardBooleanEquivalenceTau smtRndFME=null;
 		
 		//Compute the partition
@@ -583,12 +588,36 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 			//smtFBE=null;
 			 
 		}
+		else if(reduction.equalsIgnoreCase("rndfbe")) {
+			//The one with Max and Omar, to reduce SAT
+			smtRndFBEsat = new RandomizedForwardBooleanEquivalence_SAT(aggr);
+			
+			if(bn.isMultiValued()) {
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"The reduction techinque "+reduction+ " is meant for Boolean BNs or SAT formulas.",DialogType.Error);
+				//+ "" Please use one among NFB, NBB, BB, FB, DSB, SMB, WFB, EFL, BDE, FDE or GEFL.");
+				return null;
+			}
+
+			PartitionAndStringAndBoolean ps;
+			try {
+				ps = smtRndFBEsat.computeOFL_rnd_noSMT(bn, initial, CRNReducerCommandLine.verbose, out, bwOut, print, terminator);
+				obtainedPartition = ps.getPartition();
+				//smtTime=ps.getString();
+				//smtChecksTime=smtRndFBEsat.getSMTChecksSecondsAtStep();
+				succeeded=ps.booleanValue();
+			} catch (/*Z3Exception | IOException |*/ RndFMETauMonomialException e) {
+				succeeded=false;
+				obtainedPartition=partition;
+				CRNReducerCommandLine.println(out, bwOut, "The reduction failed.");
+			}
+		}
 		else if(reduction.equalsIgnoreCase("rndfme")) {
+			//The one in LICS2023 to reduce ODEs over monoids
 			if(attemptDropTauN) {
-				smtRndFME = new RandomizedForwardBooleanEquivalenceTau(aggr, succeeded);
+				smtRndFME = new RandomizedForwardBooleanEquivalenceTau(aggr, simplify.equalsIgnoreCase("true"));
 			}
 			else {
-				smtRndFME = new RandomizedForwardBooleanEquivalence(aggr, succeeded);
+				smtRndFME = new RandomizedForwardBooleanEquivalence(aggr, simplify.equalsIgnoreCase("true"));
 			}
 			//
 			
@@ -694,7 +723,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 
 			if(!computeOnlyPartition.equalsIgnoreCase("true")){
 				computeReducedModel(updateCRN, reduction, out, bwOut, reducedFileName, print, aggr, obtainedPartition,
-						icWarning, reductionName, reducedModelName, smtFBE, smtBBE,smtRndFME, writeReducedCRN, infoReduction);
+						icWarning, reductionName, reducedModelName, smtFBE, smtBBE,smtRndFME, smtRndFBEsat, writeReducedCRN, infoReduction);
 			}	
 
 
@@ -728,7 +757,7 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 	public void computeReducedModel(boolean updateCRN, String reduction, MessageConsoleStream out, BufferedWriter bwOut,
 			String reducedFileName, boolean print, FBEAggregationFunctions aggr, IPartition obtainedPartition,
 			String icWarning, String reductionName, String reducedModelName, SMTForwardBooleanEquivalence smtFBE,
-			SMTBackwardBooleanEquivalence smtBBE, RandomizedForwardBooleanEquivalence smtRndFME, boolean writeReducedCRN, InfoBooleanNetworkReduction infoReduction)
+			SMTBackwardBooleanEquivalence smtBBE, RandomizedForwardBooleanEquivalence smtRndFME, RandomizedForwardBooleanEquivalence_SAT smtRndFBE_SAT, boolean writeReducedCRN, InfoBooleanNetworkReduction infoReduction)
 			throws IOException {
 		long begin;
 		long end;
@@ -751,6 +780,10 @@ public class BooleanNetworkCommandLine extends AbstractCommandLine {
 		}
 		else if(reduction.equalsIgnoreCase("rndfme")) {
 			bp = smtRndFME.computeReducedFBE(bn, reducedModelName, obtainedPartition, "//",  out, bwOut, terminator, aggr);
+			smtFBE=null;
+		}
+		else if(reduction.equalsIgnoreCase("rndfbe")) {
+			bp = smtRndFBE_SAT.computeReducedFBE(bn, reducedModelName, obtainedPartition, "//",  out, bwOut, terminator, aggr);
 			smtFBE=null;
 		}
 

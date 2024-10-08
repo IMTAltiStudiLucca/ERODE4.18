@@ -141,5 +141,15 @@ public class ProductMonomial extends Monomial {
 		}
 		return getCoefficientParam();
 	}
+	
+	@Override
+	public double eval(HashMap<ISpecies, Double> speciesToValue, HashMap<ISpecies, Double> forceReplacement) {
+		Double l =left.eval(speciesToValue,forceReplacement);
+		Double r =right.eval(speciesToValue,forceReplacement);
+		if(l==null || r==null) {
+			System.out.println("ciao");
+		}
+		return l*r;
+	}
 
 }

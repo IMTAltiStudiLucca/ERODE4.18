@@ -9,6 +9,7 @@ import org.eclipse.ui.console.MessageConsoleStream;
 
 import it.imt.erode.commandline.IMessageDialogShower;
 import it.imt.erode.importing.chemkin.ChemKinImporter;
+import it.imt.erode.importing.cnf.CNFImporter;
 import it.imt.erode.importing.csv.CSVMatrixAsLinearSystemImporter;
 import it.imt.erode.importing.csv.CompactCSVMatrixImporter;
 import it.imt.erode.importing.konect.KonectNetworksImporter;
@@ -137,6 +138,10 @@ public class ImporterOfSupportedNetworks {
 			importer = new CNFImporter(fileName, out, bwOut, msgDialogShower);
 			((CNFImporter)importer).readCNFandPolynomiaze(print);
 		}
+//		else if(format.equals(SupportedFormats.CNFasQuantumOptSAT)){
+//			importer = new CNFImporter(fileName, out, bwOut, msgDialogShower);
+//			((CNFImporter)importer).readCNFandMakeQuantumOptimization(print);
+//		}
 		else if(format.equals(SupportedFormats.LinearWithInputs)){
 			//TODO
 			importer = new CompactCSVMatrixImporter(fileName,optionalParameters,out,bwOut,msgDialogShower);

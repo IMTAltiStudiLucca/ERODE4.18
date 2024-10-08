@@ -54,6 +54,25 @@ ModelDefinition :
 )
 |
 (	
+	'begin' 'Probabilistic' 'Program'  name = ID ('[' 'logger' '=' log=BooleanValue ']')?
+		(
+			(
+				(elements += ICList)
+				(elements += InitPartition)?
+				'while' 'true' 'do'
+				(
+					(elements += ProbParametersList)?
+					(elements += IfClause)*
+				)
+				'end' 'while'
+			)
+			| elements+=ProbImport
+		)
+		(elements += ProbCommand)*
+	'end' 'Probabilistic' 'Program'	
+)
+|
+(	
 	'begin' 'Boolean' ('Network'|'network') name = ID ('[' 'logger' '=' log=BooleanValue ']')?
 		(
 			(
@@ -89,8 +108,18 @@ ModelDefinition :
 )
 ;
 
+ProbCommand:
+	ProbReduction
+;
+ProbReduction:
+	reduceFPE
+;
+reduceFPE : {reduceFPE}
+	'reduceFPE' '(' optionalParametersFormatted=FormattedOptionalParametersReductions ')'
+;
+
 ImportFolder:
-	importSBMLFolder|importAndPolyCNFFolder
+	importSBMLFolder|importAndPolyCNFFolder|importCNFFolderAsQuantumOpt
 	//|importBoolCubeSBMLFolder
 ;
 
@@ -172,7 +201,7 @@ ODEsList: {ODEsList}
 ;
 
 ODE:
- 'd' '(' name = [Species] ')' '=' drift = ArithmeticExpressionWithSpecies
+ ('d'|'upd') '(' name = [Species] ')' '=' drift = ArithmeticExpressionWithSpecies
  //'d' '(' name = [Species|IDorSTRING] ')' '=' drift = ArithmeticExpressionWithSpecies	
 	
   //'[' name = [Species] ']' '=' drift = ArithmeticExpressionWithSpecies ';'
@@ -182,6 +211,7 @@ ODE:
 BasicConstraint:
 	symbolicParameter = [SymbolicParameter] comp = Comp constraint = ArithmeticExpressionWithSymbPar //NAT
 ;
+
 
 AlgebraicList: {AlgebraicList}
 	'begin' 'algebraic' (algs += ALG)* 'end' 'algebraic'
@@ -271,6 +301,47 @@ Parameter:
 	name = ID '=' paramValue=ArithmeticExpression //';'
 ;
 
+
+ProbParametersList : {ProbParametersList}
+  	'begin' 'parameters' (parameters += ProbParameter)* 'end' 'parameters'
+;
+
+ProbParameter:
+	name = ID '=' paramValue=ProbDistr //';'
+;
+ProbDistr:
+	NormalDistr|UniformDistr
+;
+NormalDistr:
+	'N' '(' mu=ArithmeticExpression ',' sigma=ArithmeticExpression')'
+;
+UniformDistr:
+	'Uniform' '(' from=ArithmeticExpression ',' to=ArithmeticExpression')'
+;
+IfClause:
+	'if' condition=Condition 'then' then=StateBlock 
+		(elseBranches+=ElseBranch)*
+		(elseFinal= ElseFinal)?
+	'end' 'if'
+	
+;
+ElseBranch:
+	'elif'  condition=Condition 'then' then=StateBlock
+;
+ElseFinal:
+	'else' then=StateBlock
+;
+
+StateBlock: {StateBlock}
+	(odes += ODE)*
+;
+Condition:
+	expressions+=ExpressionOfCondition  ('and' expressions+=ExpressionOfCondition)* 
+;
+ExpressionOfCondition:
+	expr=ArithmeticExpressionWithSpecies comp = Comp number=ZERO
+;
+
 /*SpeciesList : {SpeciesList}
   //'begin species' (allSpecies += Species)+ 'end species'
   'begin species' (allSpecies += SpeciesForCRN)+ 'end species'
@@ -318,7 +389,7 @@ ReferenceToParameterOrSpecies: {ReferenceToParameterOrSpecies}
 */
 
 ParameterOrSymbolicParameterOrSpecies:
-	SymbolicParameter|Parameter|Species|AlgSpecies
+	SymbolicParameter|Parameter|Species|AlgSpecies|ProbParameter
 	//SymbolicParameter|ParameterOrSpecies
 ;
 
@@ -511,6 +582,9 @@ ImportBoolean:
 importBNet:
 	'importBNet' '(' params = ParametersImport ',' 'guessPrepartition' '=' guessPrep = ('inputs'|'outputs'|'inputsOneBlock'|'outputsOneBlock') ')'
 ;
+ProbImport: {ProbImport}
+	'loadProbProg' '(' params = ParametersImport ')';
+	
 Import:
 	load |
 	importBNG |
@@ -618,8 +692,12 @@ importSBMLFolder:
 	//'importSBMLFolder' '(' 'folderIn' '=' folderIn = STRING ',' 'folderOut' '=' folderOut = STRING (',' 'forceMassAction' '=' forceMassAction = BooleanValue)? ')'
 ;
 importAndPolyCNFFolder:
-	'importAndPolyCNFFolder' '(' params = ParametersImportFolder ')'
+	'importAndPolyCNFFolder' '(' params = ParametersImportFolder  ')'
 ;
+importCNFFolderAsQuantumOpt:
+	'importCNFFolderAsQuantumOpt' '(' params = ParametersImportFolder  ')'
+;
+
 
 Reduction:
 	MassActionReduction |
@@ -720,6 +798,7 @@ CoRNParams:
 			 	 ('upper' '=' upperFactor = POSITIVEINTORREAL))
 			 )
 		 ) ',' 'certain' 'constants' '=' certainConstants=BooleanValue
+		 ',' 'onlyFEoonCentreBounds' '=' onlyFEOnCentreBounds=BooleanValue
 	 )
 	 |
 	('closure'
@@ -831,8 +910,9 @@ OptionalParametersReductions: //{OptionalParametersReductions}
 	FileSameIC |
 	PrintInfo | 
 	OnlyPart |
-	| FilePart*/  
+	*/  
 	//FileIn |
+	| FilePart
 	| ReductionAlgorithm
 	| CSVFile
 	| SMTTimesCSVFile
@@ -1332,6 +1412,7 @@ write:
 	 			(',' 'deterministicCorrection' '=' deterministicCorrection=BooleanValue)?
 				(',' paramsToCurry=paramsToCurry)?
 				(',' 'originalNames' '=' originalNames=BooleanValue)?
+				(',' 'resetParameters' '=' resetParameters=BooleanValue)?
 	  ')'
 ;
 
@@ -1722,7 +1803,7 @@ ParameterOrSymbolicParameterValue:
 ; 	*/
 	
 ParameterOrSymbolicParameter:
-	SymbolicParameter|Parameter
+	SymbolicParameter|Parameter|ProbParameter
 ;
 
 ReferenceToParameterOrSymbolicParameter: {ReferenceToParameterOrSymbolicParameter} 
@@ -2221,7 +2302,7 @@ UpdateStatusBooleanCommand:
 BooleanReduction: 
 	//SMTBooleanReduction
 	reduceBBE | 
-	reduceFBE |
+	reduceFBE | reduceRndFBE |
 	//reduceBME |
 	reduceFME | reduceRndFME	
 ;
@@ -2236,6 +2317,10 @@ reduceBBE : {reduceBBE}
 
 reduceFBE : {reduceFBE}
 	'reduceFBE' '(' 'aggregationFunction' '=' aggregationFunction=('OR'|'AND'|'XOR') (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
+;
+
+reduceRndFBE : {reduceRndFBE}
+	'reduceRndFBE' '(' 'aggregationFunction' '=' aggregationFunction=('OR'|'AND'|'XOR') (',')? optionalParametersFormatted=FormattedOptionalParametersBooleanReductions')'
 ;
 
 //reduceBME : {reduceBME}

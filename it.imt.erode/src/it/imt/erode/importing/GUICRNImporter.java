@@ -55,7 +55,7 @@ import it.imt.erode.partitionrefinement.algorithms.EpsilonDifferentialEquivalenc
  * @author Andrea Vandin
  * This class is used to import reaction networks or ODEs written using the XTEXT/based GUI
  */
-public class GUICRNImporter  extends AbstractImporter {
+public class GUICRNImporter extends AbstractImporter {
 
 	public static final String GUICRNNetworksFolder = "."+File.separator+"GUICRNNetworks"+File.separator;
 	//private static final boolean ADDEULERTAU=false;
@@ -71,7 +71,8 @@ public class GUICRNImporter  extends AbstractImporter {
 	
 	
 	
-	public InfoCRNImporting importCRNNetwork(boolean printInfo, boolean printCRN,boolean print, String modelName, ArrayList<String> symbolicParameters, List<IConstraint> constraints, ArrayList<ArrayList<String>> parameters,ArrayList<LinkedHashMap<String,String>> reactions,ArrayList<LinkedHashMap<String,String>> algConstraints,ArrayList<ArrayList<String>> views,ArrayList<ArrayList<String>> initialConcentrations,ArrayList<ArrayList<String>> initialAlgConcentrations, ArrayList<ArrayList<String>> userPartition/*,ArrayList<String> commands*/, ODEorNET modelDefKind, MessageConsoleStream consoleOut) throws IOException{
+	public InfoCRNImporting importCRNNetwork(boolean printInfo, boolean printCRN,boolean print, String modelName, ArrayList<String> symbolicParameters, List<IConstraint> constraints, ArrayList<ArrayList<String>> parameters,ArrayList<LinkedHashMap<String,String>> reactions,ArrayList<LinkedHashMap<String,String>> algConstraints,ArrayList<ArrayList<String>> views,ArrayList<ArrayList<String>> initialConcentrations,ArrayList<ArrayList<String>> initialAlgConcentrations, 
+			ArrayList<ArrayList<String>> userPartition/*,ArrayList<String> commands*/, ODEorNET modelDefKind, MessageConsoleStream consoleOut) throws IOException{
 		if(print){
 			//CRNReducerCommandLine.println(out,"\nImporting the model "+ modelName +" from the editor");
 			CRNReducerCommandLine.println(out,bwOut,"\nReading "+ modelName +"...");
@@ -102,16 +103,7 @@ public class GUICRNImporter  extends AbstractImporter {
 			}
 		}
 		
-		HashMap<String, ISpecies> speciesStoredInHashMap = new HashMap<String, ISpecies>();
-		for (ArrayList<String> initialConcentration : initialConcentrations) {
-			if(initialConcentration.size()==3){
-				addSpecies(initialConcentration.get(0), initialConcentration.get(2),initialConcentration.get(1), speciesStoredInHashMap);
-			}
-			else{
-				addSpecies(initialConcentration.get(0), null,initialConcentration.get(1), speciesStoredInHashMap);
-			}
-			
-		}
+		HashMap<String, ISpecies> speciesStoredInHashMap = addAllSpecies(initialConcentrations);
 		
 		//HashMap<String, ISpecies> algSpeciesStoredInHashMap = new HashMap<String, ISpecies>();
 		for (ArrayList<String> initialAlgConcentration : initialAlgConcentrations) {
@@ -190,6 +182,7 @@ public class GUICRNImporter  extends AbstractImporter {
 		}
 		
 		
+		
 		IBlock uniqueBlock = new Block();
 		IBlock uniqueAlgebraicBlock = new Block();
 		boolean algBlockAdded=false;
@@ -258,6 +251,7 @@ public class GUICRNImporter  extends AbstractImporter {
 
 		return getInfoImporting();
 	}
+	
 	public static void readPartition(ArrayList<ArrayList<String>> initialPartition,
 			HashMap<String, ISpecies> speciesStoredInHashMap,ICRN crn) {
 		//if(!(initialPartition.size()==0 ||(initialPartition.size()==1 && initialPartition.get(0).equals("")))){
@@ -329,14 +323,7 @@ public class GUICRNImporter  extends AbstractImporter {
 	 * @throws IOException
 	 */
 	private void storeODEReaction(HashMap<String, ISpecies> speciesStoredInHashMap, String[] reagentsArray,String body,String id) throws IOException {
-		if(reagentsArray.length!=1){
-			throw new UnsupportedOperationException("I expect one reagent only, which is the species of the considered ODE");
-		}
-		HashMap<ISpecies, Integer> reagentsHM = CRNImporter.generateNewSpeciesAndBuildArrayOfNames(speciesStoredInHashMap, reagentsArray,getCRN());
-		ISpecies speciesOfODE = reagentsHM.keySet().iterator().next();
-		//create reaction speciesOfODE -> speciesOfODE + speciesOfODE, arbitrary rateLaw
-		IComposite products = new Composite(speciesOfODE,speciesOfODE);
-		ICRNReaction reaction = new CRNReactionArbitraryGUI((IComposite)speciesOfODE, products, body,id);
+		ICRNReaction reaction = parseODEReaction_AddSpeciesIfNecessary(speciesStoredInHashMap, reagentsArray, body, id,getCRN());
 		getCRN().addReaction(reaction);
 		/*
 		addToIncomingReactionsOfProducts(reaction.getArity(),(IComposite)speciesOfODE, reaction,CRNReducerCommandLine.addReactionToComposites);
@@ -346,6 +333,18 @@ public class GUICRNImporter  extends AbstractImporter {
 			addToReactionsWithNonZeroStoichiometry(reaction.getArity(), reagentsHM,reaction);
 		}
 		*/
+	}
+	public static ICRNReaction parseODEReaction_AddSpeciesIfNecessary(HashMap<String, ISpecies> speciesStoredInHashMap, String[] reagentsArray,
+			String body, String id, ICRN crn) throws IOException {
+		if(reagentsArray.length!=1){
+			throw new UnsupportedOperationException("I expect one reagent only, which is the species of the considered ODE");
+		}
+		HashMap<ISpecies, Integer> reagentsHM = CRNImporter.generateNewSpeciesAndBuildArrayOfNames(speciesStoredInHashMap, reagentsArray,crn);
+		ISpecies speciesOfODE = reagentsHM.keySet().iterator().next();
+		//create reaction speciesOfODE -> speciesOfODE + speciesOfODE, arbitrary rateLaw
+		IComposite products = new Composite(speciesOfODE,speciesOfODE);
+		ICRNReaction reaction = new CRNReactionArbitraryGUI((IComposite)speciesOfODE, products, body,id);
+		return reaction;
 	}
 	
 	public static String getOnlyAlphaNumeric(String s) {
@@ -361,13 +360,23 @@ public class GUICRNImporter  extends AbstractImporter {
 			EULER euler) {
 		printToERODEFIle(crn,partition, name, assignPopulationOfRepresentative, 
 				groupAccordingToCurrentPartition, preambleCommentLines, verbose, 
-				icComment,out,bwOut, type, rnEncoding,originalNames,null,euler);
+				icComment,out,bwOut, type, rnEncoding,originalNames, 
+				euler,false);
+	}
+	
+	public static void printToERODEFIle(ICRN crn,IPartition partition, String name, boolean assignPopulationOfRepresentative, 
+			boolean groupAccordingToCurrentPartition, Collection<String> preambleCommentLines, boolean verbose, 
+			String icComment,MessageConsoleStream out,BufferedWriter bwOut, ODEorNET type, boolean rnEncoding,boolean originalNames, 
+			EULER euler,boolean resetParameters) {
+		printToERODEFIle(crn,partition, name, assignPopulationOfRepresentative, 
+				groupAccordingToCurrentPartition, preambleCommentLines, verbose, 
+				icComment,out,bwOut, type, rnEncoding,originalNames,null,euler,resetParameters);
 	}
 	
 	public static void printToERODEFIle(ICRN crn,IPartition partition, String name, boolean assignPopulationOfRepresentative, 
 			boolean groupAccordingToCurrentPartition, Collection<String> preambleCommentLines, boolean verbose, 
 			String icComment,MessageConsoleStream out,BufferedWriter bwOut, ODEorNET type, boolean rnEncoding,boolean originalNames
-			,ArrayList<String> commands,EULER euler){
+			,ArrayList<String> commands,EULER euler,boolean resetParameters){
 		String fileName = name;
 		String nam;
 		
@@ -420,7 +429,7 @@ public class GUICRNImporter  extends AbstractImporter {
 				writeOldCRNAndXtextImport(bw,crn,type,false,out,bwOut,rnEncoding,fileName,partition);
 			}
 			else{
-				writeXtextCRN(bw,crn,type,false,out,bwOut,rnEncoding,originalNames,euler);
+				writeXtextCRN(bw,crn,type,false,out,bwOut,rnEncoding,originalNames,euler,resetParameters);
 				if(euler.equals(EULER.NO)) {
 					if(groupAccordingToCurrentPartition){
 						bw.write(" begin views\n");
@@ -963,7 +972,7 @@ public class GUICRNImporter  extends AbstractImporter {
 	
 	
 	private static void writeXtextCRN(BufferedWriter bw,ICRN crn, ODEorNET type, boolean printView,MessageConsoleStream out,
-			BufferedWriter bwOut,boolean rnEncoding,boolean originalNames,EULER euler) throws IOException {		
+			BufferedWriter bwOut,boolean rnEncoding,boolean originalNames,EULER euler,boolean resetParameters) throws IOException {		
 		
 		String str_d="d(";
 		String str_dend=")";
@@ -973,6 +982,10 @@ public class GUICRNImporter  extends AbstractImporter {
 			str_d="";
 			str_dend="";
 			str_odeFunc="update functions";
+			dropParameters=true;
+		}
+		
+		if(resetParameters) {
 			dropParameters=true;
 		}
 		
@@ -1171,13 +1184,13 @@ public class GUICRNImporter  extends AbstractImporter {
 					ICRN crnRN = new CRN(crn.getName()+"RN",crn.getMath(), out, bwOut);
 					CRN.collapseAndCombineAndAddReactions(crnRN, rnReactions, out,bwOut);
 					for (ICRNReaction reaction : crnRN.getReactions()) {
-						writeReaction(bw, reaction,originalNames);
+						writeReaction(bw, reaction,originalNames,resetParameters);
 					}
 				}
 				else{
 					//If no RN encoding was required, or if the RN encoding failed, I write the model as an arbitrary RN.
 					for (ICRNReaction reaction : crn.getReactions()) {
-						writeReaction(bw, reaction,originalNames);
+						writeReaction(bw, reaction,originalNames,resetParameters);
 					}
 				}
 				bw.write(" end reactions\n");
@@ -1392,7 +1405,7 @@ public class GUICRNImporter  extends AbstractImporter {
 	}
 	
 	public static ArrayList<IMonomial> parseGUIPolynomialArbitraryRateExpression(ASTNode node, HashMap<String, ISpecies> speciesNameToSpecies, MathEval math) throws UnsupportedReactionNetworkEncodingException {
-		return parseGUIPolynomialODE(node, speciesNameToSpecies, math,null,null);
+ 		return parseGUIPolynomialODE(node, speciesNameToSpecies, math,null,null);
 	}
 	
 //	public void dropParameters(ASTNode node, HashMap<String, ISpecies> speciesNameToSpecies, MathEval math) {
@@ -1563,7 +1576,7 @@ public class GUICRNImporter  extends AbstractImporter {
 	
 	
 	
-	private static void writeReaction(BufferedWriter bw, ICRNReaction reaction, boolean originalNames) throws IOException {
+	private static void writeReaction(BufferedWriter bw, ICRNReaction reaction, boolean originalNames, boolean simplifyRate) throws IOException {
 		bw.write("  ");
 		if(originalNames) {
 			bw.write(reaction.getReagents().toMultiSetWithStoichiometriesOrigNames(true));
@@ -1585,7 +1598,12 @@ public class GUICRNImporter  extends AbstractImporter {
 		if(reaction.hasArbitraryKinetics()){
 			bw.write("arbitrary ");
 		}
-		bw.write(reaction.getRateExpression());
+		if(simplifyRate) {
+			bw.write(reaction.getRate().toString());
+		}
+		else {
+			bw.write(reaction.getRateExpression());
+		}
 		
 		if(reaction.getID()!=null && !reaction.getID().equals("")){
 			bw.write(" [");

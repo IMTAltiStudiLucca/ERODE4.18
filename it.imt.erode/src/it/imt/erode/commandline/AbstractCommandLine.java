@@ -426,7 +426,7 @@ public abstract class AbstractCommandLine implements ICommandLine {
 		
 	}
 
-	private List<String> createCsvReductionLabels() {
+	private static List<String> createCsvReductionLabels() {
 		List<String> csvLabels = new ArrayList<String>();
 		csvLabels.add("ModelName");
 		csvLabels.add("Reduction");
@@ -444,7 +444,7 @@ public abstract class AbstractCommandLine implements ICommandLine {
 		return csvLabels;
 	}
 	
-	protected void writeReductionInfoInCSVFile(MessageConsoleStream out, BufferedWriter bwOut, String csvFile,
+	protected static void writeReductionInfoInCSVFile(MessageConsoleStream out, BufferedWriter bwOut, String csvFile,
 			InfoCRNReduction infoReduction, LinkedHashMap<String, String> extraColumnsForCSV) {
 		if(csvFile!=null) {
 			List<String> csvLabels = createCsvReductionLabels();

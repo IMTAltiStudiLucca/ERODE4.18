@@ -4,6 +4,8 @@ import java.io.IOException;
 //import java.io.IOException;
 import java.util.LinkedHashSet;
 
+//import it.imt.erode.auxiliarydatastructures.IPartitionAndBoolean;
+
 //import com.microsoft.z3.Z3Exception;
 
 import it.imt.erode.importing.MatlabODEsImporter;
@@ -23,7 +25,7 @@ public class EntryPointEps extends EntryPointForMatlabAbstract{
 		CRNReducerCommandLine.print(out,bwOut,"Writing the matlab script to file "+ fileName+" ...");
 		
 		try {
-			MatlabODEsImporter.printEpsilonScriptToMatlabFIle(erode.getCRN(), erode.getPartition(), fileName, verbose, out, bwOut, null,paramsToPerturb,new Terminator(),epsilon,prePartitionUserDefined,prePartitionWRTIC,forward,backward,fastDegreeOneBE);
+			MatlabODEsImporter.printEpsilonScriptToMatlabFIle(erode.getCRN(), erode.getPartition(), fileName, verbose, out, bwOut, null,paramsToPerturb,new Terminator(),epsilon,prePartitionUserDefined,prePartitionWRTIC,forward,backward,fastDegreeOneBE,false);
 		} catch (UnsupportedFormatException e) {
 			e.printStackTrace();
 		}
@@ -49,26 +51,31 @@ public class EntryPointEps extends EntryPointForMatlabAbstract{
 		
 		EntryPointEps erode = new EntryPointEps(printPartitions, printModels);
 		//int numberOfSpecies = 
-		erode.load("/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/isabel/epsislon/BIOMD0000000030.ode");
+		//erode.load("/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/isabel/epsislon/BIOMD0000000030.ode");
+		//erode.load("/Users/andrea/OneDrive - Scuola Superiore Sant'Anna 2/runtimes/runtime-ERODE.product(4)/isabel/epsislon/BIOMD0000000030.ode");
+		//erode.load("/Users/andrea/Library/CloudStorage/OneDrive-ScuolaSuperioreSant'Anna/runtimes/runtime-ERODE.product(4)/isabel/epsislon/BIOMD0000000030.ode");
+		erode.load("/Users/andrea/Documents/erode-python/test2_pert.csv");
+		
 		double epsilon=2;
 
-		String fileName="/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/isabel/epsislon/matalbScriptTwoConsole.m";
+		//String fileName="/Users/andrea/OneDrive - Scuola Superiore Sant'Anna 2/runtimes/runtime-ERODE.product(4)/isabel/epsislon/matalbScriptTwoConsole2023.m";
+		String fileName="/Users/andrea/Documents/erode-python/test2_pert.m";
 		LinkedHashSet<String> paramsToPerturb=new LinkedHashSet<String>();
 		paramsToPerturb.add("ALL");
 		/*paramsToPerturb.add("h1");
 		paramsToPerturb.add("h10");*/
 		String prePartitionUserDefined = "false";//"true"
 		String prePartitionWRTIC = "false";//true
-		boolean forward =false;
-		boolean backward = true;
-		boolean fastDegreeOneBE=true;
+		boolean forward =false;//false;
+		boolean backward = true;//true;
+		boolean fastDegreeOneBE=false;//true;
 		erode.approximateDE(fileName, paramsToPerturb,epsilon, prePartitionUserDefined, prePartitionWRTIC, forward, backward,fastDegreeOneBE);
 		
 		//simulateODE(tEnd=1000, steps=100, viewPlot = NO,library=APACHE,csvFile="csvFile")
-		double tEnd = 1000;
-		int steps = 100;
-		String csvFile = "/Users/andrea/OneDrive - Danmarks Tekniske Universitet/runtimes/runtime-ERODE.product(4)/isabel/epsislon/csvFileConsole";
-		erode.simulateODE(tEnd, steps, csvFile);
+//		double tEnd = 1000;
+//		int steps = 100;
+//		String csvFile = "/Users/andrea/OneDrive - Scuola Superiore Sant'Anna 2/runtimes/runtime-ERODE.product(4)/isabel/epsislon/csvFileConsole2023";
+//		erode.simulateODE(tEnd, steps, csvFile);
 		
 	}
 

@@ -103,5 +103,10 @@ public class ParameterMonomial extends Monomial {
 	public boolean needsI() {
 		return true;
 	}
+	
+	@Override
+	public double eval(HashMap<ISpecies, Double> speciesToValue, HashMap<ISpecies, Double> forceReplacement) {
+		return this.val.doubleValue();
+	}
 
 }
