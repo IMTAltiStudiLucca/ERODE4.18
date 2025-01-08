@@ -2095,7 +2095,7 @@ function UCTMC()
 			if(forward){
 				CRNReducerCommandLine.print(out,bwOut,"\nComputing the "+(epsilon)+"-FDE and writing the obtained linear equations ...");
 				//Compute the epsilon FDE, and write the linear system of constraints
-				computeEpsilonFDEAndWriteLinearSystemOfConstraints(crn, initial,out,bwOut, msgDialogShower, bw, functionName,verbose,terminator,epsilon/*,defaultIC*/,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC,computeOnlyPartition);
+				ret=computeEpsilonFDEAndWriteLinearSystemOfConstraints(crn, initial,out,bwOut, msgDialogShower, bw, functionName,verbose,terminator,epsilon/*,defaultIC*/,paramsToPerturb,prePartitionUserDefined,prePartitionWRTIC,computeOnlyPartition);
 				CRNReducerCommandLine.println(out,bwOut," completed");
 
 				if(!computeOnlyPartition) {
@@ -2995,11 +2995,10 @@ end
 		return axbWithIC;
 	}
 
-	private static void computeEpsilonFDEAndWriteLinearSystemOfConstraints(ICRN crn, IPartition initial,MessageConsoleStream out,BufferedWriter bwOut,
+	private static IPartitionAndBooleanAndAxB computeEpsilonFDEAndWriteLinearSystemOfConstraints(ICRN crn, IPartition initial,MessageConsoleStream out,BufferedWriter bwOut,
 			IMessageDialogShower msgDialogShower, BufferedWriter bw, String functionName, boolean verbose,Terminator terminator,double epsilon/*,BigDecimal defaultIC*/, LinkedHashSet<String> paramsToPerturb, String prePartitionUserDefined, String prePartitionWRTIC,
 			boolean computeOnlyPartition) throws UnsupportedFormatException, IOException {
 
-		{	
 
 			EpsilonDifferentialEquivalences epsilonDE = new EpsilonDifferentialEquivalences();
 			long begin = System.currentTimeMillis();
@@ -3024,6 +3023,12 @@ end
 			double[][] A = axb.getA();
 			double[] b = axb.getB();
 			LinkedHashSet<String> columns = axb.getColumns();
+			
+			//AAA
+			double[] p0=null;
+			if(columns!=null) {
+				p0=new double[ columns.size()];
+			}
 
 
 			if(!computeOnlyPartition) {
@@ -3109,6 +3114,7 @@ end
 				bw.write("    end    \n");
 				bw.write("\n");
 
+								
 				bw.write("    % The parameters of the reference trajectory\n");
 				//bw.write("p0 = [1, 1, 1];\n");
 				if(columns.size()!=1){
@@ -3122,6 +3128,7 @@ end
 					int i=0;
 					for(String par : columns){
 						double p = crn.getMath().evaluate(par);
+						p0[i]=p;
 						bw.write(String.valueOf(p));
 						if(i<columns.size()-1){
 							bw.write(", ");
@@ -3165,7 +3172,10 @@ end
 				bw.write("\n");
 				bw.write("end\n");
 			}
-		}
+			
+			return new IPartitionAndBooleanAndAxB(obtainedPartitionAndBool.getPartition(), obtainedPartitionAndBool.getBool(), axb,p0);
+		
+		
 
 	}
 

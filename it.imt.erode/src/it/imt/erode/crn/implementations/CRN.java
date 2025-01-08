@@ -581,14 +581,30 @@ public class CRN implements ICRN {
 	
 	@Override
 	public String toString() {
-		StringBuilder sb;
+		StringBuilder sb=null;
+		
+		String params=" ";
+		if(getParameters()!=null && getParameters().size()>0) {
+			params=getParameters().size()+" parameters, ";
+		}
+		
 		if(getName()==null){
 			//sb = new StringBuilder(getReactions().size()+" reactions, "+getSpecies().size()+" species, "+getProducts().size()+" products.\n");
-			sb = new StringBuilder(getReactions().size()+" reactions, "+getSpecies().size()+" species.\n");
+			sb = new StringBuilder(params+getReactions().size()+" reactions, "+getSpecies().size()+" species.\n");
 		}
 		else{
 			//sb = new StringBuilder(getName()+": "+getReactions().size()+" reactions, "+getSpecies().size()+" species, "+getProducts().size()+" products.\n");
-			sb = new StringBuilder(getName()+": "+getReactions().size()+" reactions, "+getSpecies().size()+" species.\n");
+			sb = new StringBuilder(getName()+": "+params+getReactions().size()+" reactions, "+getSpecies().size()+" species.\n");
+		}
+		if(getParameters()!=null && getParameters().size()>0) {
+			sb.append("Parameters:\n");
+//			for(String p : getParameters()) {
+//				sb.append(p);
+//				sb.append(" ");
+//			}
+			sb.append(getParameters().toString());
+			sb.append("\n");
+			//sb.append(getParameters().toString());
 		}
 		sb.append("Species:\n");
 		sb.append(getSpecies().toString());

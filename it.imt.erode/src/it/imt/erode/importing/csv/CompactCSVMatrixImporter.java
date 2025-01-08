@@ -202,6 +202,64 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 		return getInfoImporting();
 	}
 	
+	public InfoCRNImporting importAffineSystem(int numberOfVariables, int[] rows, int[] columns, double[] values, double[] B) throws  UnsupportedFormatException, IOException{
+		return importAffineSystem(false,false,false,numberOfVariables, rows, columns, values,B);
+	}
+	public InfoCRNImporting importAffineSystem(boolean printInfo, boolean printCRN,boolean print,int numberOfVariables, int[] rows, int[] columns, double[] values, double[] B) throws UnsupportedFormatException, IOException{
+		
+		if(print){
+			CRNReducerCommandLine.println(out,bwOut,"\nImporting affine system:");
+			CRNReducerCommandLine.println(out,bwOut,"\t from lists");
+			if(addReverseEdges) {
+				CRNReducerCommandLine.println(out,bwOut,"\tAdding reverse edges: for every edge (i,j,w) we add the reverse one (j,i,w).");
+			}
+		}
+		
+		init();
+		
+		long begin=System.currentTimeMillis();
+		
+		//load species
+		loadSpecies(numberOfVariables,false);
+		getInfoImporting().setReadSpecies(getCRN().getSpecies().size());
+		
+		
+		//load A
+		BigDecimal[] outgoingRates=null;//DEFAULT NULL. CHANGE IT IF YOU WANT TO SCALE! Not necessary for Ax=b
+		for(int i =0; i< rows.length;i++) {
+			int row = rows[i]-1;
+			int col = columns[i]-1;
+			BigDecimal val = BigDecimal.valueOf(values[i]);
+			String valExpr = String.valueOf(values[i]);//val.toPlainString();
+			addReaction(outgoingRates, i, row, col, val, valExpr,"");
+			if(addReverseEdges) {
+				addReaction(outgoingRates, i, col, row, val, valExpr,"_rev");
+			}
+		}
+		
+		
+		//load b
+		ISpecies I = null;
+		MutableInt row = new MutableInt(0);
+		//double[] B=null;
+		for(int i=0;i<B.length;i++) {
+			I = addBentry(outgoingRates, I, row, B[i]);
+		}
+		
+		//load IC
+		//not necessary
+		
+		
+		getInfoImporting().setReadCRNReactions(getCRN().getReactions().size());
+		//getInfoImporting().setReadReagents(getCRN().getReagents().size());
+		//getInfoImporting().setReadProducts(getCRN().getProducts().size());
+		long end=System.currentTimeMillis();
+		getInfoImporting().setRequiredMS(end -begin);
+		
+		return getInfoImporting();
+	}
+	
+	
 	public InfoCRNImporting importAffineSystem(boolean printInfo, boolean printCRN,boolean print) throws FileNotFoundException, IOException, UnsupportedFormatException{
 		if(print){
 			CRNReducerCommandLine.println(out,bwOut,"\nImporting affine system:");
@@ -778,37 +836,16 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 		ISpecies I = null;
 		//ISpecies I = speciesIdToSpecies[speciesIdToSpecies.length-1];
 
-		int row=0;
+		//int row=0;
+		MutableInt row = new MutableInt(0);
 		String lineB=null;
 		while ((lineB = brB.readLine()) != null) {
 			lineB=lineB.trim();
-			if(!lineB.isEmpty()) {		
-				if( (speciesIcreated && row > getCRN().getSpecies().size()-2) ||  
-					((!speciesIcreated) && row > getCRN().getSpecies().size()-1) ){
-				//if(row > getCRN().getSpecies().size()-2){
-					//CRNReducerCommandLine.printWarning(out,bwOut,true,msgDialogShower,"The size of b is wrong. It should contain " +b.length+" entries.");
-					//return null;
-					throw new UnsupportedFormatException("The size of b is wrong. It should contain " +(getCRN().getSpecies().size()-1)+" entries.");
-				}
-				else{
-					BigDecimal val=BigDecimal.valueOf(Double.valueOf(lineB));
-					if(val.compareTo(BigDecimal.ZERO)!=0) {
-						if(speciesIcreated && I==null) {
-							I = getCRN().getSpecies().get(getCRN().getSpeciesSize()-1);
-							//I = speciesIdToSpecies[speciesIdToSpecies.length-1];
-						}
-						else if(!speciesIcreated){
-							//speciesIdToSpecies = addIAtTheEnd(speciesIdToSpecies);
-							addIAtTheEnd();
-							//I = speciesIdToSpecies[speciesIdToSpecies.length-1];
-							I = getCRN().getSpecies().get(getCRN().getSpeciesSize()-1);
-							speciesIcreated=true;
-						}
-						loadReactionLinearSystemAXFromEntryOfB(row, val, val.toPlainString(), /*speciesIdToSpecies,*/ outgoingRates, I);
-					}
-					row++;
-				}
+			if(!lineB.isEmpty()) {
+				double lineBDouble=Double.valueOf(lineB);
+				I = addBentry(outgoingRates, I, row, lineBDouble);
 			}
+			
 		}
 
 		if(brB!=null){
@@ -817,6 +854,37 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 
 		//return speciesIdToSpecies;
 
+	}
+
+	public ISpecies addBentry(BigDecimal[] outgoingRates, ISpecies I, MutableInt row, double Bentry)
+			throws UnsupportedFormatException, IOException {
+			if( (speciesIcreated && row.getVal() > getCRN().getSpecies().size()-2) ||  
+				((!speciesIcreated) && row.getVal() > getCRN().getSpecies().size()-1) ){
+			//if(row > getCRN().getSpecies().size()-2){
+				//CRNReducerCommandLine.printWarning(out,bwOut,true,msgDialogShower,"The size of b is wrong. It should contain " +b.length+" entries.");
+				//return null;
+				throw new UnsupportedFormatException("The size of b is wrong. It should contain " +(getCRN().getSpecies().size()-1)+" entries.");
+			}
+			else{
+				BigDecimal val=BigDecimal.valueOf(Bentry);
+				if(val.compareTo(BigDecimal.ZERO)!=0) {
+					if(speciesIcreated && I==null) {
+						I = getCRN().getSpecies().get(getCRN().getSpeciesSize()-1);
+						//I = speciesIdToSpecies[speciesIdToSpecies.length-1];
+					}
+					else if(!speciesIcreated){
+						//speciesIdToSpecies = addIAtTheEnd(speciesIdToSpecies);
+						addIAtTheEnd();
+						//I = speciesIdToSpecies[speciesIdToSpecies.length-1];
+						I = getCRN().getSpecies().get(getCRN().getSpeciesSize()-1);
+						speciesIcreated=true;
+					}
+					loadReactionLinearSystemAXFromEntryOfB(row.getVal(), val, val.toPlainString(), /*speciesIdToSpecies,*/ outgoingRates, I);
+				}
+				//row++;
+				row.increaseVal();
+			}
+		return I;
 	}
 
 	private void loadIC(/*ISpecies[] speciesIdToSpecies*/) throws IOException, UnsupportedFormatException {

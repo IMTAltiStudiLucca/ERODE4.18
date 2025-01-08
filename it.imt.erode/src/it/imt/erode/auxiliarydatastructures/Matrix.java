@@ -76,8 +76,8 @@ public class Matrix {
 			ret[i][j]=entry.getValue();
 			if(round) {
 				 BigDecimal bd = BigDecimal.valueOf(entry.getValue());
-				  bd = bd.setScale(5, RoundingMode.HALF_UP);
-				  ret[i][j]=bd.doubleValue();
+				 bd = bd.setScale(5, RoundingMode.HALF_UP);
+				 ret[i][j]=bd.doubleValue();
 			}
 		}
 		

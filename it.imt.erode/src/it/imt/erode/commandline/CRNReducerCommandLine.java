@@ -7426,6 +7426,44 @@ String[] parameters = CRNReducerCommandLine.getParameters(command);
 		return true;
 	}
 	
+	
+	public boolean handleImportAffineSystem(int numberOfVariables, int[] rows, int[] columns, double[] values, double[] B, MessageConsoleStream out, BufferedWriter bwOut) {
+		String[] formAndOtherParams = new String[2];
+		formAndOtherParams[0]="form";
+		formAndOtherParams[1]="AX";
+		CompactCSVMatrixImporter importer = new CompactCSVMatrixImporter("fromArrays", formAndOtherParams, out, bwOut, null);
+		
+		try {
+		importer.importAffineSystem(numberOfVariables, rows, columns, values,B);
+//		} catch (FileNotFoundException e) {
+//			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"File not found: "+fileName,DialogType.Error);
+//			return false;
+		} catch (UnsupportedFormatException e) {
+			if(e.getMessage()!=null){
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of affine system from arrays failed.\nError message:\n"+e.getMessage(),DialogType.Error);
+			}
+			else{
+				CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading of affine system from arrays failed.",DialogType.Error);
+			}
+			return false;
+		} catch (IOException e) {
+			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled IO errors.\nError message:\n"+e.getMessage(),DialogType.Error);
+			//CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+		} 
+		//catch (JDOMException e) {
+//			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled errors.\nError message:\nError message:\n"+e.getMessage(),DialogType.Error);
+//			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+//		}  catch (XMLStreamException e) {
+//			CRNReducerCommandLine.printWarning(out, bwOut,true,messageDialogShower,"Loading failed due to unhandled error.\nError message:\n"+e.getMessage(),DialogType.Error);
+//			CRNReducerCommandLine.printStackTrace(out,bwOut,e);
+//		}
+		
+		crn = importer.getCRN();
+		partition = importer.getInitialPartition();
+		
+		return true;
+		
+	}
 	public boolean handleImportAffineSystem(String command, MessageConsoleStream out, BufferedWriter bwOut) {
 		String[] parameters = CRNReducerCommandLine.getParameters(command);
 		
