@@ -205,7 +205,8 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 	public InfoCRNImporting importAffineSystem(int numberOfVariables, int[] rows, int[] columns, double[] values, double[] B) throws  UnsupportedFormatException, IOException{
 		return importAffineSystem(false,false,false,numberOfVariables, rows, columns, values,B);
 	}
-	public InfoCRNImporting importAffineSystem(boolean printInfo, boolean printCRN,boolean print,int numberOfVariables, int[] rows, int[] columns, double[] values, double[] B) throws UnsupportedFormatException, IOException{
+	public InfoCRNImporting importAffineSystem(boolean printInfo, boolean printCRN,boolean print,int numberOfVariables, int[] rows, int[] columns,
+			double[] values, double[] B) throws UnsupportedFormatException, IOException{
 		
 		if(print){
 			CRNReducerCommandLine.println(out,bwOut,"\nImporting affine system:");
@@ -240,10 +241,12 @@ public class CompactCSVMatrixImporter extends AbstractImporter{
 		
 		//load b
 		ISpecies I = null;
-		MutableInt row = new MutableInt(0);
-		//double[] B=null;
-		for(int i=0;i<B.length;i++) {
-			I = addBentry(outgoingRates, I, row, B[i]);
+		if(B!=null) {
+			MutableInt row = new MutableInt(0);
+			//double[] B=null;
+			for(int i=0;i<B.length;i++) {
+				I = addBentry(outgoingRates, I, row, B[i]);
+			}
 		}
 		
 		//load IC

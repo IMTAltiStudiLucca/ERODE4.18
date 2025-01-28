@@ -362,6 +362,149 @@ public class EntryPointPythonHeadless {
 		return completeImporting();
 	}
 	
+	
+	/*
+	public int importAffine(int numberOfVariables, byte[] rows_b, byte[] columns_b, byte[] values_b, int numberOfEntriesInMatrix){
+		
+	    java.nio.ByteBuffer buf_rows = java.nio.ByteBuffer.wrap(rows_b);
+	    java.nio.ByteBuffer buf_cols = java.nio.ByteBuffer.wrap(columns_b);
+	    java.nio.ByteBuffer buf_vals = java.nio.ByteBuffer.wrap(values_b);
+
+	    int[] rows = new int[numberOfEntriesInMatrix];
+	    int[] columns = new int[numberOfEntriesInMatrix];
+	    double[] values = new double[numberOfEntriesInMatrix];
+	    
+	    for (int i = 0; i < numberOfEntriesInMatrix; ++i) {
+            rows[i] = buf_rows.getInt();
+	    	columns[i] = buf_cols.getInt();
+	    	values[i]=buf_vals.getDouble();
+	    }
+	    
+	
+	    double[] B =new double[numberOfVariables];
+		
+		erode.handleImportAffineSystem(numberOfVariables, rows, columns, values, B,out, bwOut);
+		int ret=completeImporting();
+		return ret;
+	}
+	*/
+	
+//	
+//	public int[] pippo(byte[] rows_b){
+//
+//		java.nio.ByteBuffer buf_rows = java.nio.ByteBuffer.wrap(rows_b);
+//
+//		int[] rows = new int[2];
+//
+//		buf_rows.rewind(); 
+//		System.out.println("ciao1");
+//		for (int i = 0; i < 2; ++i) {
+//			System.out.println("ciao2");
+//			rows[i] = buf_rows.getInt();
+//			System.out.println("ciao3");
+//		}
+//
+//		return rows;
+//	}
+//	
+//	public int createFromPy4j(byte[] data) {
+//	      java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(data);
+//	      int n = buf.getInt(), m = buf.getInt();
+//	      int[][] matrix = new int[n][m];
+//	      for (int i = 0; i < n; ++i)
+//	         for (int j = 0; j < m; ++j)
+//	            matrix[i][j] = buf.getInt();
+//	      int sum =0;
+//	      for (int i = 0; i < n; ++i)
+//		         for (int j = 0; j < m; ++j)
+//		            sum+=matrix[i][j];
+//	      return sum;
+////	      return MyClass.create(matrix);
+//	   }
+//	
+//	public int createFromPy4j(int n, int m,byte[] data) {
+//	      java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(data);
+//	      //int n = buf.getInt(), m = buf.getInt();
+//	      int[][] matrix = new int[n][m];
+//	      for (int i = 0; i < n; ++i)
+//	         for (int j = 0; j < m; ++j)
+//	            matrix[i][j] = buf.getInt();
+//	      int sum =0;
+//	      for (int i = 0; i < n; ++i)
+//		         for (int j = 0; j < m; ++j)
+//		            sum+=matrix[i][j];
+//	      return sum;
+////	      return MyClass.create(matrix);
+//	   }
+//	
+//	
+//	public int createFromPy4j(int n, int m,byte[] data, byte[] data2) {
+//	      java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(data);
+//	      java.nio.ByteBuffer buf2 = java.nio.ByteBuffer.wrap(data);
+//	      int[] data_array = new int[n];
+//	      int[] data2_array = new int[m];
+//	      for (int i = 0; i < n; ++i)
+//	            data_array[i] = buf.getInt();
+//	      for (int i = 0; i < m; ++i)
+//	            data2_array[i] = buf2.getInt();
+//	      int sum =0;
+//	      for (int i = 0; i < n; ++i)
+//		           sum+=data_array[i];
+//	      for (int i = 0; i < m; ++i)
+//	            sum+=data2_array[i];
+//	      return sum;
+////	      return MyClass.create(matrix);
+//	   }
+//	
+//	public int createFromPy4j_intdouble(int n, int m,byte[] data, byte[] data2) {
+//		/*this does not work. We have trouble reading doubles*/
+//		java.nio.ByteBuffer buf = java.nio.ByteBuffer.wrap(data);
+//		java.nio.ByteBuffer buf2 = java.nio.ByteBuffer.wrap(data);
+//		int[] data_array = new int[n];
+//		double[] data2_array = new double[m];
+//		for (int i = 0; i < n; ++i)
+//			data_array[i] = buf.getInt();
+//		for (int i = 0; i < m; ++i)
+//			data2_array[i] = buf2.getDouble();//buf2.getFloat();
+//			int sum =0;
+//			for (int i = 0; i < n; ++i)
+//				sum+=data_array[i];
+//			for (int i = 0; i < m; ++i)
+//				sum+=data2_array[i];
+//			return sum;
+//			//	      return MyClass.create(matrix);
+//	}
+
+	
+	public int importAffine(int numberOfVariables, int numberOfEntries, byte[] rows_b, byte[] columns_b, byte[] values_b, boolean doubleEntries){
+		//For the time being, we don't pass B. As we always have 0 for graphs. We save time.
+		// Addding B is trivial. Just add bite[] B_b in the parameters, and read the values in the B created below
+		
+	    java.nio.ByteBuffer buf_rows = java.nio.ByteBuffer.wrap(rows_b);
+	    java.nio.ByteBuffer buf_cols = java.nio.ByteBuffer.wrap(columns_b);
+	    java.nio.ByteBuffer buf_values = java.nio.ByteBuffer.wrap(values_b);
+
+	    int[] rows = new int[numberOfEntries];
+	    int[] columns = new int[numberOfEntries];
+	    double[] values = new double[numberOfEntries];
+	
+	    for (int i = 0; i < values.length; i++) {
+            rows[i] = buf_rows.getInt();
+	    	columns[i] = buf_cols.getInt();
+	    	if(doubleEntries)
+	    		values[i] = buf_values.getDouble();
+	    	else
+	    		values[i] = buf_values.getInt();
+	    }
+	    
+	
+	    double[] B =new double[numberOfVariables];
+		
+		erode.handleImportAffineSystem(numberOfVariables, rows, columns, values, B,out, bwOut);
+		int ret=completeImporting();
+		return ret;
+	}
+	
 	public int importAffine(int numberOfVariables, int[] rows, int[] columns, double[] values, double[] B){
 		
 		erode.handleImportAffineSystem(numberOfVariables, rows, columns, values, B,out, bwOut);
